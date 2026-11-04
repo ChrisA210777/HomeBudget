@@ -32,6 +32,9 @@ public static class AccountRoutes
     /// <summary>GET: the signed-in user, or 401 if nobody is signed in.</summary>
     public const string CurrentUser = "/bff/user";
 
+    /// <summary>POST: signs out by clearing the session cookie. Returns 204.</summary>
+    public const string Logout = "/bff/logout";
+
     /// <summary>The client page that shows the sign-in options.</summary>
     public const string LoginPage = "/login";
 
@@ -39,6 +42,9 @@ public static class AccountRoutes
         $"/account/login/{Uri.EscapeDataString(provider)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
 
     public static string LoginPageWithError(string error) => $"{LoginPage}?error={Uri.EscapeDataString(error)}";
+
+    /// <summary>The sign-in page, confirming the person has signed out.</summary>
+    public const string LoginPageAfterSignOut = LoginPage + "?signedOut=true";
 }
 
 /// <summary>Values of the <c>error</c> query parameter on the sign-in page.</summary>
