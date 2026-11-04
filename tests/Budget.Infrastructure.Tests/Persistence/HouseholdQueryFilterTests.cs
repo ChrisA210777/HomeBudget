@@ -67,7 +67,7 @@ public sealed class HouseholdQueryFilterTests(SqlServerFixture sqlServer) : IAsy
     public async Task The_current_household_is_read_each_time_a_query_runs()
     {
         var current = new MutableCurrentHousehold { HouseholdId = HouseholdA };
-        await using var db = CreateContext(current);
+        await using var db = CreateContextFor(current);
 
         var forA = await db.Notes.CountAsync();
         current.HouseholdId = HouseholdB;
@@ -78,9 +78,9 @@ public sealed class HouseholdQueryFilterTests(SqlServerFixture sqlServer) : IAsy
     }
 
     private FilterTestDbContext CreateContext(Guid? currentHousehold) =>
-        CreateContext(new MutableCurrentHousehold { HouseholdId = currentHousehold });
+        CreateContextFor(new MutableCurrentHousehold { HouseholdId = currentHousehold });
 
-    private FilterTestDbContext CreateContext(ICurrentHousehold currentHousehold)
+    private FilterTestDbContext CreateContextFor(ICurrentHousehold currentHousehold)
     {
         var options = new DbContextOptionsBuilder<FilterTestDbContext>()
             .UseSqlServer(sqlServer.GetConnectionString("HouseholdFilterTests"))
