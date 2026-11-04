@@ -1,18 +1,47 @@
+using Budget.Infrastructure.Identity;
+using Budget.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Budget.Infrastructure;
 
 public static class DependencyInjection
 {
+    /// <summary>The name of the connection string in configuration (<c>ConnectionStrings:Budget</c>).</summary>
+    public const string ConnectionStringName = "Budget";
+
     /// <summary>
-    /// Registers infrastructure services: the EF Core DbContext, Identity stores and
-    /// email sender. The DbContext and Identity are added in BUD-8.
+    /// Registers infrastructure services: the EF Core DbContext with auditing, and the ASP.NET Core
+    /// Identity user store. Register the host's own <see cref="ICurrentUser"/> before calling this;
+    /// otherwise changes are recorded as made by the system.
     /// </summary>
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
+        services.AddScoped<AuditingInterceptor>();
+
+        // The connection string is read when the DbContext is first created rather than now, so
+        // configuration added later (e.g. by integration tests) is picked up.
+        services.AddDbContext<BudgetDbContext>((serviceProvider, options) =>
+        {
+            var connectionString = serviceProvider.GetRequiredService<IConfiguration>().GetConnectionString(ConnectionStringName);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException(
+                    $"Connection string '{ConnectionStringName}' is not configured. Set ConnectionStrings:{ConnectionStringName}.");
+            }
+
+            options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure());
+            options.AddInterceptors(serviceProvider.GetRequiredService<AuditingInterceptor>());
+        });
+
+        services.AddIdentityCore<ApplicationUser>()
+            .AddEntityFrameworkStores<BudgetDbContext>();
 
         return services;
     }

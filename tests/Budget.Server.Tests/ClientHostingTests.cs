@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Mvc.Testing;
+using Budget.Server.Tests.Infrastructure;
 
 namespace Budget.Server.Tests;
 
@@ -8,15 +8,15 @@ namespace Budget.Server.Tests;
 /// Checks that the server hosts the Blazor WebAssembly client: the shell page loads and
 /// the framework script it references can be downloaded.
 /// </summary>
-public partial class ClientHostingTests(WebApplicationFactory<Program> factory)
-    : IClassFixture<WebApplicationFactory<Program>>
+[Collection(ApiCollection.Name)]
+public partial class ClientHostingTests(BudgetApiFactory factory) : IntegrationTestBase(factory)
 {
     [Theory]
     [InlineData("/")]
     [InlineData("/some/client/route")]
     public async Task Client_routes_return_the_app_shell(string path)
     {
-        using var client = factory.CreateClient();
+        using var client = CreateClient();
 
         var html = await GetPageAsync(client, path);
 
@@ -26,7 +26,7 @@ public partial class ClientHostingTests(WebApplicationFactory<Program> factory)
     [Fact]
     public async Task Framework_script_referenced_by_the_shell_is_served()
     {
-        using var client = factory.CreateClient();
+        using var client = CreateClient();
         var html = await GetPageAsync(client, "/");
 
         var match = FrameworkScript().Match(html);

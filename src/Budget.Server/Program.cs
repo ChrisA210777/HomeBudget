@@ -1,13 +1,25 @@
 using Budget.Infrastructure;
+using Budget.Infrastructure.Identity;
+using Budget.Infrastructure.Persistence;
+using Budget.Server.Identity;
 using Budget.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+builder.Services.AddInfrastructure();
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
+
+// In Development the database is created and migrated on startup. Deployed environments
+// apply migrations from the pipeline using the migration bundle instead (see ADR-003).
+if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await app.Services.ApplyMigrationsAsync();
+}
 
 if (app.Environment.IsDevelopment())
 {

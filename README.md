@@ -35,6 +35,8 @@ dotnet run --project src/Budget.Server --launch-profile https
 
 Then open https://localhost:7180. The health check is at https://localhost:7180/health.
 
+In Development the app creates the `HomeBudget` database and applies any pending migrations on startup, so SQL Server must be running first.
+
 If the HTTPS development certificate isn't trusted yet, run `dotnet dev-certs https --trust`.
 
 ## Build and test
@@ -43,6 +45,23 @@ If the HTTPS development certificate isn't trusted yet, run `dotnet dev-certs ht
 dotnet build HomeBudget.slnx
 dotnet test HomeBudget.slnx
 ```
+
+The integration tests start their own SQL Server in Docker (Testcontainers), so Docker must be running. The `docker compose` database isn't used.
+
+## Database migrations
+
+EF Core migrations live in `src/Budget.Infrastructure/Persistence/Migrations`. After changing the model, add a migration in one of two ways:
+
+- **Locally:**
+
+  ```bash
+  dotnet tool restore
+  dotnet ef migrations add <Name> --project src/Budget.Infrastructure --startup-project src/Budget.Server --output-dir Persistence/Migrations
+  ```
+
+- **From GitHub:** go to Actions → *Add EF Core migration* → *Run workflow*, pick your branch and enter the name. The workflow commits the migration to that branch.
+
+A test fails if the model has changes that aren't in a migration. CI also builds a self-contained migration bundle (`efbundle` artifact), which the deployment pipeline uses to apply migrations.
 
 ## Conventions
 
