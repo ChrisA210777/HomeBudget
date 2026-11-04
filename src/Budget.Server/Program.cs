@@ -21,8 +21,10 @@ else
 
 app.UseHttpsRedirection();
 
-// Serve the Blazor WebAssembly client (see ADR-001).
-app.UseBlazorFrameworkFiles();
+// Serve the Blazor WebAssembly client (see ADR-001). MapStaticAssets serves the client's
+// wwwroot and its _framework files (fingerprinted and compressed), so UseBlazorFrameworkFiles
+// is not needed. Adding it breaks _framework requests, because its branch pipeline never
+// reaches the endpoint that MapStaticAssets selected.
 app.MapStaticAssets();
 
 app.MapHealthChecks(ApiRoutes.Health);
