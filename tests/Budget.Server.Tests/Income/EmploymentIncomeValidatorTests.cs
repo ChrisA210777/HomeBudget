@@ -50,10 +50,10 @@ public class EmploymentIncomeValidatorTests
 
     [Theory]
     [InlineData(null)]
-    [InlineData(0)]
-    [InlineData(-5)]
+    [InlineData(0d)]
+    [InlineData(-5d)]
     [InlineData(12.345)]
-    [InlineData(100_000_001)]
+    [InlineData(100_000_001d)]
     public void Fixed_amount_must_be_a_positive_amount_in_pence(double? amount)
     {
         var errors = EmploymentIncomeValidator.Validate(ValidFixed with { GrossAmount = (decimal?)amount });
