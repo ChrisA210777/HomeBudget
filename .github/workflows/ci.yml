@@ -42,3 +42,21 @@ jobs:
         with:
           name: test-results
           path: TestResults
+
+      # A self-contained executable that applies EF Core migrations. The deployment pipeline
+      # (BUD-11) runs it against each environment's database: ./efbundle --connection "<conn>"
+      - name: Build migration bundle
+        run: |
+          dotnet tool restore
+          dotnet ef migrations bundle \
+            --project src/Budget.Infrastructure \
+            --startup-project src/Budget.Server \
+            --configuration Release \
+            --self-contained --target-runtime linux-x64 \
+            --output artifacts/efbundle --force
+
+      - name: Upload migration bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: efbundle
+          path: artifacts/efbundle

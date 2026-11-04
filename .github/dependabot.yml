@@ -8,6 +8,8 @@ updates:
       aspnetcore:
         patterns:
           - "Microsoft.AspNetCore.*"
+          - "Microsoft.EntityFrameworkCore.*"
+          - "dotnet-ef"
       testing:
         patterns:
           - "xunit*"
