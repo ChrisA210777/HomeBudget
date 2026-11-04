@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      aspnetcore:
+        patterns:
+          - "Microsoft.AspNetCore.*"
+      testing:
+        patterns:
+          - "xunit*"
+          - "bunit"
+          - "coverlet.*"
+          - "Microsoft.NET.Test.Sdk"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

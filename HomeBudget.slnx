@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Budget.Client/Budget.Client.csproj" />
+    <Project Path="src/Budget.Domain/Budget.Domain.csproj" />
+    <Project Path="src/Budget.Infrastructure/Budget.Infrastructure.csproj" />
+    <Project Path="src/Budget.Server/Budget.Server.csproj" />
+    <Project Path="src/Budget.Shared/Budget.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Budget.Client.Tests/Budget.Client.Tests.csproj" />
+    <Project Path="tests/Budget.Domain.Tests/Budget.Domain.Tests.csproj" />
+    <Project Path="tests/Budget.Server.Tests/Budget.Server.Tests.csproj" />
+  </Folder>
+</Solution>

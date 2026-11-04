@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <AspNetCoreVersion>10.0.14</AspNetCoreVersion>
+  </PropertyGroup>
+  <ItemGroup Label="Transitive security pins">
+    <!-- bUnit pulls in AngleSharp 1.1.2, which is affected by GHSA-pgww-w46g-26qg; fixed in 1.5.0. -->
+    <PackageVersion Include="AngleSharp" Version="1.5.0" />
+  </ItemGroup>
+  <ItemGroup Label="ASP.NET Core / Blazor">
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="MudBlazor" Version="9.12.0" />
+  </ItemGroup>
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="bunit" Version="1.36.0" />
+  </ItemGroup>
+</Project>
