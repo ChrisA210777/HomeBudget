@@ -1,8 +1,13 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <AspNetCoreVersion>10.0.1</AspNetCoreVersion>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <AspNetCoreVersion>10.0.14</AspNetCoreVersion>
   </PropertyGroup>
+  <ItemGroup Label="Transitive security pins">
+    <!-- bUnit pulls in AngleSharp 1.1.2, which is affected by GHSA-pgww-w46g-26qg; fixed in 1.5.0. -->
+    <PackageVersion Include="AngleSharp" Version="1.5.0" />
+  </ItemGroup>
   <ItemGroup Label="ASP.NET Core / Blazor">
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="$(AspNetCoreVersion)" />
