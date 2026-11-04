@@ -1,0 +1,305 @@
+@page "/income/new"
+@page "/income/{IncomeStreamId:guid}/edit"
+@attribute [Authorize]
+@using Budget.Client.Income
+@using Budget.Shared.Households
+@using Budget.Shared.Income
+@inject UserSession Session
+@inject IIncomeApi IncomeApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>@Title · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/income" Class="mb-2">Income</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-4">@Title</h1>
+
+    @if (_notFound)
+    {
+        <MudAlert Severity="Severity.Warning" data-testid="not-found">This income has been deleted, or you don't have access to it.</MudAlert>
+    }
+    else if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!_canEdit)
+    {
+        <MudAlert Severity="Severity.Info" data-testid="read-only">Viewers can see income but not change it.</MudAlert>
+    }
+    else
+    {
+        @if (_conflict)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4" data-testid="conflict">
+                Someone else changed this income while you were editing.
+                <MudLink OnClick="ReloadAsync">Load their changes</MudLink> and make yours again.
+            </MudAlert>
+        }
+
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.subtitle2">Type: Employment</MudText>
+
+                <MudTextField @bind-Value="_name"
+                              Label="Name"
+                              HelperText="For example, \"Sam – Acme Ltd\""
+                              MaxLength="EmploymentIncomeValidator.NameMaxLength"
+                              Error="HasError(nameof(SaveEmploymentIncomeRequest.Name))"
+                              ErrorText="@ErrorFor(nameof(SaveEmploymentIncomeRequest.Name))"
+                              Variant="Variant.Outlined"
+                              data-testid="name" />
+
+                <MudTextField @bind-Value="_employerName"
+                              Label="Employer (optional)"
+                              MaxLength="EmploymentIncomeValidator.EmployerNameMaxLength"
+                              Error="HasError(nameof(SaveEmploymentIncomeRequest.EmployerName))"
+                              ErrorText="@ErrorFor(nameof(SaveEmploymentIncomeRequest.EmployerName))"
+                              Variant="Variant.Outlined"
+                              data-testid="employer" />
+
+                <MudSelect T="Guid?" @bind-Value="_memberUserId"
+                           ToStringFunc="MemberName"
+                           Label="Whose income is it? (optional)"
+                           Error="HasError(nameof(SaveEmploymentIncomeRequest.MemberUserId))"
+                           ErrorText="@ErrorFor(nameof(SaveEmploymentIncomeRequest.MemberUserId))"
+                           Variant="Variant.Outlined"
+                           data-testid="member">
+                    <MudSelectItem T="Guid?" Value="null">Not set</MudSelectItem>
+                    @foreach (var member in _members)
+                    {
+                        <MudSelectItem T="Guid?" Value="member.UserId">@member.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="PayFrequencyDto" @bind-Value="_payFrequency" ToStringFunc="IncomeLabels.Frequency" Label="How often are you paid?" Variant="Variant.Outlined" data-testid="frequency">
+                    @foreach (var frequency in Enum.GetValues<PayFrequencyDto>())
+                    {
+                        <MudSelectItem T="PayFrequencyDto" Value="frequency">@IncomeLabels.Frequency(frequency)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <div>
+                    <MudText Typo="Typo.body2" Class="mb-1">Is the pay the same every time?</MudText>
+                    <MudRadioGroup T="IncomeKindDto" @bind-Value="_kind" data-testid="kind">
+                        <MudRadio T="IncomeKindDto" Value="IncomeKindDto.Fixed" Color="Color.Primary" data-testid="kind-fixed">Yes, fixed</MudRadio>
+                        <MudRadio T="IncomeKindDto" Value="IncomeKindDto.Variable" Color="Color.Primary" data-testid="kind-variable">No, it varies</MudRadio>
+                    </MudRadioGroup>
+                </div>
+
+                @if (_kind == IncomeKindDto.Fixed)
+                {
+                    <div class="d-flex flex-wrap gap-3">
+                        <MudNumericField T="decimal?" @bind-Value="_grossAmount"
+                                         Label="Gross pay"
+                                         Adornment="Adornment.Start" AdornmentText="@CurrencySymbol"
+                                         InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
+                                         Error="HasError(nameof(SaveEmploymentIncomeRequest.GrossAmount))"
+                                         ErrorText="@ErrorFor(nameof(SaveEmploymentIncomeRequest.GrossAmount))"
+                                         Variant="Variant.Outlined" Class="flex-grow-1"
+                                         data-testid="gross-amount" />
+                        <MudSelect T="AmountBasisDto" @bind-Value="_amountBasis" ToStringFunc="IncomeLabels.Basis" Label="For" Variant="Variant.Outlined" Style="min-width: 10rem" data-testid="amount-basis">
+                            @foreach (var basis in Enum.GetValues<AmountBasisDto>())
+                            {
+                                <MudSelectItem T="AmountBasisDto" Value="basis">@IncomeLabels.Basis(basis)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2">Over a typical few months, what's the gross pay for each @IncomeLabels.Period(_payFrequency)?</MudText>
+                    @AmountField(nameof(SaveEmploymentIncomeRequest.LowestGross), $"Lowest gross per {IncomeLabels.Period(_payFrequency)}", () => _lowestGross, v => _lowestGross = v, "lowest")
+                    @AmountField(nameof(SaveEmploymentIncomeRequest.AverageGross), $"Average gross per {IncomeLabels.Period(_payFrequency)}", () => _averageGross, v => _averageGross = v, "average")
+                    @AmountField(nameof(SaveEmploymentIncomeRequest.HighestGross), $"Highest gross per {IncomeLabels.Period(_payFrequency)}", () => _highestGross, v => _highestGross = v, "highest")
+                }
+
+                @if (Preview() is { } preview)
+                {
+                    <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Calculate" data-testid="preview">
+                        @preview
+                    </MudAlert>
+                }
+
+                <div class="d-flex justify-end gap-2 mt-2">
+                    <MudButton Variant="Variant.Text" Href="/income">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving" data-testid="save">
+                        @(IncomeStreamId is null ? "Add income" : "Save changes")
+                    </MudButton>
+                </div>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid? IncomeStreamId { get; set; }
+
+    private HouseholdMembershipSummary? _household;
+    private IReadOnlyList<HouseholdMemberSummary> _members = [];
+    private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
+    private bool _loaded;
+    private bool _canEdit;
+    private bool _notFound;
+    private bool _saving;
+    private bool _conflict;
+    private string? _version;
+
+    private string? _name;
+    private string? _employerName;
+    private Guid? _memberUserId;
+    private PayFrequencyDto _payFrequency = PayFrequencyDto.Monthly;
+    private IncomeKindDto _kind = IncomeKindDto.Fixed;
+    private decimal? _grossAmount;
+    private AmountBasisDto _amountBasis = AmountBasisDto.Annual;
+    private decimal? _lowestGross;
+    private decimal? _averageGross;
+    private decimal? _highestGross;
+
+    private string Title => IncomeStreamId is null ? "Add income" : "Edit income";
+
+    private string CurrencySymbol => Money.Symbol("GBP");
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        if (_household is null)
+        {
+            _notFound = true;
+            return;
+        }
+
+        _canEdit = _household.Role != "Viewer";
+        _members = await IncomeApi.GetMembersAsync(_household.HouseholdId);
+
+        if (IncomeStreamId is { } id && !await LoadAsync(id))
+        {
+            _notFound = true;
+            return;
+        }
+
+        _loaded = true;
+    }
+
+    private async Task<bool> LoadAsync(Guid id)
+    {
+        var details = await IncomeApi.GetAsync(_household!.HouseholdId, id);
+        if (details is null)
+        {
+            return false;
+        }
+
+        _name = details.Name;
+        _employerName = details.EmployerName;
+        _memberUserId = details.MemberUserId;
+        _payFrequency = details.PayFrequency;
+        _kind = details.Kind;
+        _grossAmount = details.GrossAmount;
+        _amountBasis = details.AmountBasis ?? AmountBasisDto.Annual;
+        _lowestGross = details.LowestGross;
+        _averageGross = details.AverageGross;
+        _highestGross = details.HighestGross;
+        _version = details.Version;
+        return true;
+    }
+
+    private async Task ReloadAsync()
+    {
+        _conflict = false;
+        _errors = new Dictionary<string, string[]>();
+        if (!await LoadAsync(IncomeStreamId!.Value))
+        {
+            _notFound = true;
+        }
+    }
+
+    private SaveEmploymentIncomeRequest BuildRequest() => new()
+    {
+        Name = _name ?? string.Empty,
+        EmployerName = _employerName,
+        MemberUserId = _memberUserId,
+        PayFrequency = _payFrequency,
+        Kind = _kind,
+        GrossAmount = _kind == IncomeKindDto.Fixed ? _grossAmount : null,
+        AmountBasis = _kind == IncomeKindDto.Fixed ? _amountBasis : null,
+        LowestGross = _kind == IncomeKindDto.Variable ? _lowestGross : null,
+        AverageGross = _kind == IncomeKindDto.Variable ? _averageGross : null,
+        HighestGross = _kind == IncomeKindDto.Variable ? _highestGross : null,
+        Version = _version,
+    };
+
+    private async Task SaveAsync()
+    {
+        var request = BuildRequest();
+        _errors = EmploymentIncomeValidator.Validate(request);
+        if (_errors.Count > 0)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = IncomeStreamId is { } id
+                ? await IncomeApi.UpdateAsync(_household!.HouseholdId, id, request)
+                : await IncomeApi.CreateAsync(_household!.HouseholdId, request);
+
+            if (result.Succeeded)
+            {
+                Snackbar.Add(IncomeStreamId is null ? $"{request.Name.Trim()} was added." : "Changes saved.", Severity.Success);
+                Navigation.NavigateTo("/income");
+                return;
+            }
+
+            _conflict = result.Conflict;
+            _errors = result.Errors;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>"£2,307.69 per 4-weekly pay, £30,000.00 a year", or nothing until the amounts make sense.</summary>
+    private string? Preview()
+    {
+        if (_kind == IncomeKindDto.Fixed)
+        {
+            if (_grossAmount is not > 0)
+            {
+                return null;
+            }
+
+            var (perPay, perYear) = PayEstimator.Fixed(_grossAmount.Value, _amountBasis, _payFrequency);
+            return $"{Money.Format(perPay)} per {IncomeLabels.Period(_payFrequency)}, {Money.Format(perYear)} a year before tax.";
+        }
+
+        if (_lowestGross is not > 0 || _averageGross is not > 0 || _highestGross is not > 0)
+        {
+            return null;
+        }
+
+        return $"About {Money.Format(PayEstimator.PerYear(_averageGross.Value, _payFrequency))} a year before tax "
+            + $"({Money.Format(PayEstimator.PerYear(_lowestGross.Value, _payFrequency))} – {Money.Format(PayEstimator.PerYear(_highestGross.Value, _payFrequency))}).";
+    }
+
+    private string MemberName(Guid? userId) =>
+        userId is null ? "Not set" : _members.FirstOrDefault(m => m.UserId == userId)?.DisplayName ?? string.Empty;
+
+    private bool HasError(string field) => _errors.ContainsKey(field);
+
+    private string? ErrorFor(string field) => _errors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
+
+    private RenderFragment AmountField(string field, string label, Func<decimal?> get, Action<decimal?> set, string testId) =>
+        @<MudNumericField T="decimal?"
+                          Value="get()"
+                          ValueChanged="value => set(value)"
+                          Label="@label"
+                          Adornment="Adornment.Start" AdornmentText="@CurrencySymbol"
+                          InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
+                          Error="HasError(field)"
+                          ErrorText="@ErrorFor(field)"
+                          Variant="Variant.Outlined"
+                          data-testid="@testId" />;
+}
