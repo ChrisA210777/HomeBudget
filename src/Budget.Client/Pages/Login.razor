@@ -11,6 +11,11 @@
         <h1 class="mud-typography mud-typography-h5 mb-2">Sign in</h1>
         <MudText Typo="Typo.body2" Class="mb-4">Sign in to see and manage your household budget.</MudText>
 
+        @if (_signedOut)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="signed-out">You've signed out.</MudAlert>
+        }
+
         @if (_errorMessage is not null)
         {
             <MudAlert Severity="Severity.Warning" Class="mb-4" data-testid="login-error">@_errorMessage</MudAlert>
@@ -46,6 +51,7 @@
 @code {
     private IReadOnlyList<AuthProvider>? _providers;
     private string? _errorMessage;
+    private bool _signedOut;
     private string _returnUrl = "/";
 
     protected override async Task OnInitializedAsync()
@@ -57,6 +63,8 @@
         {
             _returnUrl = returnUrl;
         }
+
+        _signedOut = string.Equals(query["signedOut"], "true", StringComparison.OrdinalIgnoreCase);
 
         _errorMessage = query["error"] switch
         {

@@ -47,5 +47,7 @@ public class BffAuthenticationStateProviderTests
 
         public Task<CurrentUserResponse?> GetCurrentUserAsync(CancellationToken cancellationToken = default) =>
             Error is null ? Task.FromResult(user) : Task.FromException<CurrentUserResponse?>(Error);
+
+        public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

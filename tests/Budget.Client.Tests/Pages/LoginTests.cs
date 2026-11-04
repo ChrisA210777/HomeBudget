@@ -70,6 +70,16 @@ public sealed class LoginTests : IDisposable
     }
 
     [Fact]
+    public void Confirms_when_the_user_has_signed_out()
+    {
+        Navigation.NavigateTo("/login?signedOut=true");
+
+        var cut = _context.RenderComponent<Login>();
+
+        Assert.Equal("You've signed out.", cut.Find("[data-testid=signed-out]").TextContent.Trim());
+    }
+
+    [Fact]
     public void Says_so_when_no_providers_are_configured()
     {
         _accountApi.Providers = [];
@@ -91,5 +101,7 @@ public sealed class LoginTests : IDisposable
 
         public Task<CurrentUserResponse?> GetCurrentUserAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<CurrentUserResponse?>(null);
+
+        public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

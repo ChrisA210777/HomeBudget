@@ -11,11 +11,7 @@
     <MudAppBar Elevation="1">
         <MudText Typo="Typo.h6">Home Budget</MudText>
         <MudSpacer />
-        <AuthorizeView>
-            <Authorized>
-                <MudText Typo="Typo.body2" data-testid="signed-in-user">@context.User.Identity?.Name</MudText>
-            </Authorized>
-        </AuthorizeView>
+        <UserMenu />
     </MudAppBar>
     <MudMainContent>
         @Body

@@ -31,3 +31,13 @@ body {
     right: 1rem;
     top: 0.75rem;
 }
+
+/* Keep a long name from pushing the app bar off a narrow phone screen. */
+.user-menu-name {
+    display: inline-block;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}

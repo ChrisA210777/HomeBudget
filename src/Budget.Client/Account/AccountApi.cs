@@ -11,6 +11,9 @@ public interface IAccountApi
 
     /// <returns>The signed-in user, or <c>null</c> if nobody is signed in.</returns>
     Task<CurrentUserResponse?> GetCurrentUserAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Asks the server to clear the session cookie.</summary>
+    Task SignOutAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class AccountApi(HttpClient http) : IAccountApi
@@ -28,5 +31,11 @@ public sealed class AccountApi(HttpClient http) : IAccountApi
 
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<CurrentUserResponse>(cancellationToken);
+    }
+
+    public async Task SignOutAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await http.PostAsync(new Uri(AccountRoutes.Logout, UriKind.Relative), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
     }
 }
