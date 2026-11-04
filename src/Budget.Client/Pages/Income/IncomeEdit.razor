@@ -43,7 +43,7 @@
 
                 <MudTextField @bind-Value="_name"
                               Label="Name"
-                              HelperText="For example, \"Sam – Acme Ltd\""
+                              HelperText="@NameHelperText"
                               MaxLength="EmploymentIncomeValidator.NameMaxLength"
                               Error="HasError(nameof(SaveEmploymentIncomeRequest.Name))"
                               ErrorText="@ErrorFor(nameof(SaveEmploymentIncomeRequest.Name))"
@@ -156,6 +156,8 @@
     private decimal? _lowestGross;
     private decimal? _averageGross;
     private decimal? _highestGross;
+
+    private const string NameHelperText = "For example, “Sam – Acme Ltd”";
 
     private string Title => IncomeStreamId is null ? "Add income" : "Edit income";
 
