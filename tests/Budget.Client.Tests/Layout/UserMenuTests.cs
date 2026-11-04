@@ -40,9 +40,13 @@ public sealed class UserMenuTests : IDisposable
         cut.Find("[data-testid=user-menu-button]").Click();
         popovers.WaitForElement("[data-testid=sign-out]").Click();
 
-        Assert.True(_accountApi.SignedOut);
-        Assert.Equal("http://localhost/login?signedOut=true", Navigation.Uri);
-        Assert.True(Navigation.History.First().Options.ForceLoad);
+        // The menu item runs its click handler asynchronously (it closes the menu first).
+        cut.WaitForAssertion(() =>
+        {
+            Assert.True(_accountApi.SignedOut);
+            Assert.Equal("http://localhost/login?signedOut=true", Navigation.Uri);
+            Assert.True(Navigation.History.First().Options.ForceLoad);
+        });
     }
 
     [Fact]
