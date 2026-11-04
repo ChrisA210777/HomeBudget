@@ -44,7 +44,8 @@ public sealed class IncomeListTests : IDisposable
         Assert.Equal("£4,450.00", cut.Find("[data-testid=total-monthly]").TextContent.Trim());
         Assert.Equal("£53,400.00", cut.Find("[data-testid=total-annual]").TextContent.Trim());
 
-        var items = cut.FindAll("[data-testid=income-item]");
+        // ToList: indexing bUnit's element collection directly fails with the pinned AngleSharp 1.5.
+        var items = cut.FindAll("[data-testid=income-item]").ToList();
         Assert.Equal(2, items.Count);
 
         var salary = items[1];
