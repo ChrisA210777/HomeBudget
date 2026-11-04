@@ -29,8 +29,9 @@ public class CsrfHeaderTests(BudgetApiFactory factory) : IntegrationTestBase(fac
 
         using var response = await client.PostAsync(BffEndpoint, content: null);
 
-        // The endpoint only supports GET, so passing the check means "method not allowed".
-        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+        // There's no POST endpoint here, so once past the check the request falls through to the
+        // "unknown /bff route" 404 rather than being rejected as a forgery.
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
