@@ -13,8 +13,26 @@ public static class HouseholdEndpoints
         var household = app.MapGroup(HouseholdRoutes.Base);
 
         household.MapGet("/", GetHouseholdAsync).RequireAuthorization(HouseholdPolicies.Viewer);
+        household.MapGet("/members", GetMembersAsync).RequireAuthorization(HouseholdPolicies.Viewer);
 
         return app;
+    }
+
+    /// <summary>The household's members: owner first, then by name.</summary>
+    private static async Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId, BudgetDbContext db)
+    {
+        var members = await (
+                from member in db.HouseholdMembers
+                join user in db.Users on member.UserId equals user.Id
+                where member.HouseholdId == householdId
+                orderby member.IsOwner descending, user.DisplayName
+                select new { member.UserId, user.DisplayName, user.Email, member.Role, member.IsOwner, member.JoinedAt })
+            .AsNoTracking()
+            .ToListAsync();
+
+        return members
+            .Select(m => new HouseholdMemberSummary(m.UserId, m.DisplayName, m.Email, m.Role.ToString(), m.IsOwner, m.JoinedAt))
+            .ToList();
     }
 
     private static async Task<IResult> GetHouseholdAsync(Guid householdId, ClaimsPrincipal principal, BudgetDbContext db)
