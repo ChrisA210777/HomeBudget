@@ -77,5 +77,7 @@ public sealed class HomeTests : IDisposable
 
         public Task<CurrentUserResponse?> GetCurrentUserAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(User);
+
+        public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

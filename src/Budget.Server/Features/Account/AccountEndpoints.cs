@@ -18,6 +18,9 @@ public static class AccountEndpoints
         app.MapGet(AccountRoutes.ExternalCallback, ExternalCallbackAsync).AllowAnonymous();
         app.MapGet(AccountRoutes.CurrentUser, GetCurrentUserAsync).RequireAuthorization();
 
+        // Anonymous so that signing out always succeeds, even if the session has already expired.
+        app.MapPost(AccountRoutes.Logout, LogoutAsync).AllowAnonymous();
+
         return app;
     }
 
@@ -68,6 +71,13 @@ public static class AccountEndpoints
 
         await signInManager.SignInAsync(user, isPersistent: true, authenticationMethod: login.LoginProvider);
         return Results.LocalRedirect(ReturnUrl.Sanitize(returnUrl));
+    }
+
+    /// <summary>Clears the session cookie (and any half-finished external sign-in).</summary>
+    private static async Task<IResult> LogoutAsync(SignInManager<ApplicationUser> signInManager)
+    {
+        await signInManager.SignOutAsync();
+        return Results.NoContent();
     }
 
     private static async Task<IResult> GetCurrentUserAsync(
