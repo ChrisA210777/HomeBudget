@@ -23,6 +23,18 @@ public partial class ClientHostingTests(BudgetApiFactory factory) : IntegrationT
         Assert.Contains("<div id=\"app\">", html, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("/api/does-not-exist")]
+    [InlineData("/bff/does-not-exist")]
+    public async Task Unknown_api_routes_return_not_found_rather_than_the_app_shell(string path)
+    {
+        using var client = CreateClient();
+
+        using var response = await client.GetAsync(new Uri(path, UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     [Fact]
     public async Task Framework_script_referenced_by_the_shell_is_served()
     {

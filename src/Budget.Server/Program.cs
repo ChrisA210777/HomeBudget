@@ -1,6 +1,7 @@
 using Budget.Infrastructure;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.Account;
 using Budget.Server.Identity;
 using Budget.Shared;
 
@@ -9,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services.AddInfrastructure();
+builder.Services.AddBudgetAuthentication(builder.Configuration);
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 
@@ -33,6 +35,10 @@ else
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseCsrfHeaderCheck();
+
 // Serve the Blazor WebAssembly client (see ADR-001). MapStaticAssets serves the client's
 // wwwroot and its _framework files (fingerprinted and compressed), so UseBlazorFrameworkFiles
 // is not needed. Adding it breaks _framework requests, because its branch pipeline never
@@ -41,9 +47,16 @@ app.MapStaticAssets();
 
 app.MapHealthChecks(ApiRoutes.Health);
 
-// Feature endpoints are mapped here, one group per feature folder (see ADR-004).
+// Feature endpoints, one group per feature folder (see ADR-004).
+app.MapAccountEndpoints();
 
-app.MapFallbackToFile("index.html");
+// Unknown API routes are 404s, not the client app's page.
+app.MapFallback("/api/{**path}", () => Results.NotFound());
+app.MapFallback("/bff/{**path}", () => Results.NotFound());
+
+// Any other GET is a client-side route: serve the Blazor app and let its router handle it.
+app.MapFallbackToFile("index.html")
+    .WithMetadata(new HttpMethodMetadata([HttpMethods.Get, HttpMethods.Head]));
 
 await app.RunAsync();
 
