@@ -23,7 +23,7 @@ jobs:
       MIGRATION_NAME: ${{ inputs.name }}
       MIGRATIONS_DIR: src/Budget.Infrastructure/Persistence/Migrations
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate migration name
         run: |
