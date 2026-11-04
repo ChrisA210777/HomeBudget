@@ -39,6 +39,23 @@ In Development the app creates the `HomeBudget` database and applies any pending
 
 If the HTTPS development certificate isn't trusted yet, run `dotnet dev-certs https --trust`.
 
+### Microsoft sign-in
+
+Sign-in needs a Microsoft Entra app registration. Without one, the sign-in page says no providers are set up.
+
+1. In the [Microsoft Entra admin center](https://entra.microsoft.com), go to **App registrations → New registration**:
+   - **Supported account types:** *Accounts in any organizational directory and personal Microsoft accounts*. Personal accounts (outlook.com, hotmail.com) need this option.
+   - **Redirect URI:** platform *Web*, `https://localhost:7180/signin-microsoft`
+2. Copy the **Application (client) ID**. Under **Certificates & secrets**, create a client secret and copy its **Value**.
+3. Store both as user secrets. They stay outside the repo:
+
+   ```bash
+   dotnet user-secrets set "Authentication:Microsoft:ClientId" "<client id>" --project src/Budget.Server
+   dotnet user-secrets set "Authentication:Microsoft:ClientSecret" "<secret value>" --project src/Budget.Server
+   ```
+
+The first time someone signs in, a user is created for them.
+
 ## Build and test
 
 ```bash
