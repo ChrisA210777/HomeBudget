@@ -1,8 +1,11 @@
 using Budget.Infrastructure;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
 
 namespace Budget.Server.Tests.Infrastructure;
@@ -15,8 +18,17 @@ namespace Budget.Server.Tests.Infrastructure;
 public sealed class BudgetApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-latest";
+    public const string MicrosoftClientId = "test-client-id";
 
     private readonly MsSqlContainer _sqlServer = new MsSqlBuilder(SqlServerImage).Build();
+
+    public BudgetApiFactory()
+    {
+        // Sign-in providers are registered while Program builds its services, before the
+        // configuration below is applied, so their settings are supplied as environment variables.
+        Environment.SetEnvironmentVariable("Authentication__Microsoft__ClientId", MicrosoftClientId);
+        Environment.SetEnvironmentVariable("Authentication__Microsoft__ClientSecret", "test-client-secret");
+    }
 
     public async Task InitializeAsync() => await _sqlServer.StartAsync();
 
@@ -44,5 +56,15 @@ public sealed class BudgetApiFactory : WebApplicationFactory<Program>, IAsyncLif
                 [$"ConnectionStrings:{DependencyInjection.ConnectionStringName}"] = connectionString,
                 ["Database:MigrateOnStartup"] = "true",
             }));
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddAuthentication()
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+
+            // Who you are comes from the test header; signing in and challenges still use the
+            // app's real cookie and Microsoft schemes.
+            services.Configure<AuthenticationOptions>(options => options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName);
+        });
     }
 }

@@ -1,5 +1,6 @@
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,7 +42,8 @@ public static class DependencyInjection
         });
 
         services.AddIdentityCore<ApplicationUser>()
-            .AddEntityFrameworkStores<BudgetDbContext>();
+            .AddEntityFrameworkStores<BudgetDbContext>()
+            .AddSignInManager();
 
         return services;
     }

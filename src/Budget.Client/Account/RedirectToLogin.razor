@@ -1,0 +1,10 @@
+@* Sends someone who isn't signed in to the sign-in page, remembering where they were going. *@
+@inject NavigationManager Navigation
+
+@code {
+    protected override void OnInitialized()
+    {
+        var returnUrl = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+        Navigation.NavigateTo($"{AccountRoutes.LoginPage}?returnUrl={Uri.EscapeDataString(returnUrl)}", replace: true);
+    }
+}
