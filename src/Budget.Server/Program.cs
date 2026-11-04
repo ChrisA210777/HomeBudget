@@ -3,6 +3,7 @@ using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Account;
 using Budget.Server.Features.Households;
+using Budget.Server.Features.Income;
 using Budget.Server.Identity;
 using Budget.Shared;
 
@@ -52,6 +53,7 @@ app.MapHealthChecks(ApiRoutes.Health);
 // Feature endpoints, one group per feature folder (see ADR-004).
 app.MapAccountEndpoints();
 app.MapHouseholdEndpoints();
+app.MapIncomeStreamEndpoints();
 
 // Unknown API routes are 404s, not the client app's page.
 app.MapFallback("/api/{**path}", () => Results.NotFound());
