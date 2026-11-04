@@ -1,0 +1,17 @@
+@inherits LayoutComponentBase
+
+@* Placeholder shell. The responsive navigation, household switcher and user menu arrive in BUD-36. *@
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudText Typo="Typo.h6">Home Budget</MudText>
+    </MudAppBar>
+    <MudMainContent>
+        @Body
+    </MudMainContent>
+</MudLayout>

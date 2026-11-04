@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>Budget.Server</RootNamespace>
+    <UserSecretsId>homebudget-server-6f2c1a4e</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Budget.Client\Budget.Client.csproj" />
+    <ProjectReference Include="..\Budget.Domain\Budget.Domain.csproj" />
+    <ProjectReference Include="..\Budget.Infrastructure\Budget.Infrastructure.csproj" />
+    <ProjectReference Include="..\Budget.Shared\Budget.Shared.csproj" />
+  </ItemGroup>
+
+</Project>
