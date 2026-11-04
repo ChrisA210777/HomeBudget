@@ -54,6 +54,34 @@ public class HouseholdTests
         Assert.Throws<ArgumentException>(() => Household.Create(Guid.NewGuid(), Now, new string('a', 101)));
     }
 
+    [Theory]
+    [InlineData(HouseholdRole.Viewer)]
+    [InlineData(HouseholdRole.User)]
+    [InlineData(HouseholdRole.Admin)]
+    public void Members_can_be_added_with_any_role_but_are_not_owners(HouseholdRole role)
+    {
+        var household = Household.Create(Guid.NewGuid(), Now);
+        var userId = Guid.NewGuid();
+
+        var member = household.AddMember(userId, role, Now);
+
+        Assert.Equal(2, household.Members.Count);
+        Assert.Equal(userId, member.UserId);
+        Assert.Equal(household.Id, member.HouseholdId);
+        Assert.Equal(role, member.Role);
+        Assert.False(member.IsOwner);
+        Assert.Single(household.Members, m => m.IsOwner);
+    }
+
+    [Fact]
+    public void Someone_who_is_already_a_member_cannot_be_added_again()
+    {
+        var ownerId = Guid.NewGuid();
+        var household = Household.Create(ownerId, Now);
+
+        Assert.Throws<InvalidOperationException>(() => household.AddMember(ownerId, HouseholdRole.Viewer, Now));
+    }
+
     [Fact]
     public void Household_needs_an_owner()
     {

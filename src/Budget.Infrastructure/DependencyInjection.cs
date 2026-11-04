@@ -25,6 +25,8 @@ public static class DependencyInjection
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
         services.AddScoped<AuditingInterceptor>();
+        services.AddScoped<CurrentHousehold>();
+        services.AddScoped<ICurrentHousehold>(sp => sp.GetRequiredService<CurrentHousehold>());
 
         // The connection string is read when the DbContext is first created rather than now, so
         // configuration added later (e.g. by integration tests) is picked up.

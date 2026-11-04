@@ -65,7 +65,6 @@ public static class AuthenticationSetup
             });
         }
 
-        services.AddAuthorization();
         services.AddScoped<ExternalUserProvisioner>();
 
         return services;

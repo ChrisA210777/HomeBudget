@@ -10,12 +10,28 @@ namespace Budget.Infrastructure.Persistence;
 /// external logins, claims and tokens) but not Identity's role tables: roles in this app
 /// are per household and live on the household membership (see Roles &amp; Permissions).
 /// </summary>
-public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
-    : IdentityUserContext<ApplicationUser, Guid>(options)
+public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
 {
+    private readonly ICurrentHousehold _currentHousehold;
+
+    /// <summary>For tools and tests: no current household, so household-owned data is hidden.</summary>
+    public BudgetDbContext(DbContextOptions<BudgetDbContext> options)
+        : this(options, NoCurrentHousehold.Instance)
+    {
+    }
+
+    public BudgetDbContext(DbContextOptions<BudgetDbContext> options, ICurrentHousehold currentHousehold)
+        : base(options)
+    {
+        _currentHousehold = currentHousehold ?? throw new ArgumentNullException(nameof(currentHousehold));
+    }
+
     public DbSet<Household> Households => Set<Household>();
 
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
+
+    /// <summary>Read by the household query filters each time a query runs.</summary>
+    private Guid? CurrentHouseholdId => _currentHousehold.HouseholdId;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -24,6 +40,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
         base.OnModelCreating(builder);
 
         builder.ApplyConfigurationsFromAssembly(typeof(BudgetDbContext).Assembly);
+        builder.ApplyHouseholdQueryFilters(() => CurrentHouseholdId);
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -32,5 +49,12 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
 
         // Money is stored as entered with four decimal places (see ADR-007).
         configurationBuilder.Properties<decimal>().HavePrecision(19, 4);
+    }
+
+    private sealed class NoCurrentHousehold : ICurrentHousehold
+    {
+        public static readonly NoCurrentHousehold Instance = new();
+
+        public Guid? HouseholdId => null;
     }
 }
