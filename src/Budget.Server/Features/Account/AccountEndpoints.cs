@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using Budget.Infrastructure.Identity;
+using Budget.Infrastructure.Persistence;
 using Budget.Shared;
 using Budget.Shared.Account;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Budget.Server.Features.Account;
 
@@ -68,7 +70,10 @@ public static class AccountEndpoints
         return Results.LocalRedirect(ReturnUrl.Sanitize(returnUrl));
     }
 
-    private static async Task<IResult> GetCurrentUserAsync(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+    private static async Task<IResult> GetCurrentUserAsync(
+        ClaimsPrincipal principal,
+        UserManager<ApplicationUser> users,
+        BudgetDbContext db)
     {
         var user = await users.GetUserAsync(principal);
         if (user is null)
@@ -77,7 +82,19 @@ public static class AccountEndpoints
             return Results.Unauthorized();
         }
 
-        // Households are added in BUD-14.
-        return Results.Ok(new CurrentUserResponse(user.Id, user.DisplayName, user.Email, [], LastActiveHouseholdId: null));
+        var households = await (
+                from member in db.HouseholdMembers
+                join household in db.Households on member.HouseholdId equals household.Id
+                where member.UserId == user.Id
+                orderby household.Name
+                select new HouseholdMembershipSummary(household.Id, household.Name, member.Role.ToString(), member.IsOwner))
+            .ToListAsync();
+
+        // Fall back to another household if the last active one is gone or no longer theirs.
+        var activeHouseholdId = households.Any(h => h.HouseholdId == user.LastActiveHouseholdId)
+            ? user.LastActiveHouseholdId
+            : households.FirstOrDefault()?.HouseholdId;
+
+        return Results.Ok(new CurrentUserResponse(user.Id, user.DisplayName, user.Email, households, activeHouseholdId));
     }
 }

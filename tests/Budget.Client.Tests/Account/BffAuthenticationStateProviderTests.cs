@@ -12,7 +12,7 @@ public class BffAuthenticationStateProviderTests
         var userId = Guid.NewGuid();
         var api = new StubAccountApi(new CurrentUserResponse(userId, "Chris Austin", "chris@outlook.com", [], null));
 
-        var state = await new BffAuthenticationStateProvider(api).GetAuthenticationStateAsync();
+        var state = await new BffAuthenticationStateProvider(new UserSession(api)).GetAuthenticationStateAsync();
 
         Assert.True(state.User.Identity?.IsAuthenticated);
         Assert.Equal("Chris Austin", state.User.Identity?.Name);
@@ -23,7 +23,7 @@ public class BffAuthenticationStateProviderTests
     [Fact]
     public async Task Nobody_signed_in_is_anonymous()
     {
-        var state = await new BffAuthenticationStateProvider(new StubAccountApi(null)).GetAuthenticationStateAsync();
+        var state = await new BffAuthenticationStateProvider(new UserSession(new StubAccountApi(null))).GetAuthenticationStateAsync();
 
         Assert.False(state.User.Identity?.IsAuthenticated);
     }
@@ -33,7 +33,7 @@ public class BffAuthenticationStateProviderTests
     {
         var api = new StubAccountApi(null) { Error = new HttpRequestException("offline") };
 
-        var state = await new BffAuthenticationStateProvider(api).GetAuthenticationStateAsync();
+        var state = await new BffAuthenticationStateProvider(new UserSession(api)).GetAuthenticationStateAsync();
 
         Assert.False(state.User.Identity?.IsAuthenticated);
     }

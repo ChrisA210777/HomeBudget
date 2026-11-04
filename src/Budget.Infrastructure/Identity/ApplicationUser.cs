@@ -14,4 +14,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public string DisplayName { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The household shown after sign-in (see ADR-008).</summary>
+    public Guid? LastActiveHouseholdId { get; set; }
 }
