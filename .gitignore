@@ -1,0 +1,25 @@
+## .NET build output
+bin/
+obj/
+artifacts/
+TestResults/
+*.trx
+coverage*.xml
+coverage*.json
+
+## IDEs
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+
+## Local secrets and environment
+.env
+appsettings.*.local.json
+
+## OS
+.DS_Store
+Thumbs.db
