@@ -1,0 +1,74 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@using System.Web
+@inject IAccountApi AccountApi
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="mt-8">
+    <MudPaper Class="pa-6" Elevation="2">
+        <h1 class="mud-typography mud-typography-h5 mb-2">Sign in</h1>
+        <MudText Typo="Typo.body2" Class="mb-4">Sign in to see and manage your household budget.</MudText>
+
+        @if (_errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4" data-testid="login-error">@_errorMessage</MudAlert>
+        }
+
+        @if (_providers is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_providers.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" data-testid="no-providers">
+                No sign-in providers are set up yet. See the README for how to configure Microsoft sign-in.
+            </MudAlert>
+        }
+        else
+        {
+            @foreach (var provider in _providers)
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           Class="mb-2"
+                           OnClick="() => SignIn(provider)">
+                    Sign in with @provider.DisplayName
+                </MudButton>
+            }
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private IReadOnlyList<AuthProvider>? _providers;
+    private string? _errorMessage;
+    private string _returnUrl = "/";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var query = HttpUtility.ParseQueryString(Navigation.ToAbsoluteUri(Navigation.Uri).Query);
+
+        var returnUrl = query["returnUrl"];
+        if (!string.IsNullOrEmpty(returnUrl) && returnUrl.StartsWith('/') && !returnUrl.StartsWith("//", StringComparison.Ordinal))
+        {
+            _returnUrl = returnUrl;
+        }
+
+        _errorMessage = query["error"] switch
+        {
+            null or "" => null,
+            LoginErrors.Cancelled => "Sign-in was cancelled.",
+            _ => "Sign-in didn't work. Please try again.",
+        };
+
+        _providers = await AccountApi.GetProvidersAsync();
+    }
+
+    // A full page load, not client-side navigation: the server sends the browser to the provider.
+    private void SignIn(AuthProvider provider) =>
+        Navigation.NavigateTo(AccountRoutes.Login(provider.Name, _returnUrl), forceLoad: true);
+}

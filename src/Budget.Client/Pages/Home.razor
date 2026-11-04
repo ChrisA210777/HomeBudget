@@ -1,10 +1,16 @@
 @page "/"
+@attribute [Authorize]
 
 <PageTitle>Home Budget</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-6">
     <h1 class="mud-typography mud-typography-h4">Home Budget</h1>
+    <AuthorizeView>
+        <Authorized>
+            <MudText Typo="Typo.h6" Class="mb-2" data-testid="welcome">Welcome, @context.User.Identity?.Name</MudText>
+        </Authorized>
+    </AuthorizeView>
     <MudText Typo="Typo.body1">
-        Your household budget, in one place. Sign-in and households are coming next.
+        Your household budget, in one place. Households and income are coming next.
     </MudText>
 </MudContainer>

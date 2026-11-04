@@ -41,7 +41,8 @@ public static class DependencyInjection
         });
 
         services.AddIdentityCore<ApplicationUser>()
-            .AddEntityFrameworkStores<BudgetDbContext>();
+            .AddEntityFrameworkStores<BudgetDbContext>()
+            .AddSignInManager();
 
         return services;
     }
