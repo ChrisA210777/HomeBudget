@@ -16,6 +16,7 @@ builder.Services.AddScoped(_ => new HttpClient(new CsrfHeaderHandler { InnerHand
     BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
 });
 builder.Services.AddScoped<IAccountApi, AccountApi>();
+builder.Services.AddScoped<UserSession>();
 
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();

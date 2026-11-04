@@ -1,3 +1,4 @@
+using Budget.Domain.Households;
 using Budget.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -12,16 +13,15 @@ namespace Budget.Infrastructure.Persistence;
 public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
     : IdentityUserContext<ApplicationUser, Guid>(options)
 {
+    public DbSet<Household> Households => Set<Household>();
+
+    public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
         base.OnModelCreating(builder);
-
-        builder.Entity<ApplicationUser>(user =>
-        {
-            user.Property(u => u.DisplayName).HasMaxLength(ApplicationUser.DisplayNameMaxLength);
-        });
 
         builder.ApplyConfigurationsFromAssembly(typeof(BudgetDbContext).Assembly);
     }

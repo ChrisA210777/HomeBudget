@@ -7,7 +7,7 @@ namespace Budget.Client.Account;
 /// Asks the server who is signed in. The session itself is an HTTP-only cookie the client
 /// can't read (Backend-for-Frontend, see ADR-001).
 /// </summary>
-public sealed class BffAuthenticationStateProvider(IAccountApi accountApi) : AuthenticationStateProvider
+public sealed class BffAuthenticationStateProvider(UserSession session) : AuthenticationStateProvider
 {
     public const string AuthenticationType = "bff";
 
@@ -21,7 +21,7 @@ public sealed class BffAuthenticationStateProvider(IAccountApi accountApi) : Aut
     {
         try
         {
-            var user = await accountApi.GetCurrentUserAsync();
+            var user = await session.GetCurrentUserAsync();
             if (user is null)
             {
                 return Anonymous;
