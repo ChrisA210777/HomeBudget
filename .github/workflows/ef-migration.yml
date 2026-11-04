@@ -51,6 +51,8 @@ jobs:
       - name: Add migration
         if: steps.existing.outputs.exists != 'true'
         run: |
+          # dotnet-ef reads project metadata before building, so packages must be restored first.
+          dotnet restore HomeBudget.slnx
           dotnet tool restore
           dotnet ef migrations add "$MIGRATION_NAME" \
             --project src/Budget.Infrastructure \
