@@ -16,6 +16,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Budget.Client.Tests/Budget.Client.Tests.csproj" />
     <Project Path="tests/Budget.Domain.Tests/Budget.Domain.Tests.csproj" />
+    <Project Path="tests/Budget.Infrastructure.Tests/Budget.Infrastructure.Tests.csproj" />
     <Project Path="tests/Budget.Server.Tests/Budget.Server.Tests.csproj" />
   </Folder>
 </Solution>
