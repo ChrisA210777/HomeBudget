@@ -14,7 +14,10 @@ Features/
 Guidelines:
 
 - One `Map<Feature>Endpoints(this IEndpointRouteBuilder app)` extension per feature, called from `Program.cs`.
-- Household-scoped routes use `/api/households/{householdId}/...` and an authorisation policy
-  (`HouseholdViewer`, `HouseholdUser`, `HouseholdAdmin`, `HouseholdOwner`).
-- Every household-scoped endpoint gets a cross-household integration test.
+- Household-scoped routes live under `HouseholdRoutes.Base` (`/api/households/{householdId:guid}`) and
+  require one of the `HouseholdPolicies`: `Viewer`, `User`, `Admin` or `Owner`. Non-members get 404,
+  members without the role get 403. Once authorised, `ICurrentHousehold` is set and every
+  `IHouseholdOwned` query is filtered to that household.
+- Every household-scoped endpoint needs two tests from `IntegrationTestBase`:
+  `AssertOtherHouseholdsCannotAccessAsync` (isolation) and `AssertMinimumRoleAsync` (roles).
 - Request/response DTOs that the client also uses go in `Budget.Shared`.

@@ -20,12 +20,15 @@ public sealed class HouseholdMember : AuditableEntity
 
     public DateTimeOffset JoinedAt { get; private set; }
 
-    internal static HouseholdMember CreateOwner(Guid householdId, Guid userId, DateTimeOffset now) => new()
+    internal static HouseholdMember CreateOwner(Guid householdId, Guid userId, DateTimeOffset now) =>
+        Create(householdId, userId, HouseholdRole.Admin, isOwner: true, now);
+
+    internal static HouseholdMember Create(Guid householdId, Guid userId, HouseholdRole role, bool isOwner, DateTimeOffset now) => new()
     {
         HouseholdId = householdId,
         UserId = userId,
-        Role = HouseholdRole.Admin,
-        IsOwner = true,
+        Role = role,
+        IsOwner = isOwner,
         JoinedAt = now,
     };
 }

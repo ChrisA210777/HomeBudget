@@ -48,6 +48,30 @@ public sealed class Household : AuditableEntity
         return household;
     }
 
+    /// <summary>Adds someone to the household with the given role. They can't already be a member.</summary>
+    /// <remarks>The household's members must be loaded.</remarks>
+    public HouseholdMember AddMember(Guid userId, HouseholdRole role, DateTimeOffset now)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("A member needs a user.", nameof(userId));
+        }
+
+        if (!Enum.IsDefined(role))
+        {
+            throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown household role.");
+        }
+
+        if (_members.Any(m => m.UserId == userId))
+        {
+            throw new InvalidOperationException("That user is already a member of this household.");
+        }
+
+        var member = HouseholdMember.Create(Id, userId, role, isOwner: false, now);
+        _members.Add(member);
+        return member;
+    }
+
     /// <summary>Trims the name and checks it is between 1 and <see cref="NameMaxLength"/> characters.</summary>
     public static string NormaliseName(string name)
     {
