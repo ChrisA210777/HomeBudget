@@ -4,16 +4,16 @@
 @inject ISnackbar Snackbar
 
 <AuthorizeView>
-    <Authorized>
+    <Authorized Context="auth">
         <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
-            <ActivatorContent>
+            <ActivatorContent Context="menu">
                 <MudButton Variant="Variant.Text"
                            Color="Color.Inherit"
                            StartIcon="@Icons.Material.Filled.AccountCircle"
                            Class="user-menu-button"
-                           aria-label="Account menu"
+                           OnClick="menu.ToggleAsync"
                            data-testid="user-menu-button">
-                    <span class="user-menu-name">@context.User.Identity?.Name</span>
+                    <span class="user-menu-name">@auth.User.Identity?.Name</span>
                 </MudButton>
             </ActivatorContent>
             <ChildContent>
