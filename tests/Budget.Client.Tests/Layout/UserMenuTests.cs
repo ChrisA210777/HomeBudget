@@ -29,7 +29,9 @@ public sealed class UserMenuTests : IDisposable
     {
         var cut = _context.RenderComponent<UserMenu>();
 
-        Assert.Equal("Chris Austin", cut.Find("[data-testid=user-menu-button]").TextContent.Trim());
+        var button = cut.Find("[data-testid=user-menu] button");
+        Assert.Equal("Chris Austin", button.TextContent.Trim());
+        Assert.Equal("Account menu for Chris Austin", button.GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -38,7 +40,7 @@ public sealed class UserMenuTests : IDisposable
         var popovers = _context.RenderComponent<MudPopoverProvider>();
         var cut = _context.RenderComponent<UserMenu>();
 
-        cut.Find("[data-testid=user-menu-button]").Click();
+        cut.Find("[data-testid=user-menu] button").Click();
         popovers.WaitForElement("[data-testid=sign-out]").Click();
 
         // The menu item runs its click handler asynchronously (it closes the menu first).
@@ -58,7 +60,7 @@ public sealed class UserMenuTests : IDisposable
         var snackbars = _context.RenderComponent<MudSnackbarProvider>();
         var cut = _context.RenderComponent<UserMenu>();
 
-        cut.Find("[data-testid=user-menu-button]").Click();
+        cut.Find("[data-testid=user-menu] button").Click();
         popovers.WaitForElement("[data-testid=sign-out]").Click();
 
         Assert.Equal("http://localhost/", Navigation.Uri);
@@ -72,8 +74,8 @@ public sealed class UserMenuTests : IDisposable
         var cut = _context.RenderComponent<UserMenu>();
         var preference = _context.Services.GetRequiredService<ThemePreference>();
 
-        cut.Find("[data-testid=user-menu-button]").Click();
-        Assert.Equal("true", popovers.WaitForElement("[data-testid=theme-system]").GetAttribute("aria-checked"));
+        cut.Find("[data-testid=user-menu] button").Click();
+        Assert.Equal("true", popovers.WaitForElement("[data-testid=theme-system]").GetAttribute("data-selected"));
         popovers.Find("[data-testid=theme-dark]").Click();
 
         cut.WaitForAssertion(() =>

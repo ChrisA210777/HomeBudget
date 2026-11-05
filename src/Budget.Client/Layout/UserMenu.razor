@@ -6,26 +6,29 @@
 
 <AuthorizeView>
     <Authorized Context="auth">
-        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
-            <ActivatorContent Context="menu">
-                <MudButton Variant="Variant.Text"
-                           Color="Color.Inherit"
-                           StartIcon="@Icons.Material.Filled.AccountCircle"
-                           Class="user-menu-button"
-                           OnClick="menu.ToggleAsync"
-                           data-testid="user-menu-button">
-                    <span class="user-menu-name">@auth.User.Identity?.Name</span>
-                </MudButton>
-            </ActivatorContent>
+        @* MudBlazor's own button activator: wrapping a button in ActivatorContent nests one control in another. *@
+        <MudMenu AnchorOrigin="Origin.BottomRight"
+                 TransformOrigin="Origin.TopRight"
+                 Label="@auth.User.Identity?.Name"
+                 StartIcon="@Icons.Material.Filled.AccountCircle"
+                 Variant="Variant.Text"
+                 Color="Color.Inherit"
+                 AriaLabel="@($"Account menu for {auth.User.Identity?.Name}")"
+                 Class="user-menu"
+                 data-testid="user-menu">
             <ChildContent>
                 <MudText Typo="Typo.overline" Class="px-4 pt-2" id="theme-heading">Theme</MudText>
                 @foreach (var option in ThemeOptions)
                 {
                     <MudMenuItem Icon="@(ThemePreference.Mode == option.Mode ? Icons.Material.Filled.Check : option.Icon)"
                                  OnClick="() => ThemePreference.SetAsync(option.Mode)"
-                                 aria-checked="@(ThemePreference.Mode == option.Mode ? "true" : "false")"
+                                 data-selected="@(ThemePreference.Mode == option.Mode ? "true" : "false")"
                                  data-testid="@($"theme-{option.Mode.ToString().ToLowerInvariant()}")">
                         @option.Label
+                        @if (ThemePreference.Mode == option.Mode)
+                        {
+                            <span class="visually-hidden"> (selected)</span>
+                        }
                     </MudMenuItem>
                 }
                 <MudDivider Class="my-1" />

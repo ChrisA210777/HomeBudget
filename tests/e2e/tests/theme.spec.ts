@@ -6,7 +6,7 @@ const lightBackground = 'rgb(247, 249, 249)';
 const darkBackground = 'rgb(18, 18, 18)';
 
 async function background(page: Page): Promise<string> {
-  return page.evaluate(() => getComputedStyle(document.querySelector('.mud-layout') ?? document.body).backgroundColor);
+  return page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 }
 
 test.describe('on a device set to light mode', () => {
@@ -16,7 +16,7 @@ test.describe('on a device set to light mode', () => {
     await signIn(page);
     await expect.poll(() => background(page)).toBe(lightBackground);
 
-    await page.getByTestId('user-menu-button').click();
+    await page.getByTestId('user-menu').getByRole('button').first().click();
     await page.getByTestId('theme-dark').click();
     await expect.poll(() => background(page)).toBe(darkBackground);
 
@@ -24,7 +24,7 @@ test.describe('on a device set to light mode', () => {
     await expect(page.getByTestId('welcome')).toBeVisible();
     await expect.poll(() => background(page)).toBe(darkBackground);
 
-    await page.getByTestId('user-menu-button').click();
+    await page.getByTestId('user-menu').getByRole('button').first().click();
     await page.getByTestId('theme-system').click();
     await expect.poll(() => background(page)).toBe(lightBackground);
   });

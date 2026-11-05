@@ -28,6 +28,12 @@ for (const theme of ['Light', 'Dark']) {
         await settled(page);
         await expectNoSeriousViolations(page, `${path} (${theme})`);
       }
+
+      await page.goto('/');
+      await settled(page);
+      await page.getByTestId('user-menu').getByRole('button').first().click();
+      await expect(page.getByTestId('theme-dark')).toBeVisible();
+      await expectNoSeriousViolations(page, `user menu (${theme})`);
     });
 
     test('the sign-in page has no serious accessibility problems', async ({ page }) => {
