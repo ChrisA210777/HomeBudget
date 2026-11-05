@@ -73,8 +73,7 @@ app.MapFallback("/bff/{**path}", () => Results.NotFound());
 app.MapFallback("/account/{**path}", () => Results.NotFound());
 
 // Any other GET is a client-side route: serve the Blazor app and let its router handle it.
-app.MapFallbackToFile("index.html")
-    .WithMetadata(new HttpMethodMetadata([HttpMethods.Get, HttpMethods.Head]));
+app.MapClientAppFallback();
 
 await app.RunAsync();
 

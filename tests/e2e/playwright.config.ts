@@ -14,6 +14,9 @@ export default defineConfig({
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'https://localhost:7180',
     ignoreHTTPSErrors: true,
+    // The test server uses a self-signed certificate. Service workers refuse those even with
+    // ignoreHTTPSErrors, so tell Chromium to accept it.
+    launchOptions: { args: ['--ignore-certificate-errors'] },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
