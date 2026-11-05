@@ -4,117 +4,76 @@
 @using Budget.Shared.Income
 @inject UserSession Session
 @inject IIncomeApi IncomeApi
-@inject IDialogService Dialogs
-@inject ISnackbar Snackbar
-@inject NavigationManager Navigation
+@inject TimeProvider Clock
 
 <PageTitle>Income · Home Budget</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
-    <div class="d-flex align-center flex-wrap gap-2 mb-4">
+    <div class="d-flex align-center flex-wrap gap-2 mb-2">
         <h1 class="mud-typography mud-typography-h4 flex-grow-1">Income</h1>
         @if (_canEdit)
         {
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       Href="/income/new"
-                       data-testid="add-income">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/income/new" data-testid="add-income">
                 Add income
             </MudButton>
         }
+    </div>
+
+    <div class="d-flex align-center justify-space-between mb-3">
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
+        <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
     </div>
 
     @if (_household is null && _loaded)
     {
         <MudAlert Severity="Severity.Info">You're not in a household yet.</MudAlert>
     }
-    else if (_list is null)
+    else if (_data is null)
     {
         <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
     }
     else
     {
-        <MudPaper Class="pa-4 mb-4" Elevation="1" data-testid="income-totals">
-            <MudText Typo="Typo.overline">Estimated gross income</MudText>
-            <div class="d-flex flex-wrap gap-6">
-                <div>
-                    <MudText Typo="Typo.h5" data-testid="total-monthly">@Money.Format(_list.TotalMonthly, _list.CurrencyCode)</MudText>
-                    <MudText Typo="Typo.caption">a month</MudText>
-                </div>
-                <div>
-                    <MudText Typo="Typo.h5" data-testid="total-annual">@Money.Format(_list.TotalAnnual, _list.CurrencyCode)</MudText>
-                    <MudText Typo="Typo.caption">a year</MudText>
-                </div>
-            </div>
-            <MudText Typo="Typo.caption" Class="mt-2 d-block">Before tax. Variable pay counts at its average.</MudText>
+        <MudPaper Class="pa-4 mb-3" Elevation="1">
+            <MudText Typo="Typo.overline">Take-home income this month</MudText>
+            <MudText Typo="Typo.h4" data-testid="month-total">@Money.Format(_data.Total, _data.CurrencyCode)</MudText>
         </MudPaper>
 
-        <MudSwitch T="bool" Value="_showInactive" ValueChanged="ToggleInactiveAsync" Color="Color.Primary" Label="Show ended income" data-testid="show-inactive" />
+        <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show income that hasn't started or has ended" />
 
-        @if (_list.Items.Count == 0)
+        @if (_data.Items.Count == 0)
         {
             <MudPaper Class="pa-6 mt-2 text-center" Elevation="0" Outlined="true" data-testid="income-empty">
                 <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Large" Color="Color.Secondary" />
-                <MudText Typo="Typo.h6" Class="mt-2">No income yet</MudText>
+                <MudText Typo="Typo.h6" Class="mt-2">No income this month</MudText>
                 <MudText Typo="Typo.body2">
-                    @(_canEdit ? "Add each job in the household to see what comes in each month." : "Nobody has added any income to this household yet.")
+                    @(_canEdit ? "Add each income with its monthly take-home amount to see what you have to budget." : "Nobody has added any income for this month.")
                 </MudText>
             </MudPaper>
         }
 
-        @foreach (var item in _list.Items)
+        @foreach (var item in _data.Items)
         {
             <MudCard Class="mt-3" Outlined="true" data-testid="income-item">
-                <MudCardContent Class="pb-2">
+                <MudCardContent>
                     <div class="d-flex align-start gap-2">
                         <div class="flex-grow-1" style="min-width: 0">
-                            <MudText Typo="Typo.h6" Class="income-name" data-testid="income-name">@item.Name</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                @Description(item)
-                            </MudText>
+                            <MudLink Href="@($"/income/{item.Id}")" Typo="Typo.h6" data-testid="income-name">@item.Name</MudLink>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@item.PersonName</MudText>
                         </div>
-                        @if (!item.IsActive)
-                        {
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" data-testid="income-ended">Ended</MudChip>
-                        }
-                        @if (_canEdit)
-                        {
-                            <MudMenu Icon="@Icons.Material.Filled.MoreVert" AriaLabel="@($"Actions for {item.Name}")" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" data-testid="income-actions">
-                                <MudMenuItem Icon="@Icons.Material.Filled.Edit" Href="@($"/income/{item.Id}/edit")">Edit</MudMenuItem>
-                                @if (item.IsActive)
-                                {
-                                    <MudMenuItem Icon="@Icons.Material.Filled.PauseCircle" OnClick="() => SetActiveAsync(item, false)" data-testid="deactivate">Mark as ended</MudMenuItem>
-                                }
-                                else
-                                {
-                                    <MudMenuItem Icon="@Icons.Material.Filled.PlayCircle" OnClick="() => SetActiveAsync(item, true)" data-testid="reactivate">Mark as current</MudMenuItem>
-                                }
-                                <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error" OnClick="() => DeleteAsync(item)" data-testid="delete">Delete</MudMenuItem>
-                            </MudMenu>
-                        }
-                    </div>
-
-                    <div class="d-flex flex-wrap gap-6 mt-3">
-                        <div>
-                            <MudText Typo="Typo.subtitle1" data-testid="income-per-pay">
-                                @Money.Format(item.AveragePerPay, _list.CurrencyCode)
-                            </MudText>
-                            <MudText Typo="Typo.caption">
-                                @(item.Kind == IncomeKindDto.Variable ? "average " : string.Empty)per @IncomeLabels.Period(item.PayFrequency)
-                            </MudText>
-                            @if (item.Kind == IncomeKindDto.Variable)
+                        <div class="text-right">
+                            <MudText Typo="Typo.h6" data-testid="income-amount">@Money.Format(item.AmountForMonth, _data.CurrencyCode)</MudText>
+                            @if (item.UsualAmount is { } usual && usual != item.AmountForMonth)
                             {
-                                <MudText Typo="Typo.caption" Class="d-block" data-testid="income-range">
-                                    @Money.Format(item.LowPerPay, _list.CurrencyCode) – @Money.Format(item.HighPerPay, _list.CurrencyCode)
-                                </MudText>
+                                <MudText Typo="Typo.caption" data-testid="income-usual">usually @Money.Format(usual, _data.CurrencyCode)</MudText>
                             }
                         </div>
-                        <div>
-                            <MudText Typo="Typo.subtitle1" data-testid="income-annual">@Money.Format(item.AverageAnnual, _list.CurrencyCode)</MudText>
-                            <MudText Typo="Typo.caption">a year</MudText>
-                        </div>
                     </div>
+                    @foreach (var note in item.Notes)
+                    {
+                        <MudText Typo="Typo.caption" Class="d-block mt-1" data-testid="income-note">@note</MudText>
+                    }
                 </MudCardContent>
             </MudCard>
         }
@@ -123,13 +82,18 @@
 
 @code {
     private HouseholdMembershipSummary? _household;
-    private IncomeStreamListResponse? _list;
+    private IncomeMonthResponse? _data;
     private bool _canEdit;
-    private bool _showInactive;
+    private bool _all;
     private bool _loaded;
+    private int _year;
+    private int _month;
 
     protected override async Task OnInitializedAsync()
     {
+        var today = Clock.GetLocalNow();
+        (_year, _month) = (today.Year, today.Month);
+
         _household = await Session.GetActiveHouseholdAsync();
         _canEdit = _household is not null && _household.Role != "Viewer";
         _loaded = true;
@@ -140,55 +104,20 @@
     {
         if (_household is not null)
         {
-            _list = await IncomeApi.ListAsync(_household.HouseholdId, _showInactive);
+            _data = await IncomeApi.GetMonthAsync(_household.HouseholdId, _year, _month, _all);
         }
     }
 
-    private async Task ToggleInactiveAsync(bool value)
+    private async Task MoveAsync(int months)
     {
-        _showInactive = value;
+        var next = new DateOnly(_year, _month, 1).AddMonths(months);
+        (_year, _month) = (next.Year, next.Month);
         await LoadAsync();
     }
 
-    private static string Description(IncomeStreamSummary item)
+    private async Task ToggleAllAsync(bool value)
     {
-        var parts = new List<string>();
-        if (!string.IsNullOrEmpty(item.MemberName))
-        {
-            parts.Add(item.MemberName);
-        }
-
-        if (!string.IsNullOrEmpty(item.EmployerName))
-        {
-            parts.Add(item.EmployerName);
-        }
-
-        parts.Add($"{IncomeLabels.Frequency(item.PayFrequency)}, {IncomeLabels.Kind(item.Kind).ToLowerInvariant()} pay");
-        return string.Join(" · ", parts);
-    }
-
-    private async Task SetActiveAsync(IncomeStreamSummary item, bool active)
-    {
-        await IncomeApi.SetActiveAsync(_household!.HouseholdId, item.Id, active);
-        Snackbar.Add(active ? $"{item.Name} counts towards totals again." : $"{item.Name} is marked as ended.", Severity.Success);
-        await LoadAsync();
-    }
-
-    private async Task DeleteAsync(IncomeStreamSummary item)
-    {
-        var confirmed = await Dialogs.ShowMessageBoxAsync(
-            "Delete income?",
-            $"This permanently deletes \"{item.Name}\". If the job has just ended, you can mark it as ended instead to keep a record.",
-            yesText: "Delete",
-            cancelText: "Cancel");
-
-        if (confirmed != true)
-        {
-            return;
-        }
-
-        await IncomeApi.DeleteAsync(_household!.HouseholdId, item.Id);
-        Snackbar.Add($"{item.Name} was deleted.", Severity.Success);
+        _all = value;
         await LoadAsync();
     }
 }

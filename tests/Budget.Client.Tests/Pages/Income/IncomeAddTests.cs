@@ -1,0 +1,72 @@
+using Budget.Client.Income;
+using Budget.Client.Pages.Income;
+using Budget.Client.Tests.TestDoubles;
+using Budget.Shared.Income;
+using Bunit.TestDoubles;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Budget.Client.Tests.Pages.Income;
+
+public sealed class IncomeAddTests : IncomeTestContext
+{
+    [Fact]
+    public void Adds_income_for_you_from_the_start_of_this_month_and_opens_it()
+    {
+        var cut = Context.RenderComponent<IncomeAdd>();
+
+        cut.Find("input[data-testid=name]").Change("Chris – salary");
+        cut.Find("input[data-testid=amount]").Change("3000.50");
+        cut.Find("[data-testid=save]").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var (operation, _, body) = Assert.Single(Api.Calls);
+            Assert.Equal("Create", operation);
+            var request = Assert.IsType<CreateIncomeStreamRequest>(body);
+            Assert.Equal("Chris – salary", request.Name);
+            Assert.Equal(StaticPeopleApi.ChrisId, request.PersonId);
+            Assert.Equal(3000.50m, request.MonthlyNetAmount);
+            Assert.Equal(new DateOnly(2026, 11, 1), request.StartsOn);
+        });
+        var navigation = Context.Services.GetRequiredService<FakeNavigationManager>();
+        Assert.EndsWith($"/income/{IncomeSamples.SalaryId}", navigation.Uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Missing_details_are_flagged_before_anything_is_sent()
+    {
+        var cut = Context.RenderComponent<IncomeAdd>();
+
+        cut.Find("[data-testid=save]").Click();
+
+        Assert.Empty(Api.Calls);
+        Assert.Contains("Enter a name", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Errors_from_the_server_are_shown_against_the_field()
+    {
+        Api.NextResult = ApiResult<IncomeStreamDetails>.Invalid(new Dictionary<string, string[]>
+        {
+            [nameof(CreateIncomeStreamRequest.PersonId)] = ["Choose someone in this household."],
+        });
+        var cut = Context.RenderComponent<IncomeAdd>();
+
+        cut.Find("input[data-testid=name]").Change("Salary");
+        cut.Find("input[data-testid=amount]").Change("1000");
+        cut.Find("[data-testid=save]").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Choose someone in this household.", cut.Markup, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Viewers_cannot_add_income()
+    {
+        UseRole("Viewer");
+
+        var cut = Context.RenderComponent<IncomeAdd>();
+
+        Assert.NotNull(cut.Find("[data-testid=read-only]"));
+        Assert.Empty(cut.FindAll("[data-testid=save]").ToList());
+    }
+}

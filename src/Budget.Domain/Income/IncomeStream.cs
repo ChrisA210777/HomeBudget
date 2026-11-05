@@ -4,73 +4,162 @@ using Budget.Domain.Households;
 namespace Budget.Domain.Income;
 
 /// <summary>
-/// Money coming into a household. Each type of income (only <see cref="EmploymentIncome"/> for now)
-/// derives from this and is stored in one table with a <see cref="Type"/> column (see ADR-003).
+/// A source of money coming into a household, belonging to a person and recorded as a timeline of
+/// monthly net amounts and status periods (see ADR-009). Mistakes are corrected with a reason,
+/// and the original is kept as an <see cref="IncomeCorrection"/>.
 /// </summary>
-public abstract class IncomeStream : AuditableEntity, IHouseholdOwned
+/// <remarks>Its amount changes, status periods and corrections must be loaded to change them.</remarks>
+public sealed class IncomeStream : AuditableEntity, IHouseholdOwned
 {
     public const int NameMaxLength = 100;
+    public const int CommentMaxLength = 200;
+    public const decimal MaxAmount = 10_000_000m;
 
-    private protected IncomeStream()
+    private readonly List<IncomeAmountChange> _amountChanges = [];
+    private readonly List<IncomeStatusPeriod> _statusPeriods = [];
+    private readonly List<IncomeCorrection> _corrections = [];
+
+    private IncomeStream()
     {
-    }
-
-    private protected IncomeStream(Guid householdId, IncomeStreamType type)
-    {
-        if (householdId == Guid.Empty)
-        {
-            throw new ArgumentException("An income stream must belong to a household.", nameof(householdId));
-        }
-
-        Id = Guid.CreateVersion7();
-        HouseholdId = householdId;
-        Type = type;
-        IsActive = true;
     }
 
     public Guid Id { get; private set; }
 
     public Guid HouseholdId { get; private set; }
 
-    public IncomeStreamType Type { get; private set; }
+    public Guid PersonId { get; private set; }
 
     public string Name { get; private set; } = string.Empty;
 
-    /// <summary>The household member this income belongs to, if any.</summary>
-    public Guid? MemberUserId { get; private set; }
+    public IReadOnlyCollection<IncomeAmountChange> AmountChanges => _amountChanges.AsReadOnly();
 
-    /// <summary>Inactive streams (e.g. a job that has ended) are kept but left out of totals.</summary>
-    public bool IsActive { get; private set; }
+    public IReadOnlyCollection<IncomeStatusPeriod> StatusPeriods => _statusPeriods.AsReadOnly();
 
-    /// <summary>Gross income per pay period and per year.</summary>
-    public abstract IncomeEstimate Estimate();
+    public IReadOnlyCollection<IncomeCorrection> Corrections => _corrections.AsReadOnly();
 
-    public void Deactivate() => IsActive = false;
+    /// <summary>The date of the first amount, i.e. when the income starts.</summary>
+    public DateOnly StartsOn => _amountChanges.Min(c => c.EffectiveFrom);
 
-    public void Reactivate() => IsActive = true;
+    /// <summary>The start of an "Ended" period, if the income has ended.</summary>
+    public DateOnly? EndsOn => _statusPeriods.Where(p => p.Reason == IncomeStatusReason.Ended).Select(p => (DateOnly?)p.StartDate).Min();
 
-    /// <summary>Clears the link to a member, e.g. when they leave the household.</summary>
-    public void ClearMember() => MemberUserId = null;
-
-    private protected void SetCommonDetails(string name, Guid? memberUserId)
+    public static IncomeStream Create(
+        Guid householdId, Guid personId, string name, decimal monthlyNetAmount, DateOnly startsOn, string comment)
     {
-        Name = NormaliseName(name);
-        MemberUserId = memberUserId == Guid.Empty ? null : memberUserId;
+        if (householdId == Guid.Empty)
+        {
+            throw new ArgumentException("An income must belong to a household.", nameof(householdId));
+        }
+
+        var stream = new IncomeStream { Id = Guid.CreateVersion7(), HouseholdId = householdId };
+        stream.Rename(name);
+        stream.ChangePerson(personId);
+        stream._amountChanges.Add(IncomeAmountChange.Create(stream.Id, startsOn, monthlyNetAmount, comment));
+        return stream;
     }
 
-    private static string NormaliseName(string name)
+    public void Rename(string name) =>
+        Name = IncomeTimeline.RequiredText(name, nameof(name), NameMaxLength);
+
+    public void ChangePerson(Guid personId)
     {
-        var trimmed = name?.Trim();
-        if (string.IsNullOrEmpty(trimmed))
+        if (personId == Guid.Empty)
         {
-            throw new ArgumentException("A name is required.", nameof(name));
+            throw new ArgumentException("An income must belong to a person.", nameof(personId));
         }
 
-        if (trimmed.Length > NameMaxLength)
+        PersonId = personId;
+    }
+
+    public decimal AmountOn(DateOnly date) => IncomeTimeline.AmountOn(_amountChanges, _statusPeriods, date);
+
+    public decimal AmountForMonth(int year, int month) => IncomeTimeline.AmountForMonth(_amountChanges, _statusPeriods, year, month);
+
+    // Amount changes
+
+    public IncomeAmountChange ChangeAmount(DateOnly effectiveFrom, decimal monthlyNetAmount, string comment)
+    {
+        EnsureNoAmountChangeOn(effectiveFrom, exceptId: null);
+        var change = IncomeAmountChange.Create(Id, effectiveFrom, monthlyNetAmount, comment);
+        _amountChanges.Add(change);
+        return change;
+    }
+
+    public void CorrectAmountChange(Guid changeId, DateOnly effectiveFrom, decimal monthlyNetAmount, string comment, string reason)
+    {
+        var change = FindAmountChange(changeId);
+        EnsureNoAmountChangeOn(effectiveFrom, exceptId: changeId);
+
+        var before = change.Describe();
+        change.Update(effectiveFrom, monthlyNetAmount, comment);
+        _corrections.Add(IncomeCorrection.Create(Id, IncomeEntryType.AmountChange, changeId, IncomeCorrectionAction.Edited, before, change.Describe(), reason));
+    }
+
+    /// <summary>Deletes an amount change made by mistake. The first amount can't be deleted: delete the income instead.</summary>
+    public void DeleteAmountChange(Guid changeId, string reason)
+    {
+        var change = FindAmountChange(changeId);
+        if (change.EffectiveFrom == StartsOn)
         {
-            throw new ArgumentException($"A name can be at most {NameMaxLength} characters.", nameof(name));
+            throw new InvalidOperationException("The first amount can't be deleted. Change it, or delete the income instead.");
         }
 
-        return trimmed;
+        _corrections.Add(IncomeCorrection.Create(Id, IncomeEntryType.AmountChange, changeId, IncomeCorrectionAction.Deleted, change.Describe(), null, reason));
+        _amountChanges.Remove(change);
+    }
+
+    // Status periods
+
+    public IncomeStatusPeriod AddStatusPeriod(
+        IncomeStatusReason reason, DateOnly startDate, DateOnly? endDate, decimal? reducedMonthlyAmount, string comment)
+    {
+        EnsureNoOverlap(startDate, endDate, exceptId: null);
+        var period = IncomeStatusPeriod.Create(Id, reason, startDate, endDate, reducedMonthlyAmount, comment);
+        _statusPeriods.Add(period);
+        return period;
+    }
+
+    /// <summary>Ends the income from a date, until further notice.</summary>
+    public IncomeStatusPeriod End(DateOnly from, string comment) =>
+        AddStatusPeriod(IncomeStatusReason.Ended, from, endDate: null, reducedMonthlyAmount: null, comment);
+
+    public void CorrectStatusPeriod(
+        Guid periodId, IncomeStatusReason reason, DateOnly startDate, DateOnly? endDate, decimal? reducedMonthlyAmount, string comment, string correctionReason)
+    {
+        var period = FindStatusPeriod(periodId);
+        EnsureNoOverlap(startDate, endDate, exceptId: periodId);
+
+        var before = period.Describe();
+        period.Update(reason, startDate, endDate, reducedMonthlyAmount, comment);
+        _corrections.Add(IncomeCorrection.Create(Id, IncomeEntryType.StatusPeriod, periodId, IncomeCorrectionAction.Edited, before, period.Describe(), correctionReason));
+    }
+
+    public void DeleteStatusPeriod(Guid periodId, string reason)
+    {
+        var period = FindStatusPeriod(periodId);
+        _corrections.Add(IncomeCorrection.Create(Id, IncomeEntryType.StatusPeriod, periodId, IncomeCorrectionAction.Deleted, period.Describe(), null, reason));
+        _statusPeriods.Remove(period);
+    }
+
+    private IncomeAmountChange FindAmountChange(Guid id) =>
+        _amountChanges.SingleOrDefault(c => c.Id == id) ?? throw new KeyNotFoundException("That amount change doesn't exist.");
+
+    private IncomeStatusPeriod FindStatusPeriod(Guid id) =>
+        _statusPeriods.SingleOrDefault(p => p.Id == id) ?? throw new KeyNotFoundException("That period doesn't exist.");
+
+    private void EnsureNoAmountChangeOn(DateOnly date, Guid? exceptId)
+    {
+        if (_amountChanges.Any(c => c.EffectiveFrom == date && c.Id != exceptId))
+        {
+            throw new InvalidOperationException("There's already an amount change on that date. Change that one instead.");
+        }
+    }
+
+    private void EnsureNoOverlap(DateOnly start, DateOnly? end, Guid? exceptId)
+    {
+        if (_statusPeriods.Any(p => p.Id != exceptId && p.Overlaps(start, end)))
+        {
+            throw new InvalidOperationException("That overlaps another leave or pause for this income.");
+        }
     }
 }
