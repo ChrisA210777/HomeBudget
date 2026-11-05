@@ -2,128 +2,172 @@ using System.Text.Json.Serialization;
 
 namespace Budget.Shared.Income;
 
-// These mirror the domain enums by name; they're sent as strings in JSON.
-
-[JsonConverter(typeof(JsonStringEnumConverter<IncomeStreamTypeDto>))]
-public enum IncomeStreamTypeDto
+/// <summary>Why a leave or pause changes an income. Mirrors the domain enum by name.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<IncomeStatusReasonDto>))]
+public enum IncomeStatusReasonDto
 {
-    Employment,
-}
-
-[JsonConverter(typeof(JsonStringEnumConverter<PayFrequencyDto>))]
-public enum PayFrequencyDto
-{
-    Weekly,
-    FourWeekly,
-    Monthly,
-}
-
-[JsonConverter(typeof(JsonStringEnumConverter<IncomeKindDto>))]
-public enum IncomeKindDto
-{
-    Fixed,
-    Variable,
-}
-
-[JsonConverter(typeof(JsonStringEnumConverter<AmountBasisDto>))]
-public enum AmountBasisDto
-{
-    Annual,
-    Monthly,
-    FourWeekly,
-    Weekly,
+    Holiday,
+    SickLeave,
+    UnpaidLeave,
+    ParentalLeave,
+    Ended,
+    Other,
 }
 
 public static class IncomeRoutes
 {
-    /// <summary>GET: list (add <c>?includeInactive=true</c> for ended streams). POST: add employment income.</summary>
+    /// <summary>GET: income for a month (<c>?month=2026-11</c>, optional <c>&amp;all=true</c>). POST: add an income.</summary>
     public static string IncomeStreams(Guid householdId) => $"/api/households/{householdId}/income-streams";
 
-    /// <summary>GET: details for editing. PUT: update. DELETE: delete permanently.</summary>
-    public static string IncomeStream(Guid householdId, Guid incomeStreamId) =>
-        $"{IncomeStreams(householdId)}/{incomeStreamId}";
+    public static string ForMonth(Guid householdId, int year, int month, bool all = false) =>
+        $"{IncomeStreams(householdId)}?month={year:D4}-{month:D2}{(all ? "&all=true" : string.Empty)}";
 
-    /// <summary>POST: stop counting the stream in totals (e.g. the job ended).</summary>
-    public static string Deactivate(Guid householdId, Guid incomeStreamId) => $"{IncomeStream(householdId, incomeStreamId)}/deactivate";
+    /// <summary>GET: details and history. PUT: rename or change person. DELETE: delete the income.</summary>
+    public static string IncomeStream(Guid householdId, Guid incomeStreamId) => $"{IncomeStreams(householdId)}/{incomeStreamId}";
 
-    /// <summary>POST: count the stream in totals again.</summary>
-    public static string Reactivate(Guid householdId, Guid incomeStreamId) => $"{IncomeStream(householdId, incomeStreamId)}/reactivate";
+    /// <summary>POST: change the amount from a date.</summary>
+    public static string AmountChanges(Guid householdId, Guid incomeStreamId) => $"{IncomeStream(householdId, incomeStreamId)}/amount-changes";
+
+    /// <summary>PUT: correct an amount change. DELETE (with a reason): remove one recorded by mistake.</summary>
+    public static string AmountChange(Guid householdId, Guid incomeStreamId, Guid changeId) => $"{AmountChanges(householdId, incomeStreamId)}/{changeId}";
+
+    /// <summary>POST: add leave, a pause or the end of the income.</summary>
+    public static string StatusPeriods(Guid householdId, Guid incomeStreamId) => $"{IncomeStream(householdId, incomeStreamId)}/status-periods";
+
+    /// <summary>PUT: correct a period. DELETE (with a reason): remove one recorded by mistake.</summary>
+    public static string StatusPeriod(Guid householdId, Guid incomeStreamId, Guid periodId) => $"{StatusPeriods(householdId, incomeStreamId)}/{periodId}";
 }
 
-/// <summary>
-/// Add or edit employment income. For fixed pay set <see cref="GrossAmount"/> and <see cref="AmountBasis"/>;
-/// for variable pay set the lowest, average and highest gross per pay period.
-/// </summary>
-public sealed record SaveEmploymentIncomeRequest
+// Requests. Every change to an existing income sends the Version that was loaded, so a save over
+// someone else's change is rejected (409) rather than silently overwriting it.
+
+public sealed record CreateIncomeStreamRequest
 {
     public string Name { get; init; } = string.Empty;
 
-    public string? EmployerName { get; init; }
+    public Guid PersonId { get; init; }
 
-    /// <summary>The household member this income belongs to, if any.</summary>
-    public Guid? MemberUserId { get; init; }
+    public decimal? MonthlyNetAmount { get; init; }
 
-    public PayFrequencyDto PayFrequency { get; init; } = PayFrequencyDto.Monthly;
+    public DateOnly? StartsOn { get; init; }
 
-    public IncomeKindDto Kind { get; init; } = IncomeKindDto.Fixed;
+    /// <summary>Optional; defaults to "Starting amount".</summary>
+    public string? Comment { get; init; }
+}
 
-    public decimal? GrossAmount { get; init; }
+public sealed record UpdateIncomeStreamRequest
+{
+    public string Name { get; init; } = string.Empty;
 
-    public AmountBasisDto? AmountBasis { get; init; }
+    public Guid PersonId { get; init; }
 
-    public decimal? LowestGross { get; init; }
-
-    public decimal? AverageGross { get; init; }
-
-    public decimal? HighestGross { get; init; }
-
-    /// <summary>
-    /// When editing: the <see cref="EmploymentIncomeDetails.Version"/> that was loaded. The save is
-    /// rejected if someone else has changed the stream since.
-    /// </summary>
     public string? Version { get; init; }
 }
 
-/// <summary>An employment income stream with everything needed to edit it.</summary>
-public sealed record EmploymentIncomeDetails(
-    Guid Id,
-    string Name,
-    string? EmployerName,
-    Guid? MemberUserId,
-    PayFrequencyDto PayFrequency,
-    IncomeKindDto Kind,
-    decimal? GrossAmount,
-    AmountBasisDto? AmountBasis,
-    decimal? LowestGross,
-    decimal? AverageGross,
-    decimal? HighestGross,
-    bool IsActive,
-    string Version);
+public sealed record SaveAmountChangeRequest
+{
+    public decimal? MonthlyNetAmount { get; init; }
 
-/// <summary>One income stream in the list. Money is rounded to pennies.</summary>
-public sealed record IncomeStreamSummary(
-    Guid Id,
-    IncomeStreamTypeDto Type,
-    string Name,
-    string? EmployerName,
-    Guid? MemberUserId,
-    string? MemberName,
-    PayFrequencyDto PayFrequency,
-    IncomeKindDto Kind,
-    bool IsActive,
-    decimal LowPerPay,
-    decimal AveragePerPay,
-    decimal HighPerPay,
-    decimal LowAnnual,
-    decimal AverageAnnual,
-    decimal HighAnnual);
+    public DateOnly? EffectiveFrom { get; init; }
+
+    public string Comment { get; init; } = string.Empty;
+
+    /// <summary>Required when correcting an existing entry: why it's being changed.</summary>
+    public string? CorrectionReason { get; init; }
+
+    public string? Version { get; init; }
+}
+
+public sealed record SaveStatusPeriodRequest
+{
+    public IncomeStatusReasonDto Reason { get; init; } = IncomeStatusReasonDto.UnpaidLeave;
+
+    public DateOnly? StartDate { get; init; }
+
+    /// <summary>Inclusive; blank means until further notice.</summary>
+    public DateOnly? EndDate { get; init; }
+
+    /// <summary>Blank means no income during the period.</summary>
+    public decimal? ReducedMonthlyAmount { get; init; }
+
+    public string Comment { get; init; } = string.Empty;
+
+    /// <summary>Required when correcting an existing entry: why it's being changed.</summary>
+    public string? CorrectionReason { get; init; }
+
+    public string? Version { get; init; }
+}
+
+public sealed record DeleteEntryRequest
+{
+    public string Reason { get; init; } = string.Empty;
+
+    public string? Version { get; init; }
+}
+
+// Responses. Money is rounded to pennies.
+
+/// <summary>Household income for one month.</summary>
+public sealed record IncomeMonthResponse(int Year, int Month, IReadOnlyList<IncomeMonthItem> Items, decimal Total, string CurrencyCode);
 
 /// <summary>
-/// The household's income streams, with estimated gross totals across active streams.
-/// Variable pay counts at its average.
+/// One income in a month. <see cref="Notes"/> explain why the month differs from the usual amount,
+/// e.g. "Unpaid leave 3 Nov – 17 Nov" or "Changes to £3,300.00 from 16 Nov".
 /// </summary>
-public sealed record IncomeStreamListResponse(
-    IReadOnlyList<IncomeStreamSummary> Items,
-    decimal TotalAnnual,
-    decimal TotalMonthly,
-    string CurrencyCode);
+public sealed record IncomeMonthItem(
+    Guid Id,
+    string Name,
+    Guid PersonId,
+    string PersonName,
+    decimal AmountForMonth,
+    decimal? UsualAmount,
+    IReadOnlyList<string> Notes,
+    DateOnly StartsOn,
+    DateOnly? EndsOn);
+
+/// <summary>An income with its full history, for its own page.</summary>
+public sealed record IncomeStreamDetails(
+    Guid Id,
+    string Name,
+    Guid PersonId,
+    string PersonName,
+    decimal AmountToday,
+    DateOnly StartsOn,
+    DateOnly? EndsOn,
+    IReadOnlyList<AmountChangeEntry> AmountChanges,
+    IReadOnlyList<StatusPeriodEntry> StatusPeriods,
+    IReadOnlyList<CorrectionEntry> Corrections,
+    string CurrencyCode,
+    string Version);
+
+public sealed record AmountChangeEntry(
+    Guid Id,
+    DateOnly EffectiveFrom,
+    decimal MonthlyNetAmount,
+    string Comment,
+    string? RecordedBy,
+    DateTimeOffset RecordedAt,
+    bool IsUpcoming,
+    bool IsFirst);
+
+public sealed record StatusPeriodEntry(
+    Guid Id,
+    IncomeStatusReasonDto Reason,
+    DateOnly StartDate,
+    DateOnly? EndDate,
+    decimal? ReducedMonthlyAmount,
+    string Comment,
+    string? RecordedBy,
+    DateTimeOffset RecordedAt,
+    bool IsUpcoming);
+
+/// <param name="EntryType">"AmountChange" or "StatusPeriod".</param>
+/// <param name="Action">"Edited" or "Deleted".</param>
+public sealed record CorrectionEntry(
+    string EntryType,
+    string Action,
+    string Before,
+    string? After,
+    string Reason,
+    string? CorrectedBy,
+    DateTimeOffset CorrectedAt);

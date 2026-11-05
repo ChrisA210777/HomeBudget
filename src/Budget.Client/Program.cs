@@ -21,6 +21,7 @@ builder.Services.AddScoped<IAccountApi, AccountApi>();
 builder.Services.AddScoped<UserSession>();
 builder.Services.AddScoped<IIncomeApi, IncomeApi>();
 builder.Services.AddScoped<IPeopleApi, PeopleApi>();
+builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();

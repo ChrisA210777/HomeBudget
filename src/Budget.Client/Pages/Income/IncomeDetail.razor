@@ -1,0 +1,513 @@
+@page "/income/{IncomeStreamId:guid}"
+@attribute [Authorize]
+@using Budget.Client.Income
+@using Budget.Client.People
+@using Budget.Shared.Income
+@using Budget.Shared.People
+@inject UserSession Session
+@inject IIncomeApi IncomeApi
+@inject IPeopleApi PeopleApi
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+
+<PageTitle>@(_details?.Name ?? "Income") · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/income" Class="mb-2">Income</MudButton>
+
+    @if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_details is null)
+    {
+        <MudAlert Severity="Severity.Warning" data-testid="not-found">This income doesn't exist any more.</MudAlert>
+    }
+    else
+    {
+        var d = _details;
+
+        <div class="d-flex align-start flex-wrap gap-2 mb-1">
+            <div class="flex-grow-1">
+                <h1 class="mud-typography mud-typography-h4" data-testid="income-name">@d.Name</h1>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" data-testid="income-person">@d.PersonName</MudText>
+            </div>
+            <div class="text-right">
+                <MudText Typo="Typo.overline">Monthly today</MudText>
+                <MudText Typo="Typo.h5" data-testid="amount-today">@Money.Format(d.AmountToday, d.CurrencyCode)</MudText>
+            </div>
+        </div>
+        <MudText Typo="Typo.body2" Class="mb-3" data-testid="income-dates">
+            Started @IncomeDates.Format(d.StartsOn)@(d.EndsOn is { } ends ? $" · Ends {IncomeDates.Format(ends)}" : string.Empty)
+        </MudText>
+
+        @if (_conflict)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="conflict">
+                Someone else changed this income while you were working. We've loaded their changes – please check and try again.
+            </MudAlert>
+        }
+
+        @if (_canEdit && _mode == Mode.None)
+        {
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TrendingUp" OnClick="StartChangeAmount" data-testid="change-amount">Change amount</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.BeachAccess" OnClick="StartAddPeriod" data-testid="add-period">Add leave or pause</MudButton>
+                @if (d.EndsOn is null)
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Stop" OnClick="StartEnd" data-testid="end-income">End income</MudButton>
+                }
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Edit" OnClick="StartEditDetails" data-testid="edit-details">Edit name or person</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="() => Start(Mode.DeleteIncome)" data-testid="delete-income">Delete</MudButton>
+            </div>
+        }
+
+        @if (_mode != Mode.None)
+        {
+            <MudPaper Class="pa-4 mb-4" Elevation="2" data-testid="editor">
+                <MudText Typo="Typo.h6" Class="mb-2">@EditorTitle</MudText>
+                <MudStack Spacing="3">
+                    @switch (_mode)
+                    {
+                        case Mode.EditDetails:
+                            <MudTextField @bind-Value="_name" Label="Name" MaxLength="IncomeValidator.NameMaxLength" Variant="Variant.Outlined"
+                                          Error="Has(nameof(UpdateIncomeStreamRequest.Name))" ErrorText="@ErrorFor(nameof(UpdateIncomeStreamRequest.Name))" data-testid="name" />
+                            <MudSelect T="Guid" @bind-Value="_personId" ToStringFunc="PersonName" Label="Whose income is it?" Variant="Variant.Outlined"
+                                       Error="Has(nameof(UpdateIncomeStreamRequest.PersonId))" ErrorText="@ErrorFor(nameof(UpdateIncomeStreamRequest.PersonId))" data-testid="person">
+                                @foreach (var person in _people)
+                                {
+                                    <MudSelectItem T="Guid" Value="person.Id">@person.DisplayName</MudSelectItem>
+                                }
+                            </MudSelect>
+                            break;
+
+                        case Mode.ChangeAmount:
+                        case Mode.CorrectAmount:
+                            <MudNumericField T="decimal?" @bind-Value="_amount" Label="Monthly take-home pay" Adornment="Adornment.Start" AdornmentText="£"
+                                             InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined"
+                                             Error="Has(nameof(SaveAmountChangeRequest.MonthlyNetAmount))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.MonthlyNetAmount))" data-testid="amount" />
+                            <MudDatePicker @bind-Date="_date" Label="Applies from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
+                                           HelperText="Can be in the future once you know about it."
+                                           Error="Has(nameof(SaveAmountChangeRequest.EffectiveFrom))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.EffectiveFrom))" data-testid="date" />
+                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. 3% pay rise" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                          Error="Has(nameof(SaveAmountChangeRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.Comment))" data-testid="comment" />
+                            break;
+
+                        case Mode.AddPeriod:
+                        case Mode.CorrectPeriod:
+                            <MudSelect T="IncomeStatusReasonDto" @bind-Value="_reason" ToStringFunc="IncomeLabels.Reason" Label="Reason" Variant="Variant.Outlined"
+                                       Error="Has(nameof(SaveStatusPeriodRequest.Reason))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.Reason))" data-testid="reason">
+                                @foreach (var reason in PeriodReasons)
+                                {
+                                    <MudSelectItem T="IncomeStatusReasonDto" Value="reason">@IncomeLabels.Reason(reason)</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudDatePicker @bind-Date="_date" Label="From" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
+                                           Error="Has(nameof(SaveStatusPeriodRequest.StartDate))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.StartDate))" data-testid="date" />
+                            @if (_reason != IncomeStatusReasonDto.Ended)
+                            {
+                                <MudDatePicker @bind-Date="_endDate" Label="Until (leave blank if you don't know yet)" DateFormat="d MMM yyyy" Variant="Variant.Outlined" Clearable="true"
+                                               Error="Has(nameof(SaveStatusPeriodRequest.EndDate))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.EndDate))" data-testid="end-date" />
+                                <MudNumericField T="decimal?" @bind-Value="_amount" Label="Reduced monthly pay (blank for none)" Adornment="Adornment.Start" AdornmentText="£"
+                                                 InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined" Clearable="true"
+                                                 Error="Has(nameof(SaveStatusPeriodRequest.ReducedMonthlyAmount))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.ReducedMonthlyAmount))" data-testid="amount" />
+                            }
+                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. Statutory sick pay" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                          Error="Has(nameof(SaveStatusPeriodRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.Comment))" data-testid="comment" />
+                            break;
+
+                        case Mode.End:
+                            <MudText Typo="Typo.body2">The income stops from this date. It stays in the history for earlier months.</MudText>
+                            <MudDatePicker @bind-Date="_date" Label="Ends from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
+                                           Error="Has(nameof(SaveStatusPeriodRequest.StartDate))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.StartDate))" data-testid="date" />
+                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. Left the job" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                          Error="Has(nameof(SaveStatusPeriodRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.Comment))" data-testid="comment" />
+                            break;
+
+                        case Mode.DeleteAmount:
+                        case Mode.DeletePeriod:
+                            <MudText Typo="Typo.body2" data-testid="delete-summary">@_deleteSummary</MudText>
+                            <MudTextField @bind-Value="_correctionReason" Label="Why are you deleting this?" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                          Error="Has(nameof(DeleteEntryRequest.Reason))" ErrorText="@ErrorFor(nameof(DeleteEntryRequest.Reason))" data-testid="correction-reason" />
+                            break;
+
+                        case Mode.DeleteIncome:
+                            <MudText Typo="Typo.body2" data-testid="delete-summary">
+                                This removes @d.Name and all of its history. If the income has stopped, use “End income” instead so earlier months stay correct.
+                            </MudText>
+                            break;
+                    }
+
+                    @if (_mode is Mode.CorrectAmount or Mode.CorrectPeriod)
+                    {
+                        <MudTextField @bind-Value="_correctionReason" Label="Why are you correcting this?" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                      HelperText="The original stays in the history."
+                                      Error="Has(nameof(SaveAmountChangeRequest.CorrectionReason))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.CorrectionReason))" data-testid="correction-reason" />
+                    }
+
+                    <div class="d-flex justify-end gap-2">
+                        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="cancel">Cancel</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="@(IsDelete ? Color.Error : Color.Primary)" OnClick="SaveAsync" Disabled="_saving" data-testid="save">
+                            @(IsDelete ? "Delete" : "Save")
+                        </MudButton>
+                    </div>
+                </MudStack>
+            </MudPaper>
+        }
+
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">Amount history</MudText>
+        @foreach (var change in d.AmountChanges.OrderByDescending(c => c.EffectiveFrom))
+        {
+            <MudCard Outlined="true" Class="mb-2" data-testid="amount-change">
+                <MudCardContent Class="pa-3">
+                    <div class="d-flex align-start gap-2">
+                        <div class="flex-grow-1" style="min-width: 0">
+                            <MudText Typo="Typo.subtitle1">
+                                <b data-testid="entry-amount">@Money.Format(change.MonthlyNetAmount, d.CurrencyCode)</b> a month from @IncomeDates.Format(change.EffectiveFrom)
+                                @if (change.IsUpcoming)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" data-testid="upcoming">Upcoming</MudChip>
+                                }
+                            </MudText>
+                            <MudText Typo="Typo.body2" data-testid="entry-comment">@change.Comment</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@Recorded(change.RecordedBy, change.RecordedAt)</MudText>
+                        </div>
+                        @if (_canEdit && _mode == Mode.None)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Correct" OnClick="() => StartCorrectAmount(change)" data-testid="correct-entry" />
+                            @if (!change.IsFirst)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Delete" OnClick="() => StartDeleteAmount(change)" data-testid="delete-entry" />
+                            }
+                        }
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">Leave, pauses and endings</MudText>
+        @if (d.StatusPeriods.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="no-periods">None recorded.</MudText>
+        }
+        @foreach (var period in d.StatusPeriods.OrderByDescending(p => p.StartDate))
+        {
+            <MudCard Outlined="true" Class="mb-2" data-testid="status-period">
+                <MudCardContent Class="pa-3">
+                    <div class="d-flex align-start gap-2">
+                        <div class="flex-grow-1" style="min-width: 0">
+                            <MudText Typo="Typo.subtitle1">
+                                <b data-testid="period-reason">@IncomeLabels.Reason(period.Reason)</b> @PeriodDates(period)
+                                @if (period.IsUpcoming)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">Upcoming</MudChip>
+                                }
+                            </MudText>
+                            @if (period.Reason != IncomeStatusReasonDto.Ended)
+                            {
+                                <MudText Typo="Typo.body2" data-testid="period-amount">
+                                    @(period.ReducedMonthlyAmount is { } reduced ? $"Paid {Money.Format(reduced, d.CurrencyCode)} a month" : "Unpaid")
+                                </MudText>
+                            }
+                            <MudText Typo="Typo.body2">@period.Comment</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@Recorded(period.RecordedBy, period.RecordedAt)</MudText>
+                        </div>
+                        @if (_canEdit && _mode == Mode.None)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Correct" OnClick="() => StartCorrectPeriod(period)" data-testid="correct-entry" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Delete" OnClick="() => StartDeletePeriod(period)" data-testid="delete-entry" />
+                        }
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        @if (d.Corrections.Count > 0)
+        {
+            <MudText Typo="Typo.h6" Class="mt-4 mb-2">Corrections</MudText>
+            @foreach (var correction in d.Corrections.OrderByDescending(c => c.CorrectedAt))
+            {
+                <MudPaper Outlined="true" Class="pa-3 mb-2" data-testid="correction">
+                    <MudText Typo="Typo.body2"><b>@(correction.Action == "Deleted" ? "Deleted" : "Corrected"):</b> @correction.Before</MudText>
+                    @if (correction.After is { } after)
+                    {
+                        <MudText Typo="Typo.body2"><b>Now:</b> @after</MudText>
+                    }
+                    <MudText Typo="Typo.body2"><b>Why:</b> @correction.Reason</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@Recorded(correction.CorrectedBy, correction.CorrectedAt)</MudText>
+                </MudPaper>
+            }
+        }
+    }
+</MudContainer>
+
+@code {
+    private static readonly IncomeStatusReasonDto[] PeriodReasons = Enum.GetValues<IncomeStatusReasonDto>();
+
+    [Parameter]
+    public Guid IncomeStreamId { get; set; }
+
+    private enum Mode { None, EditDetails, ChangeAmount, CorrectAmount, DeleteAmount, AddPeriod, CorrectPeriod, DeletePeriod, End, DeleteIncome }
+
+    private HouseholdMembershipSummary? _household;
+    private IncomeStreamDetails? _details;
+    private IReadOnlyList<PersonSummary> _people = [];
+    private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
+    private bool _loaded;
+    private bool _canEdit;
+    private bool _saving;
+    private bool _conflict;
+
+    private Mode _mode;
+    private Guid _entryId;
+    private string? _name;
+    private Guid _personId;
+    private decimal? _amount;
+    private DateTime? _date;
+    private DateTime? _endDate;
+    private IncomeStatusReasonDto _reason = IncomeStatusReasonDto.UnpaidLeave;
+    private string? _comment;
+    private string? _correctionReason;
+    private string? _deleteSummary;
+
+    private bool IsDelete => _mode is Mode.DeleteAmount or Mode.DeletePeriod or Mode.DeleteIncome;
+
+    private string EditorTitle => _mode switch
+    {
+        Mode.EditDetails => "Edit name or person",
+        Mode.ChangeAmount => "Change the monthly amount",
+        Mode.CorrectAmount => "Correct an amount change",
+        Mode.DeleteAmount => "Delete an amount change",
+        Mode.AddPeriod => "Add leave or a pause",
+        Mode.CorrectPeriod => "Correct leave or a pause",
+        Mode.DeletePeriod => "Delete leave or a pause",
+        Mode.End => "End this income",
+        Mode.DeleteIncome => "Delete this income?",
+        _ => string.Empty,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        _canEdit = _household is not null && _household.Role != "Viewer";
+        if (_household is not null)
+        {
+            _details = await IncomeApi.GetAsync(_household.HouseholdId, IncomeStreamId);
+        }
+
+        _loaded = true;
+    }
+
+    private DateTime Today
+    {
+        get
+        {
+            var now = Clock.GetLocalNow();
+            return new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Unspecified);
+        }
+    }
+
+    private void Start(Mode mode)
+    {
+        _mode = mode;
+        _errors = new Dictionary<string, string[]>();
+        _conflict = false;
+        _amount = null;
+        _date = Today;
+        _endDate = null;
+        _comment = null;
+        _correctionReason = null;
+    }
+
+    private async Task StartEditDetails()
+    {
+        Start(Mode.EditDetails);
+        _name = _details!.Name;
+        _personId = _details.PersonId;
+        if (_people.Count == 0)
+        {
+            _people = await PeopleApi.ListAsync(_household!.HouseholdId);
+        }
+    }
+
+    private void StartChangeAmount() => Start(Mode.ChangeAmount);
+
+    private void StartAddPeriod()
+    {
+        Start(Mode.AddPeriod);
+        _reason = IncomeStatusReasonDto.UnpaidLeave;
+    }
+
+    private void StartEnd() => Start(Mode.End);
+
+    private void StartCorrectAmount(AmountChangeEntry change)
+    {
+        Start(Mode.CorrectAmount);
+        _entryId = change.Id;
+        _amount = change.MonthlyNetAmount;
+        _date = IncomeDates.ToDateTime(change.EffectiveFrom);
+        _comment = change.Comment;
+    }
+
+    private void StartDeleteAmount(AmountChangeEntry change)
+    {
+        Start(Mode.DeleteAmount);
+        _entryId = change.Id;
+        _deleteSummary = $"{Money.Format(change.MonthlyNetAmount, _details!.CurrencyCode)} a month from {IncomeDates.Format(change.EffectiveFrom)} ({change.Comment})";
+    }
+
+    private void StartCorrectPeriod(StatusPeriodEntry period)
+    {
+        Start(Mode.CorrectPeriod);
+        _entryId = period.Id;
+        _reason = period.Reason;
+        _date = IncomeDates.ToDateTime(period.StartDate);
+        _endDate = IncomeDates.ToDateTime(period.EndDate);
+        _amount = period.ReducedMonthlyAmount;
+        _comment = period.Comment;
+    }
+
+    private void StartDeletePeriod(StatusPeriodEntry period)
+    {
+        Start(Mode.DeletePeriod);
+        _entryId = period.Id;
+        _deleteSummary = $"{IncomeLabels.Reason(period.Reason)} {PeriodDates(period)} ({period.Comment})";
+    }
+
+    private void Cancel()
+    {
+        _mode = Mode.None;
+        _errors = new Dictionary<string, string[]>();
+    }
+
+    private async Task SaveAsync()
+    {
+        var householdId = _household!.HouseholdId;
+        var version = _details!.Version;
+
+        if (_mode == Mode.DeleteIncome)
+        {
+            _saving = true;
+            await IncomeApi.DeleteAsync(householdId, IncomeStreamId);
+            Navigation.NavigateTo("/income");
+            return;
+        }
+
+        Func<Task<ApiResult<IncomeStreamDetails>>> send;
+        switch (_mode)
+        {
+            case Mode.EditDetails:
+            {
+                var request = new UpdateIncomeStreamRequest { Name = _name ?? string.Empty, PersonId = _personId, Version = version };
+                _errors = IncomeValidator.Validate(request);
+                send = () => IncomeApi.UpdateAsync(householdId, IncomeStreamId, request);
+                break;
+            }
+
+            case Mode.ChangeAmount:
+            case Mode.CorrectAmount:
+            {
+                var isCorrection = _mode == Mode.CorrectAmount;
+                var request = new SaveAmountChangeRequest
+                {
+                    MonthlyNetAmount = _amount,
+                    EffectiveFrom = IncomeDates.ToDateOnly(_date),
+                    Comment = _comment ?? string.Empty,
+                    CorrectionReason = isCorrection ? _correctionReason : null,
+                    Version = version,
+                };
+                _errors = IncomeValidator.Validate(request, isCorrection);
+                var entryId = _entryId;
+                send = isCorrection
+                    ? () => IncomeApi.CorrectAmountChangeAsync(householdId, IncomeStreamId, entryId, request)
+                    : () => IncomeApi.AddAmountChangeAsync(householdId, IncomeStreamId, request);
+                break;
+            }
+
+            case Mode.AddPeriod:
+            case Mode.CorrectPeriod:
+            case Mode.End:
+            {
+                var isCorrection = _mode == Mode.CorrectPeriod;
+                var ended = _mode == Mode.End || _reason == IncomeStatusReasonDto.Ended;
+                var request = new SaveStatusPeriodRequest
+                {
+                    Reason = _mode == Mode.End ? IncomeStatusReasonDto.Ended : _reason,
+                    StartDate = IncomeDates.ToDateOnly(_date),
+                    EndDate = ended ? null : IncomeDates.ToDateOnly(_endDate),
+                    ReducedMonthlyAmount = ended ? null : _amount,
+                    Comment = _comment ?? string.Empty,
+                    CorrectionReason = isCorrection ? _correctionReason : null,
+                    Version = version,
+                };
+                _errors = IncomeValidator.Validate(request, isCorrection);
+                var entryId = _entryId;
+                send = isCorrection
+                    ? () => IncomeApi.CorrectStatusPeriodAsync(householdId, IncomeStreamId, entryId, request)
+                    : () => IncomeApi.AddStatusPeriodAsync(householdId, IncomeStreamId, request);
+                break;
+            }
+
+            case Mode.DeleteAmount:
+            case Mode.DeletePeriod:
+            {
+                var request = new DeleteEntryRequest { Reason = _correctionReason ?? string.Empty, Version = version };
+                _errors = IncomeValidator.Validate(request);
+                var entryId = _entryId;
+                send = _mode == Mode.DeleteAmount
+                    ? () => IncomeApi.DeleteAmountChangeAsync(householdId, IncomeStreamId, entryId, request)
+                    : () => IncomeApi.DeleteStatusPeriodAsync(householdId, IncomeStreamId, entryId, request);
+                break;
+            }
+
+            default:
+                return;
+        }
+
+        if (_errors.Count > 0)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await send();
+            if (result.Succeeded)
+            {
+                _details = result.Value;
+                _mode = Mode.None;
+            }
+            else if (result.Conflict)
+            {
+                _details = await IncomeApi.GetAsync(householdId, IncomeStreamId);
+                _conflict = true;
+                _mode = Mode.None;
+            }
+            else
+            {
+                _errors = result.Errors;
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string PeriodDates(StatusPeriodEntry period) => period switch
+    {
+        { Reason: IncomeStatusReasonDto.Ended } => $"from {IncomeDates.Format(period.StartDate)}",
+        { EndDate: { } end } => $"{IncomeDates.Format(period.StartDate)} – {IncomeDates.Format(end)}",
+        _ => $"from {IncomeDates.Format(period.StartDate)}, until further notice",
+    };
+
+    private static string Recorded(string? by, DateTimeOffset at) =>
+        $"Recorded {(by is null ? string.Empty : $"by {by} ")}on {IncomeDates.Format(DateOnly.FromDateTime(at.LocalDateTime))}";
+
+    private string PersonName(Guid id) => _people.FirstOrDefault(p => p.Id == id)?.DisplayName ?? _details?.PersonName ?? string.Empty;
+
+    private bool Has(string field) => _errors.ContainsKey(field);
+
+    private string? ErrorFor(string field) => _errors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
+}

@@ -1,8 +1,9 @@
 using Budget.Client.Account;
 using Budget.Client.Income;
+using Budget.Client.People;
 using Budget.Shared.Account;
-using Budget.Shared.Households;
 using Budget.Shared.Income;
+using Budget.Shared.People;
 
 namespace Budget.Client.Tests.TestDoubles;
 
@@ -26,58 +27,120 @@ public sealed class FakeAccountApi(string role = "Admin", bool isOwner = true) :
     public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
-/// <summary>An in-memory income API that records what the page asked it to do.</summary>
+/// <summary>A clock fixed at a given UTC time, with UTC as the local time zone.</summary>
+public sealed class FixedClock(DateTimeOffset now) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => now;
+
+    public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+}
+
+/// <summary>A household with two people: Chris (you) and Jane.</summary>
+public sealed class StaticPeopleApi : IPeopleApi
+{
+    public static readonly Guid ChrisId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    public static readonly Guid JaneId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+
+    public Task<IReadOnlyList<PersonSummary>> ListAsync(Guid householdId) =>
+        Task.FromResult<IReadOnlyList<PersonSummary>>(
+        [
+            new(ChrisId, "Chris Austin", FakeAccountApi.UserId, "Chris Austin", IsYou: true),
+            new(JaneId, "Jane", null, null, IsYou: false),
+        ]);
+
+    public Task<SavePersonResult> AddAsync(Guid householdId, SavePersonRequest request) => throw new NotSupportedException();
+
+    public Task<SavePersonResult> RenameAsync(Guid householdId, Guid personId, SavePersonRequest request) => throw new NotSupportedException();
+}
+
+/// <summary>An in-memory income API that records what the pages asked it to do.</summary>
 public sealed class FakeIncomeApi : IIncomeApi
 {
-    public IncomeStreamListResponse List { get; set; } = new([], 0m, 0m, "GBP");
+    public IncomeMonthResponse Month { get; set; } = new(2026, 11, [], 0m, "GBP");
 
-    public EmploymentIncomeDetails? Details { get; set; }
+    public IncomeStreamDetails? Details { get; set; }
 
-    public IReadOnlyList<HouseholdMemberSummary> Members { get; set; } =
-    [
-        new(FakeAccountApi.UserId, "Chris Austin", "chris@outlook.com", "Admin", IsOwner: true, DateTimeOffset.UnixEpoch),
-    ];
+    /// <summary>What the next change returns; by default it succeeds with <see cref="Details"/>.</summary>
+    public ApiResult<IncomeStreamDetails>? NextResult { get; set; }
 
-    /// <summary>What the next create or update returns; succeeds by default.</summary>
-    public SaveResult? NextSaveResult { get; set; }
+    public List<(int Year, int Month, bool All)> MonthCalls { get; } = [];
 
-    public List<bool> ListCalls { get; } = [];
+    /// <summary>Each change as (operation, entry id, request).</summary>
+    public List<(string Operation, Guid? EntryId, object Request)> Calls { get; } = [];
 
-    public List<(Guid? Id, SaveEmploymentIncomeRequest Request)> Saves { get; } = [];
+    public List<Guid> Deleted { get; } = [];
 
-    public List<(Guid Id, bool Active)> ActiveChanges { get; } = [];
+    public int GetCalls { get; private set; }
 
-    public Task<IncomeStreamListResponse> ListAsync(Guid householdId, bool includeInactive)
+    public Task<IncomeMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all)
     {
-        ListCalls.Add(includeInactive);
-        return Task.FromResult(List);
+        MonthCalls.Add((year, month, all));
+        return Task.FromResult(Month with { Year = year, Month = month });
     }
 
-    public Task<EmploymentIncomeDetails?> GetAsync(Guid householdId, Guid incomeStreamId) => Task.FromResult(Details);
-
-    public Task<SaveResult> CreateAsync(Guid householdId, SaveEmploymentIncomeRequest request)
+    public Task<IncomeStreamDetails?> GetAsync(Guid householdId, Guid incomeStreamId)
     {
-        Saves.Add((null, request));
-        return Task.FromResult(NextSaveResult ?? SaveResult.Success(ToDetails(Guid.NewGuid(), request)));
+        GetCalls++;
+        return Task.FromResult(Details);
     }
 
-    public Task<SaveResult> UpdateAsync(Guid householdId, Guid incomeStreamId, SaveEmploymentIncomeRequest request)
-    {
-        Saves.Add((incomeStreamId, request));
-        return Task.FromResult(NextSaveResult ?? SaveResult.Success(ToDetails(incomeStreamId, request)));
-    }
+    public Task<ApiResult<IncomeStreamDetails>> CreateAsync(Guid householdId, CreateIncomeStreamRequest request) => Record("Create", null, request);
 
-    public Task SetActiveAsync(Guid householdId, Guid incomeStreamId, bool active)
+    public Task<ApiResult<IncomeStreamDetails>> UpdateAsync(Guid householdId, Guid incomeStreamId, UpdateIncomeStreamRequest request) => Record("Update", null, request);
+
+    public Task DeleteAsync(Guid householdId, Guid incomeStreamId)
     {
-        ActiveChanges.Add((incomeStreamId, active));
+        Deleted.Add(incomeStreamId);
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(Guid householdId, Guid incomeStreamId) => Task.CompletedTask;
+    public Task<ApiResult<IncomeStreamDetails>> AddAmountChangeAsync(Guid householdId, Guid incomeStreamId, SaveAmountChangeRequest request) => Record("AddAmount", null, request);
 
-    public Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId) => Task.FromResult(Members);
+    public Task<ApiResult<IncomeStreamDetails>> CorrectAmountChangeAsync(Guid householdId, Guid incomeStreamId, Guid entryId, SaveAmountChangeRequest request) => Record("CorrectAmount", entryId, request);
 
-    private static EmploymentIncomeDetails ToDetails(Guid id, SaveEmploymentIncomeRequest r) => new(
-        id, r.Name, r.EmployerName, r.MemberUserId, r.PayFrequency, r.Kind, r.GrossAmount, r.AmountBasis,
-        r.LowestGross, r.AverageGross, r.HighestGross, IsActive: true, Version: "AAAAAAAAAAE=");
+    public Task<ApiResult<IncomeStreamDetails>> DeleteAmountChangeAsync(Guid householdId, Guid incomeStreamId, Guid entryId, DeleteEntryRequest request) => Record("DeleteAmount", entryId, request);
+
+    public Task<ApiResult<IncomeStreamDetails>> AddStatusPeriodAsync(Guid householdId, Guid incomeStreamId, SaveStatusPeriodRequest request) => Record("AddPeriod", null, request);
+
+    public Task<ApiResult<IncomeStreamDetails>> CorrectStatusPeriodAsync(Guid householdId, Guid incomeStreamId, Guid entryId, SaveStatusPeriodRequest request) => Record("CorrectPeriod", entryId, request);
+
+    public Task<ApiResult<IncomeStreamDetails>> DeleteStatusPeriodAsync(Guid householdId, Guid incomeStreamId, Guid entryId, DeleteEntryRequest request) => Record("DeletePeriod", entryId, request);
+
+    private Task<ApiResult<IncomeStreamDetails>> Record(string operation, Guid? entryId, object request)
+    {
+        Calls.Add((operation, entryId, request));
+        var result = NextResult ?? ApiResult<IncomeStreamDetails>.Success(Details ?? IncomeSamples.Salary());
+        NextResult = null;
+        return Task.FromResult(result);
+    }
+}
+
+/// <summary>Sample incomes for the page tests.</summary>
+public static class IncomeSamples
+{
+    public static readonly Guid SalaryId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    public static readonly Guid FirstChangeId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+    public static readonly Guid RiseId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+    public static readonly Guid LeaveId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+
+    public static IncomeStreamDetails Salary() => new(
+        SalaryId,
+        "Chris – salary",
+        StaticPeopleApi.ChrisId,
+        "Chris Austin",
+        AmountToday: 3000m,
+        StartsOn: new DateOnly(2026, 1, 1),
+        EndsOn: null,
+        AmountChanges:
+        [
+            new(FirstChangeId, new DateOnly(2026, 1, 1), 3000m, "Starting amount", "Chris Austin", DateTimeOffset.UnixEpoch, IsUpcoming: false, IsFirst: true),
+            new(RiseId, new DateOnly(2026, 12, 1), 3300m, "10% pay rise", "Chris Austin", DateTimeOffset.UnixEpoch, IsUpcoming: true, IsFirst: false),
+        ],
+        StatusPeriods:
+        [
+            new(LeaveId, IncomeStatusReasonDto.SickLeave, new DateOnly(2026, 11, 16), null, 470m, "Statutory sick pay", "Chris Austin", DateTimeOffset.UnixEpoch, IsUpcoming: false),
+        ],
+        Corrections: [],
+        CurrencyCode: "GBP",
+        Version: "AAAAAAAAAAE=");
 }

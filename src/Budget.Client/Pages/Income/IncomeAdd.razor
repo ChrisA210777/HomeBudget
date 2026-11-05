@@ -1,0 +1,138 @@
+@page "/income/new"
+@attribute [Authorize]
+@using Budget.Client.Income
+@using Budget.Client.People
+@using Budget.Shared.Income
+@using Budget.Shared.People
+@inject UserSession Session
+@inject IIncomeApi IncomeApi
+@inject IPeopleApi PeopleApi
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+
+<PageTitle>Add income · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/income" Class="mb-2">Income</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-4">Add income</h1>
+
+    @if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!_canEdit)
+    {
+        <MudAlert Severity="Severity.Info" data-testid="read-only">Viewers can see income but not add it.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_name" Label="Name" HelperText="@NameHelp" MaxLength="IncomeValidator.NameMaxLength"
+                              Error="Has(nameof(CreateIncomeStreamRequest.Name))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.Name))"
+                              Variant="Variant.Outlined" data-testid="name" />
+
+                <MudSelect T="Guid" @bind-Value="_personId" ToStringFunc="PersonName" Label="Whose income is it?"
+                           Error="Has(nameof(CreateIncomeStreamRequest.PersonId))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.PersonId))"
+                           Variant="Variant.Outlined" data-testid="person">
+                    @foreach (var person in _people)
+                    {
+                        <MudSelectItem T="Guid" Value="person.Id">@person.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudText Typo="Typo.caption">Someone missing? <MudLink Href="/people">Add them on the People page</MudLink>.</MudText>
+
+                <MudNumericField T="decimal?" @bind-Value="_amount" Label="Monthly take-home pay"
+                                 Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
+                                 Error="Has(nameof(CreateIncomeStreamRequest.MonthlyNetAmount))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.MonthlyNetAmount))"
+                                 Variant="Variant.Outlined" data-testid="amount" />
+
+                <MudDatePicker @bind-Date="_startsOn" Label="Starts from" DateFormat="d MMM yyyy"
+                               Error="Has(nameof(CreateIncomeStreamRequest.StartsOn))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.StartsOn))"
+                               Variant="Variant.Outlined" data-testid="starts-on" />
+
+                <MudTextField @bind-Value="_comment" Label="Comment (optional)" Placeholder="@IncomeValidator.DefaultStartingComment"
+                              MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined" data-testid="comment" />
+
+                <div class="d-flex justify-end gap-2 mt-2">
+                    <MudButton Variant="Variant.Text" Href="/income">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving" data-testid="save">Add income</MudButton>
+                </div>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private const string NameHelp = "For example, “Chris – salary”";
+
+    private HouseholdMembershipSummary? _household;
+    private IReadOnlyList<PersonSummary> _people = [];
+    private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
+    private bool _loaded;
+    private bool _canEdit;
+    private bool _saving;
+
+    private string? _name;
+    private Guid _personId;
+    private decimal? _amount;
+    private DateTime? _startsOn;
+    private string? _comment;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = Clock.GetLocalNow();
+        _startsOn = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
+
+        _household = await Session.GetActiveHouseholdAsync();
+        _canEdit = _household is not null && _household.Role != "Viewer";
+        if (_household is not null)
+        {
+            _people = await PeopleApi.ListAsync(_household.HouseholdId);
+            _personId = _household.PersonId ?? _people.FirstOrDefault()?.Id ?? Guid.Empty;
+        }
+
+        _loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        var request = new CreateIncomeStreamRequest
+        {
+            Name = _name ?? string.Empty,
+            PersonId = _personId,
+            MonthlyNetAmount = _amount,
+            StartsOn = IncomeDates.ToDateOnly(_startsOn),
+            Comment = _comment,
+        };
+
+        _errors = IncomeValidator.Validate(request);
+        if (_errors.Count > 0)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await IncomeApi.CreateAsync(_household!.HouseholdId, request);
+            if (result.Succeeded)
+            {
+                Navigation.NavigateTo($"/income/{result.Value!.Id}");
+                return;
+            }
+
+            _errors = result.Errors;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private string PersonName(Guid id) => _people.FirstOrDefault(p => p.Id == id)?.DisplayName ?? string.Empty;
+
+    private bool Has(string field) => _errors.ContainsKey(field);
+
+    private string? ErrorFor(string field) => _errors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
+}
