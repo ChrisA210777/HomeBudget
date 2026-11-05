@@ -60,6 +60,10 @@ public class ExternalUserProvisionerTests(BudgetApiFactory factory) : Integratio
 
             var saved = await db.Users.SingleAsync(u => u.Id == userId);
             Assert.Equal(household.Id, saved.LastActiveHouseholdId);
+
+            var person = await db.People.IgnoreQueryFilters().SingleAsync(p => p.HouseholdId == household.Id);
+            Assert.Equal("Jo Bloggs", person.DisplayName);
+            Assert.Equal(userId, person.LinkedUserId);
         });
     }
 
@@ -71,7 +75,12 @@ public class ExternalUserProvisionerTests(BudgetApiFactory factory) : Integratio
         var email = $"{Guid.NewGuid():N}@example.com";
         var login = MicrosoftLogin(new string('k', 500), "Failing User", email);
         var householdsBefore = 0;
-        await ExecuteDbContextAsync(async db => householdsBefore = await db.Households.CountAsync());
+        var peopleBefore = 0;
+        await ExecuteDbContextAsync(async db =>
+        {
+            householdsBefore = await db.Households.CountAsync();
+            peopleBefore = await db.People.IgnoreQueryFilters().CountAsync();
+        });
 
         ApplicationUser? user = null;
         await ExecuteScopeAsync(async services =>
@@ -82,6 +91,7 @@ public class ExternalUserProvisionerTests(BudgetApiFactory factory) : Integratio
         {
             Assert.False(await db.Users.AnyAsync(u => u.Email == email));
             Assert.Equal(householdsBefore, await db.Households.CountAsync());
+            Assert.Equal(peopleBefore, await db.People.IgnoreQueryFilters().CountAsync());
         });
     }
 

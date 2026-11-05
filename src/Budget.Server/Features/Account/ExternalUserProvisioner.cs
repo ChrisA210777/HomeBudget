@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Budget.Domain.Households;
+using Budget.Domain.People;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -9,8 +10,8 @@ namespace Budget.Server.Features.Account;
 
 /// <summary>
 /// Finds the user linked to an external login. The first time someone signs in it creates their
-/// user, links the login and creates "My Household" with them as Owner and Admin, all in one
-/// transaction: either everything is created or nothing is.
+/// user, links the login, creates "My Household" with them as Owner and Admin, and adds them as a
+/// person in it, all in one transaction: either everything is created or nothing is.
 /// </summary>
 public sealed partial class ExternalUserProvisioner(
     BudgetDbContext db,
@@ -54,8 +55,9 @@ public sealed partial class ExternalUserProvisioner(
         var household = Household.Create(user.Id, now);
         user.LastActiveHouseholdId = household.Id;
 
-        // CreateAsync saves the household and its owner membership along with the user.
+        // CreateAsync saves the household, its owner membership and the owner's person along with the user.
         db.Households.Add(household);
+        db.People.Add(Person.CreateForUser(household.Id, user.Id, user.DisplayName));
 
         var created = await users.CreateAsync(user);
         if (!created.Succeeded)

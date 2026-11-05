@@ -14,4 +14,5 @@ public sealed record CurrentUserResponse(
     Guid? LastActiveHouseholdId);
 
 /// <summary>A household the user belongs to and their role in it.</summary>
-public sealed record HouseholdMembershipSummary(Guid HouseholdId, string Name, string Role, bool IsOwner);
+/// <param name="PersonId">The person in that household linked to the user's login, if any.</param>
+public sealed record HouseholdMembershipSummary(Guid HouseholdId, string Name, string Role, bool IsOwner, Guid? PersonId = null);
