@@ -11,6 +11,10 @@ namespace Budget.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Income is redesigned (BUD-30): the old gross-pay rows have no person and no monthly net
+            // history, so they can't be carried over. They were test data only; people re-enter income.
+            migrationBuilder.Sql("DELETE FROM IncomeStreams;");
+
             migrationBuilder.DropForeignKey(
                 name: "FK_IncomeStreams_AspNetUsers_MemberUserId",
                 table: "IncomeStreams");
