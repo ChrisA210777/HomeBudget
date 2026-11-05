@@ -180,7 +180,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     public void Shared_enums_match_the_domain(Type domain, Type shared)
     {
         Assert.Equal(Enum.GetNames(domain), Enum.GetNames(shared));
-        Assert.Equal(Enum.GetValues(domain).Cast<int>(), Enum.GetValues(shared).Cast<int>());
+        Assert.Equal(Enum.GetValuesAsUnderlyingType(domain).Cast<int>().ToArray(), Enum.GetValuesAsUnderlyingType(shared).Cast<int>().ToArray());
     }
 
     private static CreateOutgoingRequest Valid(Guid categoryId) => new()

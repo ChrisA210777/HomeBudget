@@ -4,7 +4,7 @@ import { settled, signIn } from './helpers';
 
 /** Opens a MudSelect (found by the data-testid on its input) and picks the option containing the text. */
 async function choose(page: Page, testId: string, option: string): Promise<void> {
-  await page.locator('.mud-select').filter({ has: page.getByTestId(testId) }).click();
+  await page.locator('.mud-select').filter({ has: page.getByTestId(testId) }).first().click();
   await page.locator('.mud-popover-open .mud-list-item').filter({ hasText: option }).first().click();
   await expect(page.locator('.mud-popover-open .mud-list-item')).toHaveCount(0);
 }

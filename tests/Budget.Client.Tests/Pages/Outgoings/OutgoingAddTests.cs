@@ -41,7 +41,7 @@ public sealed class OutgoingAddTests : IDisposable
         cut.Find("input[data-testid=name]").Change("Car insurance");
         await ChooseAsync(cut, Selects<Guid>(cut)[0], InsuranceId);
         await ChooseAsync(cut, Selects<OutgoingPriorityDto?>(cut)[0], OutgoingPriorityDto.Essential);
-        cut.Find("input[data-testid=amount]").Change("480");
+        cut.Find("input[data-testid=amount]").Input("480");
         await ChooseAsync(cut, Selects<PaymentUnitDto>(cut)[0], PaymentUnitDto.Year);
         cut.Find("[data-testid=save]").Click();
 
@@ -190,7 +190,7 @@ public sealed class OutgoingAddTests : IDisposable
         cut.Find("input[data-testid=name]").Change("Car insurance");
         await ChooseAsync(cut, Selects<Guid>(cut)[0], InsuranceId);
         await ChooseAsync(cut, Selects<OutgoingPriorityDto?>(cut)[0], OutgoingPriorityDto.Preferred);
-        cut.Find("input[data-testid=amount]").Change("40");
+        cut.Find("input[data-testid=amount]").Input("40");
         return cut;
     }
 
