@@ -1,5 +1,6 @@
 using Budget.Domain.Households;
 using Budget.Domain.Income;
+using Budget.Domain.Outgoings;
 using Budget.Domain.People;
 using Budget.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -37,6 +38,12 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
 
     /// <summary>Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
     public DbSet<IncomeStream> IncomeStreams => Set<IncomeStream>();
+
+    /// <summary>Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
+    public DbSet<OutgoingCategory> OutgoingCategories => Set<OutgoingCategory>();
+
+    /// <summary>Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
+    public DbSet<Outgoing> Outgoings => Set<Outgoing>();
 
     /// <summary>Read by the household query filters each time a query runs.</summary>
     private Guid? CurrentHouseholdId => _currentHousehold.HouseholdId;

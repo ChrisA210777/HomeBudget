@@ -5,6 +5,7 @@ using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Account;
 using Budget.Server.Features.Households;
 using Budget.Server.Features.Income;
+using Budget.Server.Features.Outgoings;
 using Budget.Server.Features.People;
 using Budget.Server.Hosting;
 using Budget.Server.Identity;
@@ -74,6 +75,7 @@ if (TestSignInEndpoint.IsEnabled(app.Environment, app.Configuration))
 app.MapHouseholdEndpoints();
 app.MapIncomeStreamEndpoints();
 app.MapPeopleEndpoints();
+app.MapOutgoingCategoryEndpoints();
 
 // Unknown server routes are 404s, not the client app's page.
 app.MapFallback("/api/{**path}", () => Results.NotFound());
