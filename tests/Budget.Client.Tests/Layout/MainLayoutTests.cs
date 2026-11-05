@@ -138,7 +138,7 @@ public sealed class MainLayoutTests : IDisposable
 
         cut.InvokeAsync(() => _context.Services.GetRequiredService<ThemePreference>().SetAsync(mode));
 
-        cut.WaitForAssertion(() => Assert.Equal(dark, cut.FindComponent<MudThemeProvider>().Instance.IsDarkMode));
+        cut.WaitForAssertion(() => Assert.Equal(dark, cut.FindComponent<MudThemeProvider>().Instance.GetState(x => x.IsDarkMode)));
     }
 
     public void Dispose() => _context.Dispose();

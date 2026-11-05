@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import type { Page } from '@playwright/test';
 import { signIn } from './helpers';
 
 const lightBackground = 'rgb(247, 249, 249)';

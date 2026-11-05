@@ -110,6 +110,15 @@ jobs:
           done
           echo "The app didn't start"; cat ../server.log; exit 1
 
+      - name: Check the app serves its pages
+        run: |
+          curl -sk -o /dev/null -w "/ -> %{http_code}\n" "$E2E_BASE_URL/"
+          curl -sk -o /dev/null -w "/login -> %{http_code}\n" "$E2E_BASE_URL/login"
+          curl -sk -o /dev/null -w "/manifest.webmanifest -> %{http_code} %{content_type}\n" "$E2E_BASE_URL/manifest.webmanifest"
+          curl -sk -o /dev/null -w "/service-worker.js -> %{http_code}\n" "$E2E_BASE_URL/service-worker.js"
+          curl -sk -o /dev/null -w "/account/test-sign-in -> %{http_code}\n" "$E2E_BASE_URL/account/test-sign-in?name=Probe"
+          curl -sk "$E2E_BASE_URL/" | head -c 3000
+
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -123,6 +132,10 @@ jobs:
       - name: Run end-to-end tests
         working-directory: tests/e2e
         run: npx playwright test
+
+      - name: Show the app's log
+        if: failure()
+        run: tail -n 200 artifacts/server.log
 
       - name: Upload Playwright report
         if: always()

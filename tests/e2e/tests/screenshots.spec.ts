@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from './fixtures';
 import { addIncome, settled, signIn } from './helpers';
 
 // Not a check: saves pictures of each main page in both themes for people to look over

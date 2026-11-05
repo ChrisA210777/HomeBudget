@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { signIn } from './helpers';
 
 test('has an installable manifest with icons', async ({ request }) => {

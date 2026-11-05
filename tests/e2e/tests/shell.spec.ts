@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { addIncome, isPhone, settled, signIn } from './helpers';
 
 test('shows the household in the app bar and navigation that suits the screen', async ({ page }, testInfo) => {
