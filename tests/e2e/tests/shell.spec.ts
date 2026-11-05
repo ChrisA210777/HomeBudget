@@ -22,6 +22,10 @@ test('moves between sections with the navigation', async ({ page }, testInfo) =>
   await expect(page).toHaveURL(/\/income$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Income' })).toBeVisible();
 
+  await nav.getByRole('link', { name: 'Outgoings' }).click();
+  await expect(page).toHaveURL(/\/outgoings$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Outgoings' })).toBeVisible();
+
   await nav.getByRole('link', { name: 'People' }).click();
   await expect(page).toHaveURL(/\/people$/);
   await expect(page.getByRole('heading', { level: 1, name: 'People' })).toBeVisible();
@@ -34,7 +38,7 @@ test('nothing scrolls sideways', async ({ page }) => {
   await signIn(page);
   const incomePage = await addIncome(page, 'Salary', '2500');
 
-  for (const path of ['/', '/income', '/income/new', '/people', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname]) {
+  for (const path of ['/', '/income', '/income/new', '/people', '/outgoings', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname]) {
     await page.goto(path);
     await settled(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

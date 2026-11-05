@@ -29,7 +29,7 @@ async function choose(page: Page, testId: string, option: string): Promise<void>
   await expect(page.locator('.mud-popover-open .mud-list-item')).toHaveCount(0);
 }
 
-test('an outgoing can be added from the home page', async ({ page }) => {
+test("an outgoing added from the home page shows in this month's list", async ({ page }) => {
   await signIn(page);
   await page.getByTestId('add-outgoing').click();
   await settled(page);
@@ -43,8 +43,14 @@ test('an outgoing can be added from the home page', async ({ page }) => {
 
   await page.getByTestId('save').click();
 
-  await expect(page.getByTestId('welcome')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Outgoings' })).toBeVisible();
   await expect(page.getByText('Car insurance was added.')).toBeVisible();
+  const item = page.getByTestId('outgoing-item').filter({ hasText: 'Car insurance' });
+  // It starts this month, so this month counts in full (ADR-011).
+  await expect(item.getByTestId('outgoing-monthly')).toHaveText('£40.00');
+  await expect(item.getByTestId('outgoing-paid')).toContainText('£480.00 a year');
+  await expect(item.getByTestId('outgoing-note').first()).toContainText('Starts');
+  await expect(page.getByTestId('total-essential')).toHaveText('£40.00');
 });
 
 test('the add form warns about card numbers', async ({ page }) => {

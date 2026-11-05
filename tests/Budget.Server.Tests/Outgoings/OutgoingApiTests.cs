@@ -171,6 +171,116 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, OutgoingRoutes.PaidFromNames);
     }
 
+    [Fact]
+    public async Task A_month_lists_outgoings_by_category_with_monthly_amounts_and_notes()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var housing = await CategoryIdAsync(householdId, "Housing");
+        var insurance = await CategoryIdAsync(householdId, "Insurance");
+        var food = await CategoryIdAsync(householdId, "Food & household");
+        var personId = await PersonIdAsync(householdId);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var mortgage = Outgoing.Create(householdId, Details("Mortgage", housing, new DateOnly(2026, 1, 1)), 900m, PaymentSchedule.Monthly, "Start");
+        mortgage.PauseFor(new DateOnly(2026, 11, 1), payments: 1, "Payment holiday");
+        var carInsurance = Outgoing.Create(householdId, Details("Car insurance", insurance, new DateOnly(2026, 3, 14)) with
+        {
+            PersonId = personId,
+            Priority = OutgoingPriority.Essential,
+            RenewalDate = today.AddDays(10),
+            AlertPeriod = AlertPeriod.OneMonth,
+        }, 480m, PaymentSchedule.Yearly, "Start");
+        var councilTax = Outgoing.Create(householdId, Details("Council tax", housing, new DateOnly(2026, 4, 1)), 150m, PaymentSchedule.Monthly, "Start");
+        councilTax.ChangeAmount(new DateOnly(2026, 11, 16), 180m, PaymentSchedule.Monthly, "New band");
+        var food1 = Outgoing.Create(householdId, Details("Food shopping", food, new DateOnly(2026, 1, 5)) with
+        {
+            Kind = OutgoingKind.Allowance,
+            Priority = OutgoingPriority.Preferred,
+        }, 120m, PaymentSchedule.Weekly, "Start");
+        var future = Outgoing.Create(householdId, Details("Gym", food, new DateOnly(2027, 1, 1)), 30m, PaymentSchedule.Monthly, "Start");
+        var ended = Outgoing.Create(householdId, Details("Old phone", food, new DateOnly(2025, 1, 1)), 20m, PaymentSchedule.Monthly, "Start");
+        ended.End(new DateOnly(2026, 6, 1), "Cancelled");
+        await ExecuteDbContextAsync(async db =>
+        {
+            db.Outgoings.AddRange(mortgage, carInsurance, councilTax, food1, future, ended);
+            await db.SaveChangesAsync();
+        });
+        using var client = CreateClient(signedInAs: ownerId);
+
+        var month = (await client.GetFromJsonAsync<OutgoingMonthResponse>(Url(OutgoingRoutes.ForMonth(householdId, 2026, 11))))!;
+
+        Assert.Equal((2026, 11, "GBP"), (month.Year, month.Month, month.CurrencyCode));
+        Assert.Equal(new[] { "Council tax", "Mortgage", "Car insurance", "Food shopping" }, month.Items.Select(i => i.Name));
+
+        var councilTaxItem = month.Items[0];
+        Assert.Equal(("Housing", 150m, 180m, PaymentUnitDto.Month), (councilTaxItem.CategoryName, councilTaxItem.MonthlyAmount, councilTaxItem.Amount, councilTaxItem.Unit));
+        Assert.Equal(new[] { "Rises to £180.00 a month from 16 Nov 2026" }, councilTaxItem.Notes);
+
+        var mortgageItem = month.Items[1];
+        Assert.Equal(0m, mortgageItem.MonthlyAmount);
+        Assert.Equal(new[] { "Paused 1 Nov 2026 – 30 Nov 2026" }, mortgageItem.Notes);
+
+        var insuranceItem = month.Items[2];
+        Assert.Equal((40m, 480m, PaymentUnitDto.Year), (insuranceItem.MonthlyAmount, insuranceItem.Amount, insuranceItem.Unit));
+        Assert.Equal(personId, insuranceItem.PersonId);
+        Assert.False(string.IsNullOrEmpty(insuranceItem.PersonName));
+        Assert.True(insuranceItem.IsComingUp);
+        Assert.Equal(today.AddDays(10), insuranceItem.NextRenewal);
+        Assert.Empty(insuranceItem.Notes);
+
+        var foodItem = month.Items[3];
+        Assert.Equal((OutgoingKindDto.Allowance, OutgoingPriorityDto.Preferred, 520m), (foodItem.Kind, foodItem.Priority, foodItem.MonthlyAmount));
+        Assert.False(foodItem.IsComingUp);
+        Assert.Null(foodItem.PersonId);
+
+        var totals = OutgoingTotals.For(month.Items);
+        Assert.Equal(new OutgoingTotals(710m, 190m, 520m, 0m), totals);
+    }
+
+    [Fact]
+    public async Task Show_all_includes_outgoings_not_started_or_already_ended()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var food = await CategoryIdAsync(householdId, "Food & household");
+        var future = Outgoing.Create(householdId, Details("Gym", food, new DateOnly(2027, 1, 1)), 30m, PaymentSchedule.Monthly, "Start");
+        var ended = Outgoing.Create(householdId, Details("Old phone", food, new DateOnly(2025, 1, 1)), 20m, PaymentSchedule.Monthly, "Start");
+        ended.End(new DateOnly(2026, 6, 1), "Cancelled");
+        await ExecuteDbContextAsync(async db =>
+        {
+            db.Outgoings.AddRange(future, ended);
+            await db.SaveChangesAsync();
+        });
+        using var client = CreateClient(signedInAs: ownerId);
+
+        var usual = (await client.GetFromJsonAsync<OutgoingMonthResponse>(Url(OutgoingRoutes.ForMonth(householdId, 2026, 11))))!;
+        var all = (await client.GetFromJsonAsync<OutgoingMonthResponse>(Url(OutgoingRoutes.ForMonth(householdId, 2026, 11, all: true))))!;
+
+        Assert.Empty(usual.Items);
+        Assert.Equal(new[] { "Gym", "Old phone" }, all.Items.Select(i => i.Name));
+        Assert.Equal(new[] { "Starts 1 Jan 2027" }, all.Items[0].Notes);
+        Assert.Equal(new[] { "Ended from 1 Jun 2026" }, all.Items[1].Notes);
+        Assert.All(all.Items, i => Assert.Equal(0m, i.MonthlyAmount));
+    }
+
+    [Fact]
+    public async Task A_bad_month_is_rejected()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        using var client = CreateClient(signedInAs: ownerId);
+
+        using var response = await client.GetAsync(Url(OutgoingRoutes.Outgoings(householdId) + "?month=November"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public Task Viewers_can_see_the_month() =>
+        AssertMinimumRoleAsync(HttpMethod.Get, hh => OutgoingRoutes.ForMonth(hh, 2026, 11), HouseholdRole.Viewer);
+
+    [Fact]
+    public Task Other_households_cannot_see_the_month() =>
+        AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, hh => OutgoingRoutes.ForMonth(hh, 2026, 11));
+
     [Theory]
     [InlineData(typeof(OutgoingKind), typeof(OutgoingKindDto))]
     [InlineData(typeof(OutgoingPriority), typeof(OutgoingPriorityDto))]
@@ -182,6 +292,13 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         Assert.Equal(Enum.GetNames(domain), Enum.GetNames(shared));
         Assert.Equal(Enum.GetValuesAsUnderlyingType(domain).Cast<int>().ToArray(), Enum.GetValuesAsUnderlyingType(shared).Cast<int>().ToArray());
     }
+
+    private static OutgoingDetails Details(string name, Guid categoryId, DateOnly firstPayment) => new()
+    {
+        Name = name,
+        CategoryId = categoryId,
+        FirstPaymentDate = firstPayment,
+    };
 
     private static CreateOutgoingRequest Valid(Guid categoryId) => new()
     {
