@@ -19,4 +19,18 @@ public sealed class UserSession(IAccountApi accountApi)
         var user = await GetCurrentUserAsync();
         return user?.Households.FirstOrDefault(h => h.HouseholdId == user.LastActiveHouseholdId);
     }
+
+    /// <summary>Updates the cached household name after a rename, so every page shows the new name.</summary>
+    public async Task SetHouseholdNameAsync(Guid householdId, string name)
+    {
+        if (await GetCurrentUserAsync() is not { } user)
+        {
+            return;
+        }
+
+        var households = user.Households
+            .Select(h => h.HouseholdId == householdId ? h with { Name = name } : h)
+            .ToList();
+        _currentUser = Task.FromResult<CurrentUserResponse?>(user with { Households = households });
+    }
 }

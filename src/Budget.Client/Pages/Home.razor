@@ -1,11 +1,39 @@
 @page "/"
 @attribute [Authorize]
+@using Budget.Client.Households
+@using Budget.Shared.Households
 @inject UserSession Session
+@inject IHouseholdApi HouseholdApi
 
 <PageTitle>Home Budget</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-6">
-    <h1 class="mud-typography mud-typography-h4">@(_household?.Name ?? "Home Budget")</h1>
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-6 mb-16">
+    @if (_renaming)
+    {
+        <div class="d-flex align-start gap-1 mb-1" data-testid="rename-form">
+            <MudTextField @bind-Value="_newName" Label="Household name" Variant="Variant.Outlined" Margin="Margin.Dense" AutoFocus="true"
+                          MaxLength="HouseholdValidator.NameMaxLength" Immediate="true" OnKeyDown="OnRenameKeyDownAsync"
+                          Error="_error is not null" ErrorText="@_error" Class="flex-grow-1" data-testid="rename-input" />
+            <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Primary" aria-label="Save name" OnClick="SaveNameAsync" Disabled="_saving" Class="mt-1" data-testid="rename-save" />
+            <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Cancel rename" OnClick="CancelRename" Class="mt-1" data-testid="rename-cancel" />
+        </div>
+    }
+    else
+    {
+        <div class="d-flex align-center gap-1">
+            <h1 class="mud-typography mud-typography-h4">@(_household?.Name ?? "Home Budget")</h1>
+            @if (_household?.Role == "Admin")
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Rename household" OnClick="StartRename" data-testid="rename-household" />
+            }
+        </div>
+    }
+
+    @if (_notice is not null)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="my-2" ShowCloseIcon="true" CloseIconClicked="() => _notice = null" data-testid="rename-conflict">@_notice</MudAlert>
+    }
+
     <AuthorizeView>
         <Authorized>
             <MudText Typo="Typo.h6" Class="mb-2" data-testid="welcome">Welcome, @context.User.Identity?.Name</MudText>
@@ -19,19 +47,117 @@
         </MudText>
     }
 
-    <MudCard Outlined="true" Class="mt-2">
-        <MudCardContent>
-            <MudText Typo="Typo.h6">Income</MudText>
-            <MudText Typo="Typo.body2">Record each job in the household and see what comes in each month.</MudText>
-        </MudCardContent>
-        <MudCardActions>
-            <MudButton Href="/income" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-income">Go to income</MudButton>
-        </MudCardActions>
-    </MudCard>
+    <MudGrid Spacing="2">
+        <MudItem xs="12" sm="6">
+            <MudCard Outlined="true" Style="height: 100%" data-testid="income-card">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />Income</MudText>
+                    <MudText Typo="Typo.body2">See what comes in each month, and record pay changes and leave.</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Href="/income" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-income">Go to income</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6">
+            <MudCard Outlined="true" Style="height: 100%" data-testid="people-card">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Class="mr-1" />People</MudText>
+                    <MudText Typo="Typo.body2">Everyone in the household, including those who don't sign in.</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Href="/people" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-people">Go to people</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
 </MudContainer>
 
 @code {
     private HouseholdMembershipSummary? _household;
+    private bool _renaming;
+    private bool _saving;
+    private string? _newName;
+    private string? _error;
+    private string? _notice;
 
     protected override async Task OnInitializedAsync() => _household = await Session.GetActiveHouseholdAsync();
+
+    private void StartRename()
+    {
+        _newName = _household!.Name;
+        _error = null;
+        _notice = null;
+        _renaming = true;
+    }
+
+    private void CancelRename()
+    {
+        _renaming = false;
+        _error = null;
+    }
+
+    private async Task OnRenameKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SaveNameAsync();
+        }
+        else if (args.Key == "Escape")
+        {
+            CancelRename();
+        }
+    }
+
+    private async Task SaveNameAsync()
+    {
+        if (_saving)
+        {
+            return;
+        }
+
+        var request = new RenameHouseholdRequest { Name = _newName ?? string.Empty, PreviousName = _household!.Name };
+        if (HouseholdValidator.Validate(request).TryGetValue(nameof(request.Name), out var messages))
+        {
+            _error = messages[0];
+            return;
+        }
+
+        if (request.Name.Trim() == _household.Name)
+        {
+            CancelRename();
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await HouseholdApi.RenameAsync(_household.HouseholdId, request);
+            if (result.Succeeded)
+            {
+                await ShowNameAsync(result.Household!.Name);
+                _renaming = false;
+            }
+            else if (result.Conflict)
+            {
+                await ShowNameAsync(result.CurrentName!);
+                _notice = $"Someone else has just renamed the household to “{result.CurrentName}”. Try again if you still want to change it.";
+                _renaming = false;
+            }
+            else
+            {
+                _error = result.Errors.TryGetValue(nameof(request.Name), out var errors) ? errors[0] : "The name couldn't be saved.";
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ShowNameAsync(string name)
+    {
+        await Session.SetHouseholdNameAsync(_household!.HouseholdId, name);
+        _household = _household with { Name = name };
+    }
 }

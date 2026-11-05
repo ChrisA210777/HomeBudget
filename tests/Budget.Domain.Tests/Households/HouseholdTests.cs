@@ -54,6 +54,19 @@ public class HouseholdTests
         Assert.Throws<ArgumentException>(() => Household.Create(Guid.NewGuid(), Now, new string('a', 101)));
     }
 
+    [Fact]
+    public void Renaming_trims_the_name_and_keeps_the_rules()
+    {
+        var household = Household.Create(Guid.NewGuid(), Now);
+
+        household.Rename("  Smith Family ");
+
+        Assert.Equal("Smith Family", household.Name);
+        Assert.Throws<ArgumentException>(() => household.Rename(" "));
+        Assert.Throws<ArgumentException>(() => household.Rename(new string('a', 101)));
+        Assert.Equal("Smith Family", household.Name);
+    }
+
     [Theory]
     [InlineData(HouseholdRole.Viewer)]
     [InlineData(HouseholdRole.User)]
