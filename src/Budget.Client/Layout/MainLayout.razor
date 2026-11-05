@@ -9,7 +9,14 @@
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudText Typo="Typo.h6">Home Budget</MudText>
+        <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Typo="Typo.h6" Class="mr-4">Home Budget</MudLink>
+        <AuthorizeView>
+            <Authorized>
+                <MudButton Href="/income" Color="Color.Inherit" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Payments" aria-label="Income">
+                    <span class="d-none d-sm-inline">Income</span>
+                </MudButton>
+            </Authorized>
+        </AuthorizeView>
         <MudSpacer />
         <UserMenu />
     </MudAppBar>
