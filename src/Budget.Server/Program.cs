@@ -76,6 +76,7 @@ app.MapHouseholdEndpoints();
 app.MapIncomeStreamEndpoints();
 app.MapPeopleEndpoints();
 app.MapOutgoingCategoryEndpoints();
+app.MapOutgoingEndpoints();
 
 // Unknown server routes are 404s, not the client app's page.
 app.MapFallback("/api/{**path}", () => Results.NotFound());

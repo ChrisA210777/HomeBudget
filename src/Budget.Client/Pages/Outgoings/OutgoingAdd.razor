@@ -1,0 +1,370 @@
+@page "/outgoings/new"
+@attribute [Authorize]
+@using Budget.Client.Income
+@using Budget.Client.Outgoings
+@using Budget.Client.People
+@using Budget.Shared.Outgoings
+@using Budget.Shared.People
+@inject UserSession Session
+@inject IOutgoingApi OutgoingApi
+@inject ICategoryApi CategoryApi
+@inject IPeopleApi PeopleApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject TimeProvider Clock
+
+<PageTitle>Add an outgoing · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/" Class="mb-2">Home</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-4">Add an outgoing</h1>
+
+    @if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!_canEdit)
+    {
+        <MudAlert Severity="Severity.Info" data-testid="read-only">Viewers can see outgoings but not add them.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudStack Spacing="3">
+                <MudSelect T="OutgoingKindDto" Value="_kind" ValueChanged="KindChanged" ToStringFunc="KindName" Label="What is it?"
+                           HelperText="@OutgoingValidator.KindDescription(_kind)" Variant="Variant.Outlined" data-testid="kind">
+                    @foreach (var kind in Enum.GetValues<OutgoingKindDto>())
+                    {
+                        <MudSelectItem T="OutgoingKindDto" Value="kind">@KindName(kind)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudTextField @bind-Value="_name" Label="Name" HelperText="@OutgoingValidator.NameHelp(_kind)" MaxLength="OutgoingValidator.NameMaxLength"
+                              Error="Has(nameof(CreateOutgoingRequest.Name))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Name))"
+                              Variant="Variant.Outlined" data-testid="name" />
+
+                <MudSelect T="Guid" @bind-Value="_categoryId" ToStringFunc="CategoryName" Label="Category"
+                           Error="Has(nameof(CreateOutgoingRequest.CategoryId))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.CategoryId))"
+                           Variant="Variant.Outlined" data-testid="category">
+                    @foreach (var category in _categories)
+                    {
+                        <MudSelectItem T="Guid" Value="category.Id">@category.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="OutgoingPriorityDto?" @bind-Value="_priority" ToStringFunc="PriorityName" Label="How important is it?"
+                           Error="Has(nameof(CreateOutgoingRequest.Priority))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Priority))"
+                           Variant="Variant.Outlined" data-testid="priority">
+                    @foreach (var priority in Enum.GetValues<OutgoingPriorityDto>())
+                    {
+                        <MudSelectItem T="OutgoingPriorityDto?" Value="priority">@OutgoingValidator.Describe(priority)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="Guid" @bind-Value="_personId" ToStringFunc="PersonName" Label="Who is it for?"
+                           Error="Has(nameof(CreateOutgoingRequest.PersonId))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.PersonId))"
+                           Variant="Variant.Outlined" data-testid="person">
+                    <MudSelectItem T="Guid" Value="Guid.Empty">@WholeHousehold</MudSelectItem>
+                    @foreach (var person in _people)
+                    {
+                        <MudSelectItem T="Guid" Value="person.Id">@person.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <div class="d-flex gap-2 flex-wrap align-start">
+                    <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount" Immediate="true"
+                                     Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
+                                     Error="Has(nameof(CreateOutgoingRequest.Amount))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Amount))"
+                                     Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem" data-testid="amount" />
+                    <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                     InputMode="InputMode.numeric" HideSpinButtons="true"
+                                     Error="Has(nameof(CreateOutgoingRequest.Every))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Every))"
+                                     Variant="Variant.Outlined" Style="width: 5.5rem" data-testid="every" />
+                    <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Unit"
+                               Variant="Variant.Outlined" Style="width: 8rem" data-testid="unit">
+                        @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
+                        {
+                            <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                @if (OutgoingValidator.DescribeMonthlyEquivalent(_amount, _every, _unit) is { } equivalent)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Primary" aria-live="polite" data-testid="monthly-equivalent">@equivalent</MudText>
+                }
+
+                <MudDatePicker @bind-Date="_firstPaymentDate" Label="First payment" DateFormat="d MMM yyyy"
+                               HelperText="Later payments follow on from this date"
+                               Error="Has(nameof(CreateOutgoingRequest.FirstPaymentDate))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.FirstPaymentDate))"
+                               Variant="Variant.Outlined" data-testid="first-payment" />
+
+                <MudTextField @bind-Value="_comment" Label="Comment (optional)" Placeholder="@OutgoingValidator.DefaultStartingComment"
+                              MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined" data-testid="comment" />
+
+                @if (_kind != OutgoingKindDto.Allowance)
+                {
+                    <MudSwitch T="bool" @bind-Value="_renews" Color="Color.Primary" Label="It renews or has an anniversary" data-testid="renews" />
+                    @if (_renews)
+                    {
+                        <MudDatePicker @bind-Date="_renewalDate" Label="Next renewal" DateFormat="d MMM yyyy"
+                                       Error="Has(nameof(CreateOutgoingRequest.RenewalDate))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.RenewalDate))"
+                                       Variant="Variant.Outlined" data-testid="renewal-date" />
+                        <MudNumericField T="int" @bind-Value="_renewalEveryMonths" Label="Renews every (months)" Min="1" Max="OutgoingValidator.MaxRenewalEveryMonths"
+                                         InputMode="InputMode.numeric" HideSpinButtons="true"
+                                         Error="Has(nameof(CreateOutgoingRequest.RenewalEveryMonths))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.RenewalEveryMonths))"
+                                         Variant="Variant.Outlined" data-testid="renewal-every" />
+                        <MudCheckBox T="bool" @bind-Value="_autoRenews" Color="Color.Primary" Label="Renews automatically" data-testid="auto-renews" />
+                        <MudSelect T="AlertPeriodDto" @bind-Value="_alertPeriod" ToStringFunc="AlertName" Label="Remind me"
+                                   Variant="Variant.Outlined" data-testid="alert-period">
+                            @foreach (var period in Enum.GetValues<AlertPeriodDto>())
+                            {
+                                <MudSelectItem T="AlertPeriodDto" Value="period">@OutgoingValidator.Describe(period)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                }
+
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="() => _showDetails = !_showDetails"
+                           EndIcon="@(_showDetails ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                           aria-expanded="@(_showDetails ? "true" : "false")" Class="align-self-start" data-testid="toggle-details">
+                    More details (optional)
+                </MudButton>
+
+                @if (_showDetails)
+                {
+                    @if (_kind != OutgoingKindDto.Allowance)
+                    {
+                        <MudTextField @bind-Value="_recipient" Label="@OutgoingValidator.RecipientLabel(_kind)" HelperText="@OutgoingValidator.RecipientHelp(_kind)"
+                                      MaxLength="OutgoingValidator.RecipientMaxLength" Variant="Variant.Outlined" data-testid="recipient" />
+                    }
+
+                    <MudSelect T="PaymentMethodDto?" @bind-Value="_paymentMethod" ToStringFunc="MethodName" Label="How it's paid" Clearable="true"
+                               Variant="Variant.Outlined" data-testid="payment-method">
+                        @foreach (var method in Enum.GetValues<PaymentMethodDto>())
+                        {
+                            <MudSelectItem T="PaymentMethodDto?" Value="method">@OutgoingValidator.Describe(method)</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudAutocomplete T="string" @bind-Value="_paidFrom" SearchFunc="SearchPaidFromAsync" CoerceValue="true" CoerceText="false"
+                                     Label="Paid from" HelperText="The account's name, e.g. “Joint current account”" MaxLength="OutgoingValidator.PaidFromMaxLength"
+                                     ShowProgressIndicator="false" Variant="Variant.Outlined" data-testid="paid-from" />
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <MudTextField @bind-Value="_referenceLabel" Label="Reference name" Placeholder="e.g. Policy number"
+                                      MaxLength="OutgoingValidator.ReferenceLabelMaxLength" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-label" />
+                        <MudTextField @bind-Value="_referenceValue" Label="Reference" Immediate="true"
+                                      MaxLength="OutgoingValidator.ReferenceValueMaxLength" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-value" />
+                    </div>
+
+                    <MudTextField @bind-Value="_website" Label="Website" InputType="InputType.Url" Placeholder="example.com"
+                                  Error="Has(nameof(CreateOutgoingRequest.Website))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Website))"
+                                  MaxLength="OutgoingValidator.WebsiteMaxLength" Variant="Variant.Outlined" data-testid="website" />
+
+                    <MudTextField @bind-Value="_contactPhone" Label="Contact phone" InputType="InputType.Telephone"
+                                  MaxLength="OutgoingValidator.ContactPhoneMaxLength" Variant="Variant.Outlined" data-testid="contact-phone" />
+
+                    <MudTextField @bind-Value="_notes" Label="Notes" Lines="3" AutoGrow="true" Immediate="true"
+                                  MaxLength="OutgoingValidator.NotesMaxLength" Variant="Variant.Outlined" data-testid="notes" />
+
+                    @if (OutgoingValidator.LooksLikeCardNumber(_referenceValue) || OutgoingValidator.LooksLikeCardNumber(_notes))
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" data-testid="sensitive-warning">@OutgoingValidator.SensitiveDataWarning</MudAlert>
+                    }
+                }
+
+                <div class="d-flex justify-end gap-2 mt-2">
+                    <MudButton Variant="Variant.Text" Href="/">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">Add outgoing</MudButton>
+                </div>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    private const string WholeHousehold = "The whole household";
+
+    private HouseholdMembershipSummary? _household;
+    private IReadOnlyList<OutgoingCategorySummary> _categories = [];
+    private IReadOnlyList<PersonSummary> _people = [];
+    private IReadOnlyList<string> _paidFromNames = [];
+    private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
+    private bool _loaded;
+    private bool _canEdit;
+    private bool _saving;
+    private bool _showDetails;
+
+    private OutgoingKindDto _kind = OutgoingKindDto.Bill;
+    private string? _name;
+    private Guid _categoryId;
+    private OutgoingPriorityDto? _priority;
+    private Guid _personId;
+    private decimal? _amount;
+    private int _every = 1;
+    private PaymentUnitDto _unit = PaymentUnitDto.Month;
+    private DateTime? _firstPaymentDate;
+    private string? _comment;
+
+    private bool _renews;
+    private DateTime? _renewalDate;
+    private int _renewalEveryMonths = 12;
+    private bool _autoRenews;
+    private AlertPeriodDto _alertPeriod = AlertPeriodDto.None;
+
+    private string? _recipient;
+    private PaymentMethodDto? _paymentMethod;
+    private string? _paidFrom;
+    private string? _referenceLabel;
+    private string? _referenceValue;
+    private string? _website;
+    private string? _contactPhone;
+    private string? _notes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _firstPaymentDate = Clock.GetLocalNow().Date;
+
+        _household = await Session.GetActiveHouseholdAsync();
+        _canEdit = _household is not null && _household.Role != "Viewer";
+        if (_household is not null && _canEdit)
+        {
+            var categories = CategoryApi.ListAsync(_household.HouseholdId);
+            var people = PeopleApi.ListAsync(_household.HouseholdId);
+            var paidFrom = OutgoingApi.PaidFromNamesAsync(_household.HouseholdId);
+            _categories = (await categories).Where(c => !c.IsHidden).ToList();
+            _people = await people;
+            _paidFromNames = await paidFrom;
+        }
+
+        _loaded = true;
+    }
+
+    private void KindChanged(OutgoingKindDto kind)
+    {
+        _kind = kind;
+        if (kind == OutgoingKindDto.Allowance)
+        {
+            _renews = false;
+        }
+    }
+
+    private Task<IEnumerable<string>> SearchPaidFromAsync(string? text, CancellationToken cancellationToken)
+    {
+        IEnumerable<string> matches = string.IsNullOrWhiteSpace(text)
+            ? _paidFromNames
+            : _paidFromNames.Where(n => n.Contains(text.Trim(), StringComparison.CurrentCultureIgnoreCase));
+        return Task.FromResult(matches);
+    }
+
+    private CreateOutgoingRequest BuildRequest()
+    {
+        var renews = _renews && _kind != OutgoingKindDto.Allowance;
+        return new CreateOutgoingRequest
+        {
+            Kind = _kind,
+            Name = _name?.Trim() ?? string.Empty,
+            CategoryId = _categoryId,
+            Priority = _priority,
+            PersonId = _personId == Guid.Empty ? null : _personId,
+            Amount = _amount,
+            Every = _every,
+            Unit = _unit,
+            FirstPaymentDate = IncomeDates.ToDateOnly(_firstPaymentDate),
+            Comment = _comment,
+            Recipient = _kind == OutgoingKindDto.Allowance ? null : _recipient,
+            PaymentMethod = _paymentMethod,
+            PaidFrom = _paidFrom,
+            ReferenceLabel = _referenceLabel,
+            ReferenceValue = _referenceValue,
+            Website = _website,
+            ContactPhone = _contactPhone,
+            Notes = _notes,
+            RenewalDate = renews ? IncomeDates.ToDateOnly(_renewalDate) : null,
+            RenewalEveryMonths = _renewalEveryMonths,
+            AutoRenews = renews && _autoRenews,
+            AlertPeriod = renews ? _alertPeriod : AlertPeriodDto.None,
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        var request = BuildRequest();
+        var errors = OutgoingValidator.Validate(request).ToDictionary(e => e.Key, e => e.Value);
+        if (_renews && _kind != OutgoingKindDto.Allowance && request.RenewalDate is null)
+        {
+            errors[nameof(CreateOutgoingRequest.RenewalDate)] = ["Choose the next renewal date, or turn off renewal."];
+        }
+
+        _errors = errors;
+        if (_errors.Count > 0)
+        {
+            ShowDetailsIfTheyHaveErrors();
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await OutgoingApi.CreateAsync(_household!.HouseholdId, request);
+            if (result.Succeeded)
+            {
+                Snackbar.Add($"{result.Value!.Name} was added.", Severity.Success);
+                Navigation.NavigateTo("/");
+                return;
+            }
+
+            _errors = result.Errors;
+            ShowDetailsIfTheyHaveErrors();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void ShowDetailsIfTheyHaveErrors()
+    {
+        string[] detailFields =
+        [
+            nameof(CreateOutgoingRequest.Recipient), nameof(CreateOutgoingRequest.PaymentMethod), nameof(CreateOutgoingRequest.PaidFrom),
+            nameof(CreateOutgoingRequest.ReferenceLabel), nameof(CreateOutgoingRequest.ReferenceValue), nameof(CreateOutgoingRequest.Website),
+            nameof(CreateOutgoingRequest.ContactPhone), nameof(CreateOutgoingRequest.Notes),
+        ];
+        if (detailFields.Any(_errors.ContainsKey))
+        {
+            _showDetails = true;
+        }
+    }
+
+    private static string KindName(OutgoingKindDto kind) => kind switch
+    {
+        OutgoingKindDto.Bill => "A bill",
+        OutgoingKindDto.Savings => "Savings",
+        _ => "A spending allowance",
+    };
+
+    private string UnitName(PaymentUnitDto unit)
+    {
+        var word = unit.ToString().ToLowerInvariant();
+        return _every == 1 ? word : word + "s";
+    }
+
+    private static string PriorityName(OutgoingPriorityDto? priority) => priority is { } value ? OutgoingValidator.Describe(value) : string.Empty;
+
+    private static string MethodName(PaymentMethodDto? method) => method is { } value ? OutgoingValidator.Describe(value) : string.Empty;
+
+    private static string AlertName(AlertPeriodDto period) => OutgoingValidator.Describe(period);
+
+    private string CategoryName(Guid id) => _categories.FirstOrDefault(c => c.Id == id)?.Name ?? string.Empty;
+
+    private string PersonName(Guid id) => id == Guid.Empty ? WholeHousehold : _people.FirstOrDefault(p => p.Id == id)?.DisplayName ?? string.Empty;
+
+    private bool Has(string field) => _errors.ContainsKey(field);
+
+    private string? ErrorFor(string field) => _errors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
+}

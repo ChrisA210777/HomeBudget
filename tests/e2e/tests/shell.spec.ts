@@ -34,7 +34,7 @@ test('nothing scrolls sideways', async ({ page }) => {
   await signIn(page);
   const incomePage = await addIncome(page, 'Salary', '2500');
 
-  for (const path of ['/', '/income', '/income/new', '/people', '/outgoings/categories', new URL(incomePage).pathname]) {
+  for (const path of ['/', '/income', '/income/new', '/people', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname]) {
     await page.goto(path);
     await settled(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

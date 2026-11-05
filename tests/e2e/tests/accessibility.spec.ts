@@ -23,7 +23,7 @@ for (const theme of ['Light', 'Dark']) {
       await signIn(page);
       const incomePage = await addIncome(page, 'Salary', '3000');
 
-      for (const path of ['/', '/income', '/income/new', '/people', '/outgoings/categories', new URL(incomePage).pathname]) {
+      for (const path of ['/', '/income', '/income/new', '/people', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname]) {
         await page.goto(path);
         await settled(page);
         await expectNoSeriousViolations(page, `${path} (${theme})`);
