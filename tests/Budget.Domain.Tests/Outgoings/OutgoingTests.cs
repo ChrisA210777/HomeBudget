@@ -125,9 +125,10 @@ public class OutgoingTests
     // ---- Payment and renewal dates ----
 
     [Theory]
-    [InlineData("2026-11-05", "2026-11-28")]
-    [InlineData("2026-11-28", "2026-11-28")]
-    [InlineData("2026-11-29", "2026-12-26")]
+    [InlineData("2026-01-01", "2026-01-10")]
+    [InlineData("2026-11-05", "2026-11-14")]
+    [InlineData("2026-11-14", "2026-11-14")]
+    [InlineData("2026-11-15", "2026-12-12")]
     public void Next_payment_follows_the_schedule_from_the_first_payment(string today, string expected)
     {
         var outgoing = Create(60, new PaymentSchedule(4, PaymentUnit.Week), new DateOnly(2026, 1, 10));

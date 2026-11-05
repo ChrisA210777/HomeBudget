@@ -94,8 +94,8 @@ public sealed class CategoriesTests : IDisposable
     {
         var cut = _context.RenderComponent<Categories>();
 
-        cut.FindAll("[data-testid=toggle-hidden]")[0].Click();
-        cut.FindAll("[data-testid=toggle-hidden]")[2].Click();
+        cut.FindAll("[data-testid=toggle-hidden]").ToList()[0].Click();
+        cut.FindAll("[data-testid=toggle-hidden]").ToList()[2].Click();
 
         cut.WaitForAssertion(() => Assert.Equal(
             new[] { (HousingId, "Housing", true), (OldId, "Old stuff", false) },
@@ -107,7 +107,7 @@ public sealed class CategoriesTests : IDisposable
     {
         var cut = _context.RenderComponent<Categories>();
 
-        cut.FindAll("[data-testid=rename]")[2].Click();
+        cut.FindAll("[data-testid=rename]").ToList()[2].Click();
         cut.Find("input[data-testid=rename-name]").Change("Older stuff");
         cut.Find("[data-testid=rename-save]").Click();
 
