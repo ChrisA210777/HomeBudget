@@ -146,3 +146,18 @@ body {
 .mud-nav-link {
     min-height: 48px;
 }
+
+/* A list of rows with dividers, for content that has its own buttons (e.g. the People page). */
+.plain-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.plain-list-item {
+    padding: 8px 16px;
+}
+
+.plain-list-item + .plain-list-item {
+    border-top: 1px solid var(--mud-palette-lines-default);
+}

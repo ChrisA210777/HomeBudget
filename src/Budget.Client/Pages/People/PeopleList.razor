@@ -21,10 +21,11 @@
     else
     {
         <MudPaper Outlined="true">
-            <MudList T="string" Dense="false">
+            @* A plain list: MudList is a selectable list box, which can't contain buttons. *@
+            <ul class="plain-list" aria-label="People in this household">
                 @foreach (var person in _people)
                 {
-                    <MudListItem T="string" data-testid="person">
+                    <li class="plain-list-item" data-testid="person">
                         @if (_editingId == person.Id)
                         {
                             <div class="d-flex align-center gap-2 flex-wrap">
@@ -59,9 +60,9 @@
                                 }
                             </div>
                         }
-                    </MudListItem>
+                    </li>
                 }
-            </MudList>
+            </ul>
         </MudPaper>
 
         @if (_canEdit)
