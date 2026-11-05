@@ -164,7 +164,7 @@
                     <MudTextField @bind-Value="_contactPhone" Label="Contact phone" InputType="InputType.Telephone"
                                   MaxLength="OutgoingValidator.ContactPhoneMaxLength" Variant="Variant.Outlined" data-testid="contact-phone" />
 
-                    <MudTextField @bind-Value="_notes" Label="Notes" Lines="3" AutoGrow="true" Immediate="true"
+                    <MudTextField @bind-Value="_notes" Label="Notes" Lines="3" Sizing="InputSizing.Auto" Immediate="true"
                                   MaxLength="OutgoingValidator.NotesMaxLength" Variant="Variant.Outlined" data-testid="notes" />
 
                     @if (OutgoingValidator.LooksLikeCardNumber(_referenceValue) || OutgoingValidator.LooksLikeCardNumber(_notes))
