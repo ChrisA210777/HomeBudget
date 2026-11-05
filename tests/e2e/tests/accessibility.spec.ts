@@ -33,6 +33,9 @@ for (const theme of ['Light', 'Dark']) {
       await settled(page);
       await page.getByTestId('user-menu').getByRole('button').first().click();
       await expect(page.getByTestId('theme-dark')).toBeVisible();
+      // Let the menu finish fading in, or axe measures contrast against a half-transparent popover.
+      await expect(page.locator('.mud-popover-open').first()).toHaveCSS('opacity', '1');
+      await page.waitForTimeout(300);
       await expectNoSeriousViolations(page, `user menu (${theme})`);
     });
 
