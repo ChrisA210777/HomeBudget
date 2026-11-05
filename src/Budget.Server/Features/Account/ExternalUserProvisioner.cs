@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Budget.Domain.Households;
+using Budget.Domain.Outgoings;
 using Budget.Domain.People;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
@@ -55,9 +56,11 @@ public sealed partial class ExternalUserProvisioner(
         var household = Household.Create(user.Id, now);
         user.LastActiveHouseholdId = household.Id;
 
-        // CreateAsync saves the household, its owner membership and the owner's person along with the user.
+        // CreateAsync saves the household, its owner membership, the owner's person and the default
+        // outgoing categories along with the user.
         db.Households.Add(household);
         db.People.Add(Person.CreateForUser(household.Id, user.Id, user.DisplayName));
+        db.OutgoingCategories.AddRange(OutgoingCategory.CreateDefaults(household.Id));
 
         var created = await users.CreateAsync(user);
         if (!created.Succeeded)
