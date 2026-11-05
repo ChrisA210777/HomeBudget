@@ -57,6 +57,19 @@ namespace Budget.Infrastructure.Persistence.Migrations
                 name: "IX_People_LinkedUserId",
                 table: "People",
                 column: "LinkedUserId");
+
+            // Hand-written: give the owner of every existing household a person linked to their
+            // login, as new sign-ups now get (BUD-42). A missing name becomes "Me".
+            migrationBuilder.Sql(
+                """
+                INSERT INTO People (Id, HouseholdId, DisplayName, LinkedUserId, CreatedAt, CreatedBy, ModifiedAt, ModifiedBy)
+                SELECT NEWID(), m.HouseholdId, LEFT(COALESCE(NULLIF(LTRIM(RTRIM(u.DisplayName)), ''), 'Me'), 100), m.UserId,
+                       SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
+                FROM HouseholdMembers m
+                JOIN AspNetUsers u ON u.Id = m.UserId
+                WHERE m.IsOwner = 1
+                  AND NOT EXISTS (SELECT 1 FROM People p WHERE p.HouseholdId = m.HouseholdId AND p.LinkedUserId = m.UserId);
+                """);
         }
 
         /// <inheritdoc />
