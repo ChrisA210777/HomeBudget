@@ -37,11 +37,21 @@ body {
     max-width: 45vw;
 }
 
+.user-menu .mud-menu-button-activator {
+    text-transform: none;
+}
+
 .user-menu .mud-menu-button-activator .mud-button-label {
-    display: block;
+    display: inline-block;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.user-menu .mud-menu-button-activator .mud-button-icon-start {
+    display: inline-flex;
+    vertical-align: middle;
 }
 
 /* Read by screen readers but not shown. */

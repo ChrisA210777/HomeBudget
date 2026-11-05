@@ -6,7 +6,7 @@ import { addIncome, settled, signIn } from './helpers';
 for (const theme of ['Light', 'Dark']) {
   test(`screenshots (${theme})`, async ({ page }, testInfo) => {
     await page.addInitScript(value => window.localStorage.setItem('budget.theme', value), theme);
-    await signIn(page, 'Chris Example');
+    await signIn(page, `Chris Example ${theme}`);
     const incomePage = await addIncome(page, 'Chris – salary', '3000');
 
     const pages: [string, string][] = [['home', '/'], ['income', '/income'], ['income-detail', new URL(incomePage).pathname], ['people', '/people']];
