@@ -38,15 +38,22 @@ if [ -z "$SP_OBJECT_ID" ]; then
 fi
 
 echo "== Trusting GitHub Actions runs for the '$ENVIRONMENT' environment of $REPO (no secrets involved)"
-SUBJECT="repo:$REPO:environment:$ENVIRONMENT"
-if ! az ad app federated-credential list --id "$APP_ID" --query "[?subject=='$SUBJECT']" -o tsv | grep -q .; then
-  az ad app federated-credential create --id "$APP_ID" --parameters "{
-    \"name\": \"github-$ENVIRONMENT\",
-    \"issuer\": \"https://token.actions.githubusercontent.com\",
-    \"subject\": \"$SUBJECT\",
-    \"audiences\": [\"api://AzureADTokenExchange\"]
-  }" --output none
-fi
+# GitHub's token names the repo either by name (repo:owner/name:...) or, for newer repos and
+# organisations, by name and immutable id (repo:owner@ownerId/name@repoId:...). Trust both.
+REPO_IDS=$(curl -fsSL "https://api.github.com/repos/$REPO" | python3 -c "import json,sys; r=json.load(sys.stdin); print(f\"{r['owner']['login']}@{r['owner']['id']}/{r['name']}@{r['id']}\")")
+add_subject() {
+  local name=$1 subject=$2
+  if ! az ad app federated-credential list --id "$APP_ID" --query "[?subject=='$subject']" -o tsv | grep -q .; then
+    az ad app federated-credential create --id "$APP_ID" --parameters "{
+      \"name\": \"$name\",
+      \"issuer\": \"https://token.actions.githubusercontent.com\",
+      \"subject\": \"$subject\",
+      \"audiences\": [\"api://AzureADTokenExchange\"]
+    }" --output none
+  fi
+}
+add_subject "github-$ENVIRONMENT" "repo:$REPO:environment:$ENVIRONMENT"
+add_subject "github-$ENVIRONMENT-ids" "repo:$REPO_IDS:environment:$ENVIRONMENT"
 
 echo "== Letting it manage the resource group (and nothing else)"
 SCOPE=$(az group show --name "$RESOURCE_GROUP" --query id -o tsv)
