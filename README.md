@@ -56,6 +56,17 @@ Sign-in needs a Microsoft Entra app registration. Without one, the sign-in page 
 
 The first time someone signs in, a user is created for them.
 
+### Try it on your phone
+
+Sign-in needs HTTPS and a redirect URI registered in Entra, so a phone can't just browse to your PC's IP address. Use a tunnel instead:
+
+1. Install the dev tunnels CLI (`winget install Microsoft.devtunnel`) and run `devtunnel user login`.
+2. Start the app, then run `devtunnel host -p 7180 --protocol https --allow-anonymous`. It prints a URL such as `https://abc123-7180.uks1.devtunnels.ms`.
+3. In the Entra app registration, go to **Authentication** and add `https://<that host>/signin-microsoft` as a Web redirect URI.
+4. Open the URL on your phone. It's HTTPS, so you can also install the app from the browser menu.
+
+In Development the app trusts the tunnel's `X-Forwarded-*` headers for `*.devtunnels.ms`, `*.trycloudflare.com` and ngrok hosts (`ForwardedHeaders` in `appsettings.Development.json`). This means sign-in sends you back to the tunnel, not to `localhost`.
+
 ## Build and test
 
 ```bash
