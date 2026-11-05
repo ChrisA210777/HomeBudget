@@ -206,6 +206,32 @@ namespace Budget.Infrastructure.Persistence.Migrations
                 name: "IX_OutgoingStatusPeriods_OutgoingId",
                 table: "OutgoingStatusPeriods",
                 column: "OutgoingId");
+
+            // Households created before this migration get the default categories that new
+            // households get from OutgoingCategory.CreateDefaults (BUD-47). Keep the two in step.
+            migrationBuilder.Sql("""
+                INSERT INTO OutgoingCategories (Id, HouseholdId, Name, SortOrder, IsHidden, CreatedAt, CreatedBy, ModifiedAt, ModifiedBy)
+                SELECT NEWID(), h.Id, d.Name, d.SortOrder, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
+                FROM Households h
+                CROSS JOIN (VALUES
+                    (N'Housing', 10),
+                    (N'Utilities', 20),
+                    (N'Phone & internet', 30),
+                    (N'Insurance', 40),
+                    (N'Home maintenance', 50),
+                    (N'Car & travel', 60),
+                    (N'Pets', 70),
+                    (N'Health & personal care', 80),
+                    (N'Food & household', 90),
+                    (N'Children', 100),
+                    (N'Subscriptions & TV', 110),
+                    (N'Leisure & memberships', 120),
+                    (N'Gifts & giving', 130),
+                    (N'Banking & fees', 140),
+                    (N'Savings & set-asides', 150),
+                    (N'Discretionary spending', 160)
+                ) AS d(Name, SortOrder);
+                """);
         }
 
         /// <inheritdoc />
