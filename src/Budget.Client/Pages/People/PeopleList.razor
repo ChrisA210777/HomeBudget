@@ -1,0 +1,174 @@
+@page "/people"
+@attribute [Authorize]
+@using Budget.Client.People
+@using Budget.Shared.People
+@inject UserSession Session
+@inject IPeopleApi PeopleApi
+@inject ISnackbar Snackbar
+
+<PageTitle>People · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <h1 class="mud-typography mud-typography-h4 mb-2">People</h1>
+    <MudText Typo="Typo.body2" Class="mb-4">
+        Everyone whose income or bills you track. They don't need to sign in, but they can be linked to their login when they join.
+    </MudText>
+
+    @if (_people is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudPaper Outlined="true">
+            <MudList T="string" Dense="false">
+                @foreach (var person in _people)
+                {
+                    <MudListItem T="string" data-testid="person">
+                        @if (_editingId == person.Id)
+                        {
+                            <div class="d-flex align-center gap-2 flex-wrap">
+                                <MudTextField @bind-Value="_editName"
+                                              Label="Name"
+                                              MaxLength="PersonValidator.DisplayNameMaxLength"
+                                              Error="_editError is not null"
+                                              ErrorText="@_editError"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Class="flex-grow-1"
+                                              data-testid="rename-name" />
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => SaveRenameAsync(person)" data-testid="rename-save">Save</MudButton>
+                                <MudButton Variant="Variant.Text" OnClick="CancelRename">Cancel</MudButton>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Secondary" />
+                                <div class="flex-grow-1" style="min-width: 0">
+                                    <MudText Typo="Typo.body1" data-testid="person-name">@person.DisplayName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="person-login">@LoginDescription(person)</MudText>
+                                </div>
+                                @if (person.IsYou)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">You</MudChip>
+                                }
+                                @if (_canEdit)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="@($"Rename {person.DisplayName}")" OnClick="() => StartRename(person)" data-testid="rename" />
+                                }
+                            </div>
+                        }
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+
+        @if (_canEdit)
+        {
+            <MudPaper Class="pa-4 mt-4" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-2">Add someone</MudText>
+                <div class="d-flex align-start gap-2 flex-wrap">
+                    <MudTextField @bind-Value="_newName"
+                                  Label="Name"
+                                  HelperText="For example, a partner or a child with a part-time job"
+                                  MaxLength="PersonValidator.DisplayNameMaxLength"
+                                  Error="_addError is not null"
+                                  ErrorText="@_addError"
+                                  Variant="Variant.Outlined"
+                                  Class="flex-grow-1"
+                                  data-testid="add-name" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AddAsync" Disabled="_saving" Class="mt-2" data-testid="add-person">Add</MudButton>
+                </div>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    private HouseholdMembershipSummary? _household;
+    private IReadOnlyList<PersonSummary>? _people;
+    private bool _canEdit;
+    private bool _saving;
+
+    private string? _newName;
+    private string? _addError;
+
+    private Guid? _editingId;
+    private string? _editName;
+    private string? _editError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        _canEdit = _household is not null && _household.Role != "Viewer";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        _people = _household is null ? [] : await PeopleApi.ListAsync(_household.HouseholdId);
+
+    private static string LoginDescription(PersonSummary person) =>
+        person.LinkedUserId is null ? "Doesn't sign in" : $"Signs in as {person.LinkedUserName}";
+
+    private async Task AddAsync()
+    {
+        var request = new SavePersonRequest { DisplayName = _newName ?? string.Empty };
+        _addError = FirstError(PersonValidator.Validate(request));
+        if (_addError is not null)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await PeopleApi.AddAsync(_household!.HouseholdId, request);
+            if (!result.Succeeded)
+            {
+                _addError = FirstError(result.Errors);
+                return;
+            }
+
+            Snackbar.Add($"{result.Saved!.DisplayName} was added.", Severity.Success);
+            _newName = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void StartRename(PersonSummary person)
+    {
+        _editingId = person.Id;
+        _editName = person.DisplayName;
+        _editError = null;
+    }
+
+    private void CancelRename() => _editingId = null;
+
+    private async Task SaveRenameAsync(PersonSummary person)
+    {
+        var request = new SavePersonRequest { DisplayName = _editName ?? string.Empty };
+        _editError = FirstError(PersonValidator.Validate(request));
+        if (_editError is not null)
+        {
+            return;
+        }
+
+        var result = await PeopleApi.RenameAsync(_household!.HouseholdId, person.Id, request);
+        if (!result.Succeeded)
+        {
+            _editError = FirstError(result.Errors);
+            return;
+        }
+
+        _editingId = null;
+        await LoadAsync();
+    }
+
+    private static string? FirstError(IReadOnlyDictionary<string, string[]> errors) =>
+        errors.Values.SelectMany(v => v).FirstOrDefault();
+}

@@ -1,5 +1,6 @@
 using Budget.Domain.Households;
 using Budget.Domain.Income;
+using Budget.Domain.People;
 using Budget.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,9 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
     public DbSet<Household> Households => Set<Household>();
 
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
+
+    /// <summary>Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
+    public DbSet<Person> People => Set<Person>();
 
     /// <summary>Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
     public DbSet<IncomeStream> IncomeStreams => Set<IncomeStream>();

@@ -97,7 +97,13 @@ public static class AccountEndpoints
                 join household in db.Households on member.HouseholdId equals household.Id
                 where member.UserId == user.Id
                 orderby household.Name
-                select new HouseholdMembershipSummary(household.Id, household.Name, member.Role.ToString(), member.IsOwner))
+
+                // Across all the user's households, so the per-household filter doesn't apply here.
+                let personId = db.People.IgnoreQueryFilters()
+                    .Where(p => p.HouseholdId == household.Id && p.LinkedUserId == user.Id)
+                    .Select(p => (Guid?)p.Id)
+                    .FirstOrDefault()
+                select new HouseholdMembershipSummary(household.Id, household.Name, member.Role.ToString(), member.IsOwner, personId))
             .ToListAsync();
 
         // Fall back to another household if the last active one is gone or no longer theirs.

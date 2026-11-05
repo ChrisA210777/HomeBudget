@@ -4,6 +4,7 @@ using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Account;
 using Budget.Server.Features.Households;
 using Budget.Server.Features.Income;
+using Budget.Server.Features.People;
 using Budget.Server.Identity;
 using Budget.Shared;
 
@@ -54,6 +55,7 @@ app.MapHealthChecks(ApiRoutes.Health);
 app.MapAccountEndpoints();
 app.MapHouseholdEndpoints();
 app.MapIncomeStreamEndpoints();
+app.MapPeopleEndpoints();
 
 // Unknown API routes are 404s, not the client app's page.
 app.MapFallback("/api/{**path}", () => Results.NotFound());

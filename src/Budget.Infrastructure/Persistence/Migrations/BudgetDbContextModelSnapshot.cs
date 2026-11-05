@@ -148,6 +148,48 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.UseTphMappingStrategy();
                 });
 
+            modelBuilder.Entity("Budget.Domain.People.Person", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("LinkedUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ModifiedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkedUserId");
+
+                    b.HasIndex("HouseholdId", "DisplayName")
+                        .IsUnique();
+
+                    b.HasIndex("HouseholdId", "LinkedUserId")
+                        .IsUnique()
+                        .HasFilter("[LinkedUserId] IS NOT NULL");
+
+                    b.ToTable("People", (string)null);
+                });
+
             modelBuilder.Entity("Budget.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -358,6 +400,19 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.HasOne("Budget.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("MemberUserId");
+                });
+
+            modelBuilder.Entity("Budget.Domain.People.Person", b =>
+                {
+                    b.HasOne("Budget.Domain.Households.Household", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Budget.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("LinkedUserId");
                 });
 
             modelBuilder.Entity("Budget.Infrastructure.Identity.ApplicationUser", b =>
