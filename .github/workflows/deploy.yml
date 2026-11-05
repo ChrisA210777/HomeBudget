@@ -1,0 +1,139 @@
+name: Deploy
+
+# Deploys main to the Dev environment in Azure after CI passes (BUD-11), or on demand.
+# Setup (one-off) is in infra/README.md.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # sign in to Azure with OIDC; no stored Azure credentials
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  dev:
+    # After a successful CI run for a push to main, or when started by hand; skipped until Azure
+    # is set up (infra/README.md).
+    if: >-
+      vars.AZURE_CLIENT_ID != '' && (
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: dev
+      url: https://${{ steps.infra.outputs.host }}
+    env:
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Publish the app
+        run: dotnet publish src/Budget.Server --configuration Release --output artifacts/app
+
+      - name: Build the migration bundle
+        run: |
+          dotnet tool restore
+          dotnet ef migrations bundle \
+            --project src/Budget.Infrastructure \
+            --startup-project src/Budget.Server \
+            --configuration Release \
+            --self-contained --target-runtime linux-x64 \
+            --output artifacts/efbundle --force
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy the infrastructure
+        id: infra
+        env:
+          AZURE_DEPLOYER_OBJECT_ID: ${{ vars.AZURE_DEPLOYER_OBJECT_ID }}
+          BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
+          MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
+        run: |
+          for v in RESOURCE_GROUP AZURE_DEPLOYER_OBJECT_ID BUDGET_EMAIL; do
+            if [ -z "${!v}" ]; then echo "::error::The $v variable isn't set. See infra/README.md."; exit 1; fi
+          done
+          outputs=$(az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "homebudget-${{ github.run_number }}" \
+            --parameters infra/dev.bicepparam \
+            --query properties.outputs --output json)
+          {
+            echo "app=$(jq -r .webAppName.value <<<"$outputs")"
+            echo "host=$(jq -r .webAppHostName.value <<<"$outputs")"
+            echo "sqlServer=$(jq -r .sqlServerName.value <<<"$outputs")"
+            echo "sqlFqdn=$(jq -r .sqlServerFqdn.value <<<"$outputs")"
+            echo "database=$(jq -r .databaseName.value <<<"$outputs")"
+            echo "identityName=$(jq -r .appIdentityName.value <<<"$outputs")"
+            echo "identityClientId=$(jq -r .appIdentityClientId.value <<<"$outputs")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Let this runner reach the database
+        run: |
+          ip=$(curl -fsS https://api.ipify.org)
+          az sql server firewall-rule create --resource-group "$RESOURCE_GROUP" --server "${{ steps.infra.outputs.sqlServer }}" \
+            --name "github-${{ github.run_id }}" --start-ip-address "$ip" --end-ip-address "$ip" --output none
+
+      # The free database may be paused; the long timeout gives it time to wake up.
+      - name: Apply database migrations
+        run: |
+          ./artifacts/efbundle --connection "Server=tcp:${{ steps.infra.outputs.sqlFqdn }},1433;Database=${{ steps.infra.outputs.database }};Authentication=Active Directory Default;Encrypt=True;Connect Timeout=180"
+
+      - name: Give the app access to the database
+        run: |
+          command -v sqlcmd >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q sqlcmd; }
+          # The user is created from the identity's client id, so the server doesn't need directory access.
+          sid=$(python3 -c "import uuid,sys; print('0x' + uuid.UUID(sys.argv[1]).bytes_le.hex().upper())" "${{ steps.infra.outputs.identityClientId }}")
+          name="${{ steps.infra.outputs.identityName }}"
+          sqlcmd -S "tcp:${{ steps.infra.outputs.sqlFqdn }},1433" -d "${{ steps.infra.outputs.database }}" \
+            --authentication-method ActiveDirectoryDefault -l 180 -b -Q "
+              IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'$name')
+                CREATE USER [$name] WITH SID = $sid, TYPE = E;
+              ALTER ROLE db_datareader ADD MEMBER [$name];
+              ALTER ROLE db_datawriter ADD MEMBER [$name];"
+
+      - name: Close the database firewall again
+        if: always() && steps.infra.outputs.sqlServer != ''
+        run: |
+          az sql server firewall-rule delete --resource-group "$RESOURCE_GROUP" --server "${{ steps.infra.outputs.sqlServer }}" \
+            --name "github-${{ github.run_id }}" --output none || true
+
+      - name: Deploy the app
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ steps.infra.outputs.app }}
+          package: artifacts/app
+
+      # The free tier sleeps when idle, so give it a few minutes to start.
+      - name: Smoke test
+        run: |
+          url="https://${{ steps.infra.outputs.host }}"
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 30 "$url/health" > /dev/null; then
+              echo "Healthy: $url"
+              curl -fsS --max-time 30 "$url/" | grep -q '<div id="app">' && echo "App shell served"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::$url/health didn't respond"; exit 1

@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Budget.Infrastructure;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
@@ -19,6 +20,13 @@ builder.Services.AddHouseholdAuthorization();
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 builder.Services.AddForwardedHeadersFromConfiguration(builder.Configuration);
+
+// Requests, dependencies, logs and exceptions go to Application Insights in Azure (BUD-12).
+// The connection string is only set there, so nothing is sent when running locally or in tests.
+if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+{
+    builder.Services.AddOpenTelemetry().UseAzureMonitor();
+}
 
 var app = builder.Build();
 
