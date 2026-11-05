@@ -94,6 +94,147 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.ToTable("HouseholdMembers", (string)null);
                 });
 
+            modelBuilder.Entity("Budget.Domain.Income.IncomeAmountChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("IncomeStreamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ModifiedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("MonthlyNetAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncomeStreamId", "EffectiveFrom")
+                        .IsUnique();
+
+                    b.ToTable("IncomeAmountChanges", (string)null);
+                });
+
+            modelBuilder.Entity("Budget.Domain.Income.IncomeCorrection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("After")
+                        .HasMaxLength(600)
+                        .HasColumnType("nvarchar(600)");
+
+                    b.Property<string>("Before")
+                        .IsRequired()
+                        .HasMaxLength(600)
+                        .HasColumnType("nvarchar(600)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntryType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<Guid>("IncomeStreamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ModifiedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncomeStreamId");
+
+                    b.ToTable("IncomeCorrections", (string)null);
+                });
+
+            modelBuilder.Entity("Budget.Domain.Income.IncomeStatusPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("IncomeStreamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ModifiedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal?>("ReducedMonthlyAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncomeStreamId");
+
+                    b.ToTable("IncomeStatusPeriods", (string)null);
+                });
+
             modelBuilder.Entity("Budget.Domain.Income.IncomeStream", b =>
                 {
                     b.Property<Guid>("Id")
@@ -108,12 +249,6 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("HouseholdId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid?>("MemberUserId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTimeOffset>("ModifiedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -125,27 +260,21 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("HouseholdId");
 
-                    b.HasIndex("MemberUserId");
+                    b.HasIndex("PersonId");
 
                     b.ToTable("IncomeStreams", (string)null);
-
-                    b.HasDiscriminator<string>("Type");
-
-                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("Budget.Domain.People.Person", b =>
@@ -333,47 +462,6 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Budget.Domain.Income.EmploymentIncome", b =>
-                {
-                    b.HasBaseType("Budget.Domain.Income.IncomeStream");
-
-                    b.Property<string>("AmountBasis")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<decimal?>("AverageGross")
-                        .HasPrecision(19, 4)
-                        .HasColumnType("decimal(19,4)");
-
-                    b.Property<string>("EmployerName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<decimal?>("GrossAmount")
-                        .HasPrecision(19, 4)
-                        .HasColumnType("decimal(19,4)");
-
-                    b.Property<decimal?>("HighestGross")
-                        .HasPrecision(19, 4)
-                        .HasColumnType("decimal(19,4)");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<decimal?>("LowestGross")
-                        .HasPrecision(19, 4)
-                        .HasColumnType("decimal(19,4)");
-
-                    b.Property<string>("PayFrequency")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.HasDiscriminator().HasValue("Employment");
-                });
-
             modelBuilder.Entity("Budget.Domain.Households.HouseholdMember", b =>
                 {
                     b.HasOne("Budget.Domain.Households.Household", null)
@@ -389,6 +477,33 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Budget.Domain.Income.IncomeAmountChange", b =>
+                {
+                    b.HasOne("Budget.Domain.Income.IncomeStream", null)
+                        .WithMany("AmountChanges")
+                        .HasForeignKey("IncomeStreamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Budget.Domain.Income.IncomeCorrection", b =>
+                {
+                    b.HasOne("Budget.Domain.Income.IncomeStream", null)
+                        .WithMany("Corrections")
+                        .HasForeignKey("IncomeStreamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Budget.Domain.Income.IncomeStatusPeriod", b =>
+                {
+                    b.HasOne("Budget.Domain.Income.IncomeStream", null)
+                        .WithMany("StatusPeriods")
+                        .HasForeignKey("IncomeStreamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Budget.Domain.Income.IncomeStream", b =>
                 {
                     b.HasOne("Budget.Domain.Households.Household", null)
@@ -397,9 +512,11 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Budget.Infrastructure.Identity.ApplicationUser", null)
+                    b.HasOne("Budget.Domain.People.Person", null)
                         .WithMany()
-                        .HasForeignKey("MemberUserId");
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Budget.Domain.People.Person", b =>
@@ -452,6 +569,15 @@ namespace Budget.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Budget.Domain.Households.Household", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("Budget.Domain.Income.IncomeStream", b =>
+                {
+                    b.Navigation("AmountChanges");
+
+                    b.Navigation("Corrections");
+
+                    b.Navigation("StatusPeriods");
                 });
 #pragma warning restore 612, 618
         }
