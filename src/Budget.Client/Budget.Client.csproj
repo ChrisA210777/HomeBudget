@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <RootNamespace>Budget.Client</RootNamespace>
-    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
     <!-- Lists the files the service worker caches for offline use (BUD-37). -->
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
   </PropertyGroup>

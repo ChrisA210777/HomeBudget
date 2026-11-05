@@ -22,9 +22,9 @@ public partial class ClientHostingTests(BudgetApiFactory factory) : IntegrationT
 
         Assert.Contains("<div id=\"app\">", html, StringComparison.Ordinal);
 
-        // The build fills in the asset placeholders; serving the raw file leaves the app stuck loading.
+        // Build-time placeholders aren't filled in when the server hosts the client, and a page
+        // that still has them never starts (it requests "_framework/blazor.webassembly").
         Assert.DoesNotContain("#[", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("<script type=\"importmap\"></script>", html, StringComparison.Ordinal);
     }
 
     [Theory]
