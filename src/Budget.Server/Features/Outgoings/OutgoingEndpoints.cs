@@ -24,6 +24,7 @@ public static class OutgoingEndpoints
         outgoings.MapPost("/", CreateAsync).RequireAuthorization(HouseholdPolicies.User);
         outgoings.MapGet("/paid-from", PaidFromNamesAsync).RequireAuthorization(HouseholdPolicies.Viewer);
 
+        OutgoingDetailEndpoints.Map(outgoings);
         return app;
     }
 
@@ -133,7 +134,7 @@ public static class OutgoingEndpoints
             var text = period.Reason == OutgoingStatusReason.Ended
                 ? $"Ended from {Day(period.StartDate)}"
                 : period.ResumesOn is { } resumes
-                    ? $"Paused {Day(period.StartDate)} – {Day(resumes.AddDays(-1))}"
+                    ? $"Paused from {Day(period.StartDate)} until {Day(resumes)}"
                     : $"Paused from {Day(period.StartDate)} until further notice";
             notes.Add((period.StartDate, text));
         }
@@ -141,7 +142,7 @@ public static class OutgoingEndpoints
         return notes.OrderBy(n => n.Date).Select(n => n.Text).ToList();
     }
 
-    private static string Day(DateOnly date) => date.ToString("d MMM yyyy", Display);
+    internal static string Day(DateOnly date) => date.ToString("d MMM yyyy", Display);
 
     private static async Task<IReadOnlyList<string>> PaidFromNamesAsync(BudgetDbContext db) =>
         (await db.Outgoings

@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './fixtures';
 import type { Page } from '@playwright/test';
-import { addIncome, settled, signIn } from './helpers';
+import { addIncome, addOutgoing, settled, signIn } from './helpers';
 
 const tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
@@ -22,8 +22,9 @@ for (const theme of ['Light', 'Dark']) {
     test('main pages have no serious accessibility problems', async ({ page }) => {
       await signIn(page);
       const incomePage = await addIncome(page, 'Salary', '3000');
+      const outgoingPage = await addOutgoing(page, 'Council tax', 'Housing', '150');
 
-      for (const path of ['/', '/income', '/income/new', '/people', '/outgoings', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname]) {
+      for (const path of ['/', '/income', '/income/new', '/people', '/outgoings', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname, new URL(outgoingPage).pathname, `${new URL(outgoingPage).pathname}/edit`]) {
         await page.goto(path);
         await settled(page);
         await expectNoSeriousViolations(page, `${path} (${theme})`);

@@ -35,3 +35,44 @@ export async function addIncome(page: Page, name: string, amount: string): Promi
   await expect(page.getByTestId('income-name')).toHaveText(name);
   return page.url();
 }
+
+/** Opens a MudSelect (found by the data-testid on its input) and picks the option containing the text. */
+export async function choose(page: Page, testId: string, option: string): Promise<void> {
+  const select = page.locator('.mud-select').filter({ has: page.getByTestId(testId) }).first();
+  const item = page.locator('.mud-popover-open .mud-list-item').filter({ hasText: option }).first();
+  await select.scrollIntoViewIfNeeded();
+  try {
+    await expect(async () => {
+      if (!(await item.isVisible())) {
+        await select.click();
+      }
+      await expect(item, `the ${testId} list didn't open`).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+  } catch (error) {
+    // Diagnostics for CI, where traces can't be downloaded.
+    const box = await select.boundingBox();
+    const report = await page.evaluate(({ x, y }) => {
+      const hit = document.elementFromPoint(x, y);
+      const popovers = [...document.querySelectorAll('.mud-popover')].map(p => `${p.className} :: ${(p.textContent ?? '').slice(0, 80)}`);
+      return { hit: hit ? `${hit.tagName}.${hit.className} :: ${(hit.textContent ?? '').slice(0, 60)}` : 'none', popovers, scrollY: window.scrollY, height: window.innerHeight };
+    }, { x: (box?.x ?? 0) + (box?.width ?? 0) / 2, y: (box?.y ?? 0) + (box?.height ?? 0) / 2 });
+    console.log(`choose(${testId}) failed. Select box: ${JSON.stringify(box)}\n${JSON.stringify(report, null, 2)}`);
+    throw error;
+  }
+  await item.click();
+  await expect(page.locator('.mud-popover-open .mud-list-item')).toHaveCount(0);
+}
+
+/** Adds a monthly bill starting today and returns its details page URL. */
+export async function addOutgoing(page: Page, name: string, category: string, amount: string): Promise<string> {
+  await page.goto('/outgoings/new');
+  await settled(page);
+  await page.getByTestId('name').fill(name);
+  await choose(page, 'category', category);
+  await choose(page, 'priority', 'Optional');
+  await page.getByTestId('amount').fill(amount);
+  await page.getByTestId('save').click();
+  await page.getByTestId('outgoing-name').filter({ hasText: name }).first().click();
+  await expect(page.getByTestId('outgoing-name')).toHaveText(name);
+  return page.url();
+}

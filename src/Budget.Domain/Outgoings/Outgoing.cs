@@ -188,7 +188,12 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         CategoryId = details.CategoryId;
         Priority = details.Priority;
         PersonId = details.PersonId == Guid.Empty ? null : details.PersonId;
-        FirstPaymentDate = details.FirstPaymentDate;
+        // After it's created, the first payment date moves only by correcting the first amount.
+        if (_amountChanges.Count == 0)
+        {
+            FirstPaymentDate = details.FirstPaymentDate;
+        }
+
         RenewalDate = details.RenewalDate;
         RenewalEveryMonths = details.RenewalEveryMonths;
         AutoRenews = details.RenewalDate is not null && details.AutoRenews;
@@ -329,8 +334,25 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         var change = FindAmountChange(changeId);
         EnsureNoAmountChangeOn(effectiveFrom, exceptId: changeId);
 
+        var isFirst = change.EffectiveFrom == StartsOn;
+        var others = _amountChanges.Where(c => c.Id != changeId).Select(c => c.EffectiveFrom).ToList();
+        if (isFirst && others.Count > 0 && effectiveFrom > others.Min())
+        {
+            throw new InvalidOperationException("The first payment has to be before any later amount changes.");
+        }
+
+        if (!isFirst && effectiveFrom <= StartsOn)
+        {
+            throw new InvalidOperationException("An amount change has to be after the first payment.");
+        }
+
         var before = change.Describe();
         change.Update(effectiveFrom, amount, schedule, comment);
+        if (isFirst)
+        {
+            FirstPaymentDate = effectiveFrom;
+        }
+
         _corrections.Add(OutgoingCorrection.Create(Id, OutgoingEntryType.AmountChange, changeId, OutgoingCorrectionAction.Edited, before, change.Describe(), reason));
     }
 
@@ -368,13 +390,57 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         }
 
         EnsurePausedOnPaymentDates(firstSkipped, resumesOn: null);
+        return Pause(firstSkipped, ResumesAfterSkipping(firstSkipped, payments), comment);
+    }
+
+    /// <summary>When payments resume after skipping <paramref name="payments"/> payments from <paramref name="firstSkipped"/>.</summary>
+    public DateOnly ResumesAfterSkipping(DateOnly firstSkipped, int payments)
+    {
+        if (payments is < 1 or > MaxPausedPayments)
+        {
+            throw new ArgumentOutOfRangeException(nameof(payments), $"A pause skips from 1 to {MaxPausedPayments} payments.");
+        }
+
         var resumesOn = firstSkipped;
         for (var i = 0; i < payments; i++)
         {
             resumesOn = PaymentAfter(resumesOn);
         }
 
-        return Pause(firstSkipped, resumesOn, comment);
+        return resumesOn;
+    }
+
+    /// <summary>How many payments a pause skips, or <c>null</c> if it's until further notice (or an ending).</summary>
+    public int? PaymentsSkippedBy(OutgoingStatusPeriod period)
+    {
+        ArgumentNullException.ThrowIfNull(period);
+        if (period.Reason != OutgoingStatusReason.Paused || period.ResumesOn is not { } resumes)
+        {
+            return null;
+        }
+
+        var count = 0;
+        for (var date = period.StartDate; date < resumes && count <= MaxPausedPayments; date = PaymentAfter(date))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>The next <paramref name="count"/> payment dates on or after <paramref name="from"/>, ignoring pauses.</summary>
+    public IReadOnlyList<DateOnly> PaymentDatesFrom(DateOnly from, int count)
+    {
+        var dates = new List<DateOnly>(count);
+        var start = from < StartsOn ? StartsOn : from;
+        var date = (AmountChangeOn(start) ?? _amountChanges.MinBy(c => c.EffectiveFrom)!).Schedule.NextOnOrAfter(FirstPaymentDate, start);
+        for (var i = 0; i < count; i++)
+        {
+            dates.Add(date);
+            date = PaymentAfter(date);
+        }
+
+        return dates;
     }
 
     /// <summary>Stops the outgoing from a date. It stays in the history for earlier months.</summary>

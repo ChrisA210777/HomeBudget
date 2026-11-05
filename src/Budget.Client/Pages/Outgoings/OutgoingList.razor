@@ -137,7 +137,7 @@
                             <li class="@($"plain-list-item{(item.IsComingUp ? " outgoing-coming-up" : string.Empty)}")" data-testid="outgoing-item">
                                 <div class="d-flex align-start gap-2">
                                     <div class="flex-grow-1" style="min-width: 0">
-                                        <MudText Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudText>
+                                        <MudLink Href="@($"/outgoings/{item.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudLink>
                                         <div class="d-flex flex-wrap align-center gap-1 mt-1">
                                             <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="PriorityColour(item.Priority)" Class="ma-0" data-testid="outgoing-priority">@item.Priority</MudChip>
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)</MudText>

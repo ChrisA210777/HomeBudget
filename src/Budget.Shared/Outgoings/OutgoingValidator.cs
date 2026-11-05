@@ -20,6 +20,7 @@ public static partial class OutgoingValidator
     public const int NotesMaxLength = 2000;
     public const int MaxEvery = 99;
     public const int MaxRenewalEveryMonths = 120;
+    public const int MaxSkipPayments = 520;
     public const decimal MaxAmount = 10_000_000m;
     public const string DefaultStartingComment = "Starting amount";
 
@@ -147,6 +148,115 @@ public static partial class OutgoingValidator
 
         return errors.ToDictionary(e => e.Key, e => e.Value.ToArray());
     }
+
+    /// <summary>Checks an edit of the details, with the same rules as adding one.</summary>
+    public static IReadOnlyDictionary<string, string[]> Validate(UpdateOutgoingRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var asNew = new CreateOutgoingRequest
+        {
+            Kind = request.Kind,
+            Name = request.Name,
+            CategoryId = request.CategoryId,
+            Priority = request.Priority,
+            PersonId = request.PersonId,
+            Amount = 1m,
+            FirstPaymentDate = DateOnly.MinValue,
+            Recipient = request.Recipient,
+            PaymentMethod = request.PaymentMethod,
+            PaidFrom = request.PaidFrom,
+            ReferenceLabel = request.ReferenceLabel,
+            ReferenceValue = request.ReferenceValue,
+            Website = request.Website,
+            ContactPhone = request.ContactPhone,
+            Notes = request.Notes,
+            RenewalDate = request.RenewalDate,
+            RenewalEveryMonths = request.RenewalEveryMonths,
+            AutoRenews = request.AutoRenews,
+            AlertPeriod = request.AlertPeriod,
+        };
+        return Validate(asNew);
+    }
+
+    public static IReadOnlyDictionary<string, string[]> Validate(SaveOutgoingAmountRequest request, bool isCorrection)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var errors = Validate(new CreateOutgoingRequest
+        {
+            Name = "x",
+            CategoryId = Guid.NewGuid(),
+            Priority = OutgoingPriorityDto.Essential,
+            Amount = request.Amount,
+            Every = request.Every,
+            Unit = request.Unit,
+            FirstPaymentDate = request.EffectiveFrom,
+        }).ToDictionary(e => e.Key == nameof(CreateOutgoingRequest.FirstPaymentDate) ? nameof(request.EffectiveFrom) : e.Key, e => e.Value);
+        if (errors.ContainsKey(nameof(request.EffectiveFrom)))
+        {
+            errors[nameof(request.EffectiveFrom)] = ["Choose the date it applies from."];
+        }
+
+        Comment(errors, nameof(request.Comment), request.Comment, "Say why it changed, e.g. \"Price rise\".");
+        if (isCorrection)
+        {
+            Comment(errors, nameof(request.CorrectionReason), request.CorrectionReason, "Say why you're correcting it.");
+        }
+
+        return errors;
+    }
+
+    public static IReadOnlyDictionary<string, string[]> Validate(SaveOutgoingStatusRequest request, bool isCorrection)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var errors = new Dictionary<string, string[]>();
+        if (!Enum.IsDefined(request.Reason))
+        {
+            errors[nameof(request.Reason)] = ["Choose pause or end."];
+        }
+
+        if (request.StartDate is null)
+        {
+            errors[nameof(request.StartDate)] = [request.Reason == OutgoingStatusReasonDto.Paused ? "Choose the first payment to skip." : "Choose the date it ends from."];
+        }
+
+        if (request.Reason == OutgoingStatusReasonDto.Paused && request.SkipPayments is < 1 or > MaxSkipPayments)
+        {
+            errors[nameof(request.SkipPayments)] = [$"Skip from 1 to {MaxSkipPayments} payments, or leave it blank for until further notice."];
+        }
+
+        Comment(errors, nameof(request.Comment), request.Comment, "Add a comment, e.g. \"Payment holiday\".");
+        if (isCorrection)
+        {
+            Comment(errors, nameof(request.CorrectionReason), request.CorrectionReason, "Say why you're correcting it.");
+        }
+
+        return errors;
+    }
+
+    public static IReadOnlyDictionary<string, string[]> Validate(DeleteOutgoingEntryRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var errors = new Dictionary<string, string[]>();
+        Comment(errors, nameof(request.Reason), request.Reason, "Say why you're deleting it.");
+        return errors;
+    }
+
+    private static void Comment(Dictionary<string, string[]> errors, string key, string? text, string missing)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            errors[key] = [missing];
+        }
+        else if (text.Trim().Length > CommentMaxLength)
+        {
+            errors[key] = [$"Keep it to {CommentMaxLength} characters."];
+        }
+    }
+
+    /// <summary>"Skips 3 payments: resumes 1 Mar 2027", or "Until further notice".</summary>
+    public static string DescribePause(DateOnly? resumesOn, int? skippedPayments) => resumesOn is { } resumes
+        ? $"Skips {skippedPayments} payment{(skippedPayments == 1 ? string.Empty : "s")}: resumes {resumes.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}"
+        : "Until further notice";
 
     /// <summary>The same check the domain makes: http(s), with a dot in the host. "https://" is optional.</summary>
     public static bool IsWebsite(string? text)

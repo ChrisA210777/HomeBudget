@@ -176,3 +176,20 @@ body {
 .outgoing-coming-up {
     border-left: 4px solid var(--mud-palette-warning);
 }
+
+/* Key facts on an outgoing's page (BUD-51): label then value, two columns on wider screens. */
+.outgoing-facts {
+    display: grid;
+    grid-template-columns: minmax(8rem, max-content) 1fr;
+    gap: 0.25rem 1rem;
+    margin: 0;
+}
+
+.outgoing-facts dt {
+    color: var(--mud-palette-text-secondary);
+}
+
+.outgoing-facts dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}

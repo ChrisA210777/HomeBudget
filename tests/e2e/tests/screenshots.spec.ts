@@ -1,5 +1,5 @@
 import { test } from './fixtures';
-import { addIncome, settled, signIn } from './helpers';
+import { addIncome, addOutgoing, settled, signIn } from './helpers';
 
 // Not a check: saves pictures of each main page in both themes for people to look over
 // (uploaded by CI as the "e2e-screens" artifact).
@@ -8,8 +8,9 @@ for (const theme of ['Light', 'Dark']) {
     await page.addInitScript(value => window.localStorage.setItem('budget.theme', value), theme);
     await signIn(page, `Chris Example ${theme}`);
     const incomePage = await addIncome(page, 'Chris – salary', '3000');
+    const outgoingPage = await addOutgoing(page, 'Council tax', 'Housing', '150');
 
-    const pages: [string, string][] = [['home', '/'], ['income', '/income'], ['income-detail', new URL(incomePage).pathname], ['people', '/people'], ['outgoings', '/outgoings'], ['categories', '/outgoings/categories'], ['add-outgoing', '/outgoings/new']];
+    const pages: [string, string][] = [['home', '/'], ['income', '/income'], ['income-detail', new URL(incomePage).pathname], ['people', '/people'], ['outgoings', '/outgoings'], ['categories', '/outgoings/categories'], ['add-outgoing', '/outgoings/new'], ['outgoing-detail', new URL(outgoingPage).pathname]];
     for (const [name, path] of pages) {
       await page.goto(path);
       await settled(page);
