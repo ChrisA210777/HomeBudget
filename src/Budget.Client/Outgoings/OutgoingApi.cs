@@ -7,6 +7,8 @@ namespace Budget.Client.Outgoings;
 
 public interface IOutgoingApi
 {
+    Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all);
+
     Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request);
 
     /// <summary>Account names already used for "paid from", to suggest as people type.</summary>
@@ -15,6 +17,9 @@ public interface IOutgoingApi
 
 public sealed class OutgoingApi(HttpClient http) : IOutgoingApi
 {
+    public async Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) =>
+        (await http.GetFromJsonAsync<OutgoingMonthResponse>(Relative(OutgoingRoutes.ForMonth(householdId, year, month, all))))!;
+
     public async Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request)
     {
         using var response = await http.PostAsJsonAsync(Relative(OutgoingRoutes.Outgoings(householdId)), request);

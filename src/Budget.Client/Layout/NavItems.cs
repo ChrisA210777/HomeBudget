@@ -10,6 +10,7 @@ public static class NavItems
     [
         new("Home", "/", Icons.Material.Filled.Home, NavLinkMatch.All),
         new("Income", "/income", Icons.Material.Filled.Payments, NavLinkMatch.Prefix),
+        new("Outgoings", "/outgoings", Icons.Material.Filled.ReceiptLong, NavLinkMatch.Prefix),
         new("People", "/people", Icons.Material.Filled.People, NavLinkMatch.Prefix),
     ];
 }

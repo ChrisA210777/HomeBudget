@@ -171,3 +171,8 @@ body {
 .plain-list-item + .plain-list-item {
     border-top: 1px solid var(--mud-palette-lines-default);
 }
+
+/* An outgoing coming up for renewal (BUD-50, BUD-52). */
+.outgoing-coming-up {
+    border-left: 4px solid var(--mud-palette-warning);
+}

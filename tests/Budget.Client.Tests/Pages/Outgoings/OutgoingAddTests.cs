@@ -34,7 +34,7 @@ public sealed class OutgoingAddTests : IDisposable
     }
 
     [Fact]
-    public async Task Adds_a_bill_for_the_household_from_today_and_goes_home()
+    public async Task Adds_a_bill_for_the_household_from_today_and_goes_to_the_list()
     {
         var cut = _context.RenderComponent<OutgoingAdd>();
 
@@ -60,7 +60,7 @@ public sealed class OutgoingAddTests : IDisposable
             Assert.Null(request.RenewalDate);
             Assert.Equal(AlertPeriodDto.None, request.AlertPeriod);
         });
-        Assert.EndsWith("/", _context.Services.GetRequiredService<FakeNavigationManager>().Uri, StringComparison.Ordinal);
+        Assert.EndsWith("/outgoings", _context.Services.GetRequiredService<FakeNavigationManager>().Uri, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -237,5 +237,7 @@ public sealed class OutgoingAddTests : IDisposable
 
         public Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId) =>
             Task.FromResult<IReadOnlyList<string>>(["Joint account"]);
+
+        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) => throw new NotSupportedException();
     }
 }

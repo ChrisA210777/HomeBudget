@@ -61,6 +61,10 @@ public static class OutgoingRoutes
     /// <summary>POST: add an outgoing.</summary>
     public static string Outgoings(Guid householdId) => $"/api/households/{householdId}/outgoings";
 
+    /// <summary>GET: the outgoings for a month. <paramref name="all"/> includes ones not started or already ended.</summary>
+    public static string ForMonth(Guid householdId, int year, int month, bool all = false) =>
+        $"{Outgoings(householdId)}?month={year:D4}-{month:D2}{(all ? "&all=true" : string.Empty)}";
+
     public static string Outgoing(Guid householdId, Guid outgoingId) => $"{Outgoings(householdId)}/{outgoingId}";
 
     /// <summary>GET: the "paid from" account names already used in the household, for suggestions.</summary>
@@ -119,3 +123,60 @@ public sealed record CreateOutgoingRequest
 
 /// <summary>What's returned once an outgoing has been added.</summary>
 public sealed record OutgoingCreatedResponse(Guid Id, string Name, decimal MonthlyAmount);
+
+/// <summary>
+/// The household's outgoings for one month (BUD-50). Totals aren't included because the page
+/// filters the items and works the totals out with <see cref="OutgoingTotals"/>.
+/// </summary>
+public sealed record OutgoingMonthResponse(int Year, int Month, IReadOnlyList<OutgoingMonthItem> Items, string CurrencyCode);
+
+/// <summary>
+/// One outgoing in a month.
+/// <para><see cref="MonthlyAmount"/> is rounded to pennies for showing; <see cref="ExactMonthlyAmount"/>
+/// isn't, so totals can be rounded once.</para>
+/// <para><see cref="Amount"/>, <see cref="Every"/> and <see cref="Unit"/> are what's actually paid, as at the end of the month
+/// (or the first amount, if it hasn't started).</para>
+/// <para><see cref="Notes"/> explain why the month differs, e.g. "Paused 1 Nov – 14 Nov".</para>
+/// </summary>
+public sealed record OutgoingMonthItem(
+    Guid Id,
+    string Name,
+    OutgoingKindDto Kind,
+    OutgoingPriorityDto Priority,
+    Guid CategoryId,
+    string CategoryName,
+    int CategorySortOrder,
+    Guid? PersonId,
+    string? PersonName,
+    decimal Amount,
+    int Every,
+    PaymentUnitDto Unit,
+    decimal MonthlyAmount,
+    decimal ExactMonthlyAmount,
+    IReadOnlyList<string> Notes,
+    DateOnly StartsOn,
+    DateOnly? EndsOn,
+    DateOnly? NextRenewal,
+    bool IsComingUp);
+
+/// <summary>Totals for a set of outgoings, each rounded once from the exact amounts.</summary>
+public sealed record OutgoingTotals(decimal Total, decimal Essential, decimal Preferred, decimal Optional)
+{
+    public static OutgoingTotals For(IEnumerable<OutgoingMonthItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        var list = items.ToList();
+        decimal Sum(Func<OutgoingMonthItem, bool> include) =>
+            Math.Round(list.Where(include).Sum(i => i.ExactMonthlyAmount), 2, MidpointRounding.AwayFromZero);
+
+        return new OutgoingTotals(
+            Sum(_ => true),
+            Sum(i => i.Priority == OutgoingPriorityDto.Essential),
+            Sum(i => i.Priority == OutgoingPriorityDto.Preferred),
+            Sum(i => i.Priority == OutgoingPriorityDto.Optional));
+    }
+
+    /// <summary>The subtotal for some outgoings, e.g. one category, rounded once.</summary>
+    public static decimal Subtotal(IEnumerable<OutgoingMonthItem> items) =>
+        Math.Round(items.Sum(i => i.ExactMonthlyAmount), 2, MidpointRounding.AwayFromZero);
+}

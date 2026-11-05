@@ -9,7 +9,7 @@ for (const theme of ['Light', 'Dark']) {
     await signIn(page, `Chris Example ${theme}`);
     const incomePage = await addIncome(page, 'Chris – salary', '3000');
 
-    const pages: [string, string][] = [['home', '/'], ['income', '/income'], ['income-detail', new URL(incomePage).pathname], ['people', '/people'], ['categories', '/outgoings/categories'], ['add-outgoing', '/outgoings/new']];
+    const pages: [string, string][] = [['home', '/'], ['income', '/income'], ['income-detail', new URL(incomePage).pathname], ['people', '/people'], ['outgoings', '/outgoings'], ['categories', '/outgoings/categories'], ['add-outgoing', '/outgoings/new']];
     for (const [name, path] of pages) {
       await page.goto(path);
       await settled(page);

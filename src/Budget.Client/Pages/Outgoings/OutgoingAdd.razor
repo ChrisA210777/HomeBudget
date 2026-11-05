@@ -16,7 +16,7 @@
 <PageTitle>Add an outgoing · Home Budget</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/" Class="mb-2">Home</MudButton>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings" Class="mb-2">Outgoings</MudButton>
     <h1 class="mud-typography mud-typography-h4 mb-4">Add an outgoing</h1>
 
     @if (!_loaded)
@@ -180,7 +180,7 @@
                 }
 
                 <div class="d-flex justify-end gap-2 mt-2">
-                    <MudButton Variant="Variant.Text" Href="/">Cancel</MudButton>
+                    <MudButton Variant="Variant.Text" Href="/outgoings">Cancel</MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">Add outgoing</MudButton>
                 </div>
             </MudStack>
@@ -320,7 +320,7 @@
             if (result.Succeeded)
             {
                 Snackbar.Add($"{result.Value!.Name} was added.", Severity.Success);
-                Navigation.NavigateTo("/");
+                Navigation.NavigateTo("/outgoings");
                 return;
             }
 
