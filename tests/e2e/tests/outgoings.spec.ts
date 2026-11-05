@@ -7,12 +7,24 @@ async function choose(page: Page, testId: string, option: string): Promise<void>
   const select = page.locator('.mud-select').filter({ has: page.getByTestId(testId) }).first();
   const item = page.locator('.mud-popover-open .mud-list-item').filter({ hasText: option }).first();
   await select.scrollIntoViewIfNeeded();
-  await expect(async () => {
-    if (!(await item.isVisible())) {
-      await select.click();
-    }
-    await expect(item, `the ${testId} list didn't open`).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 20_000 });
+  try {
+    await expect(async () => {
+      if (!(await item.isVisible())) {
+        await select.click();
+      }
+      await expect(item, `the ${testId} list didn't open`).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+  } catch (error) {
+    // Diagnostics for CI, where traces can't be downloaded.
+    const box = await select.boundingBox();
+    const report = await page.evaluate(({ x, y }) => {
+      const hit = document.elementFromPoint(x, y);
+      const popovers = [...document.querySelectorAll('.mud-popover')].map(p => `${p.className} :: ${(p.textContent ?? '').slice(0, 80)}`);
+      return { hit: hit ? `${hit.tagName}.${hit.className} :: ${(hit.textContent ?? '').slice(0, 60)}` : 'none', popovers, scrollY: window.scrollY, height: window.innerHeight };
+    }, { x: (box?.x ?? 0) + (box?.width ?? 0) / 2, y: (box?.y ?? 0) + (box?.height ?? 0) / 2 });
+    console.log(`choose(${testId}) failed. Select box: ${JSON.stringify(box)}\n${JSON.stringify(report, null, 2)}`);
+    throw error;
+  }
   await item.click();
   await expect(page.locator('.mud-popover-open .mud-list-item')).toHaveCount(0);
 }
