@@ -5,6 +5,7 @@ using Budget.Server.Features.Account;
 using Budget.Server.Features.Households;
 using Budget.Server.Features.Income;
 using Budget.Server.Features.People;
+using Budget.Server.Hosting;
 using Budget.Server.Identity;
 using Budget.Shared;
 
@@ -17,8 +18,12 @@ builder.Services.AddBudgetAuthentication(builder.Configuration);
 builder.Services.AddHouseholdAuthorization();
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
+builder.Services.AddForwardedHeadersFromConfiguration(builder.Configuration);
 
 var app = builder.Build();
+
+// First, so everything after sees the original scheme and host (e.g. a dev tunnel's https URL).
+app.UseForwardedHeadersIfEnabled();
 
 // In Development the database is created and migrated on startup. Deployed environments
 // apply migrations from the pipeline using the migration bundle instead (see ADR-003).
