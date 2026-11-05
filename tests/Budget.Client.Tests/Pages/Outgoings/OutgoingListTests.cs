@@ -40,9 +40,9 @@ public sealed class OutgoingListTests : IDisposable
 
         Assert.Equal("November 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal(new[] { "Housing", "Insurance", "Food & household" }, Texts(cut, "category-name"));
-        Assert.Equal(new[] { "£615.00", "£40.00", "£520.00" }, Texts(cut, "category-subtotal"));
-        Assert.Equal("£1,175.00", Text(cut, "month-total"));
-        Assert.Equal("£655.00", Text(cut, "total-essential"));
+        Assert.Equal(new[] { "£150.00", "£40.00", "£520.00" }, Texts(cut, "category-subtotal"));
+        Assert.Equal("£710.00", Text(cut, "month-total"));
+        Assert.Equal("£190.00", Text(cut, "total-essential"));
         Assert.Equal("£520.00", Text(cut, "total-preferred"));
         Assert.Equal("£0.00", Text(cut, "total-optional"));
     }
@@ -59,7 +59,7 @@ public sealed class OutgoingListTests : IDisposable
         Assert.Contains("Essential", insurance.QuerySelector("[data-testid=outgoing-priority]")!.TextContent, StringComparison.Ordinal);
 
         var mortgage = Item(cut, "Mortgage");
-        Assert.Equal("Paused 1 Nov 2026 – 15 Nov 2026", mortgage.QuerySelector("[data-testid=outgoing-note]")!.TextContent.Trim());
+        Assert.Equal("Paused 1 Nov 2026 – 30 Nov 2026", mortgage.QuerySelector("[data-testid=outgoing-note]")!.TextContent.Trim());
     }
 
     [Fact]
@@ -167,8 +167,8 @@ public sealed class OutgoingListTests : IDisposable
             Requests.Add((year, month, all));
             IReadOnlyList<OutgoingMonthItem> items = Empty ? [] :
             [
-                Outgoing("Council tax", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 180m, PaymentUnitDto.Month, 165m, notes: ["Rises to £180.00 a month from 16 Nov 2026"]),
-                Outgoing("Mortgage", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 900m, PaymentUnitDto.Month, 450m, notes: ["Paused 1 Nov 2026 – 15 Nov 2026"]),
+                Outgoing("Council tax", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 180m, PaymentUnitDto.Month, 150m, notes: ["Rises to £180.00 a month from 16 Nov 2026"]),
+                Outgoing("Mortgage", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 900m, PaymentUnitDto.Month, 0m, notes: ["Paused 1 Nov 2026 – 30 Nov 2026"]),
                 Outgoing("Car insurance", InsuranceId, "Insurance", 40, OutgoingPriorityDto.Essential, 480m, PaymentUnitDto.Year, 40m,
                     personId: StaticPeopleApi.ChrisId, personName: "Chris Austin", comingUp: true),
                 Outgoing("Food shopping", FoodId, "Food & household", 90, OutgoingPriorityDto.Preferred, 120m, PaymentUnitDto.Week, 520m, kind: OutgoingKindDto.Allowance),

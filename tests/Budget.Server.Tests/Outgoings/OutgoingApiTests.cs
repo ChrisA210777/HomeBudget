@@ -182,7 +182,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var mortgage = Outgoing.Create(householdId, Details("Mortgage", housing, new DateOnly(2026, 1, 1)), 900m, PaymentSchedule.Monthly, "Start");
-        mortgage.Pause(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 16), "Payment holiday");
+        mortgage.PauseFor(new DateOnly(2026, 11, 1), payments: 1, "Payment holiday");
         var carInsurance = Outgoing.Create(householdId, Details("Car insurance", insurance, new DateOnly(2026, 3, 14)) with
         {
             PersonId = personId,
@@ -213,12 +213,12 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         Assert.Equal(new[] { "Council tax", "Mortgage", "Car insurance", "Food shopping" }, month.Items.Select(i => i.Name));
 
         var councilTaxItem = month.Items[0];
-        Assert.Equal(("Housing", 165m, 180m, PaymentUnitDto.Month), (councilTaxItem.CategoryName, councilTaxItem.MonthlyAmount, councilTaxItem.Amount, councilTaxItem.Unit));
+        Assert.Equal(("Housing", 150m, 180m, PaymentUnitDto.Month), (councilTaxItem.CategoryName, councilTaxItem.MonthlyAmount, councilTaxItem.Amount, councilTaxItem.Unit));
         Assert.Equal(new[] { "Rises to £180.00 a month from 16 Nov 2026" }, councilTaxItem.Notes);
 
         var mortgageItem = month.Items[1];
-        Assert.Equal(450m, mortgageItem.MonthlyAmount);
-        Assert.Equal(new[] { "Paused 1 Nov 2026 – 15 Nov 2026" }, mortgageItem.Notes);
+        Assert.Equal(0m, mortgageItem.MonthlyAmount);
+        Assert.Equal(new[] { "Paused 1 Nov 2026 – 30 Nov 2026" }, mortgageItem.Notes);
 
         var insuranceItem = month.Items[2];
         Assert.Equal((40m, 480m, PaymentUnitDto.Year), (insuranceItem.MonthlyAmount, insuranceItem.Amount, insuranceItem.Unit));
@@ -234,7 +234,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         Assert.Null(foodItem.PersonId);
 
         var totals = OutgoingTotals.For(month.Items);
-        Assert.Equal(new OutgoingTotals(1175m, 655m, 520m, 0m), totals);
+        Assert.Equal(new OutgoingTotals(710m, 190m, 520m, 0m), totals);
     }
 
     [Fact]

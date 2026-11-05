@@ -49,22 +49,25 @@ public class OutgoingTests
     }
 
     [Fact]
-    public void Starting_part_way_through_a_month_is_pro_rata()
+    public void The_month_it_starts_counts_in_full()
     {
-        var outgoing = Create(300, PaymentSchedule.Monthly, new DateOnly(2026, 11, 16));
+        var monthly = Create(300, PaymentSchedule.Monthly, new DateOnly(2026, 11, 16));
+        var weekly = Create(15, PaymentSchedule.Weekly, new DateOnly(2026, 11, 26));
 
-        Assert.Equal(150m, Month(outgoing, 2026, 11));
+        Assert.Equal(300m, Month(monthly, 2026, 11));
+        Assert.Equal(65m, Month(weekly, 2026, 11));
     }
 
     [Fact]
-    public void A_price_rise_mid_month_is_pro_rata()
+    public void A_price_change_counts_from_the_first_payment_at_the_new_price()
     {
+        // Paid on the 1st, so November's payment is still £300.
         var outgoing = Create(300, PaymentSchedule.Monthly);
         outgoing.ChangeAmount(new DateOnly(2026, 11, 16), 330, PaymentSchedule.Monthly, "10% rise");
 
-        Assert.Equal(315m, Month(outgoing, 2026, 11));
-        Assert.Equal(330m, Month(outgoing, 2026, 12));
         Assert.Equal(300m, Month(outgoing, 2026, 10));
+        Assert.Equal(300m, Month(outgoing, 2026, 11));
+        Assert.Equal(330m, Month(outgoing, 2026, 12));
     }
 
     [Fact]
@@ -78,15 +81,66 @@ public class OutgoingTests
     }
 
     [Fact]
-    public void A_pause_with_a_resumption_date_counts_nothing_until_it_resumes()
+    public void A_monthly_pause_skips_whole_months()
     {
         var outgoing = Create(900, PaymentSchedule.Monthly);
-        outgoing.Pause(new DateOnly(2026, 11, 16), new DateOnly(2027, 2, 1), "Mortgage payment holiday");
+        var pause = outgoing.PauseFor(new DateOnly(2026, 12, 1), payments: 2, "Mortgage payment holiday");
 
-        Assert.Equal(450m, Month(outgoing, 2026, 11));
+        Assert.Equal(new DateOnly(2027, 2, 1), pause.ResumesOn);
+        Assert.Equal(900m, Month(outgoing, 2026, 11));
         Assert.Equal(0m, Month(outgoing, 2026, 12));
         Assert.Equal(0m, Month(outgoing, 2027, 1));
         Assert.Equal(900m, Month(outgoing, 2027, 2));
+    }
+
+    [Fact]
+    public void Skipping_a_years_payment_stops_twelve_months_of_setting_aside()
+    {
+        var outgoing = Create(480, PaymentSchedule.Yearly, new DateOnly(2026, 3, 14));
+        var pause = outgoing.PauseFor(new DateOnly(2027, 3, 14), payments: 1, "Not renewing this year");
+
+        Assert.Equal(new DateOnly(2028, 3, 14), pause.ResumesOn);
+        Assert.Equal(40m, Month(outgoing, 2027, 2));
+        Assert.Equal(0m, Month(outgoing, 2027, 3));
+        Assert.Equal(0m, Month(outgoing, 2028, 2));
+        Assert.Equal(40m, Month(outgoing, 2028, 3));
+    }
+
+    [Fact]
+    public void A_weekly_pause_takes_off_the_share_of_that_months_payments()
+    {
+        // Paid on Mondays: 2, 9, 16, 23 and 30 November 2026. Two of the five are skipped.
+        var outgoing = Create(15, PaymentSchedule.Weekly, new DateOnly(2026, 1, 5));
+        outgoing.PauseFor(new DateOnly(2026, 11, 9), payments: 2, "Away");
+
+        Assert.Equal(39m, Month(outgoing, 2026, 11));
+        Assert.Equal(65m, Month(outgoing, 2026, 12));
+    }
+
+    [Fact]
+    public void Payments_further_apart_than_a_month_use_the_latest_one()
+    {
+        // Every 6 weeks from 5 Jan 2026: 26 Oct, then 7 Dec, so nothing is due in November.
+        var outgoing = Create(60, new PaymentSchedule(6, PaymentUnit.Week), new DateOnly(2026, 1, 5));
+
+        Assert.Equal(new[] { new DateOnly(2026, 10, 26) }, outgoing.CountingDaysIn(2026, 11));
+        Assert.Equal(Values.RoundForDisplay(60m * 52 / 12 / 6), Month(outgoing, 2026, 11));
+
+        outgoing.PauseFor(new DateOnly(2026, 10, 26), payments: 1, "Skipped");
+        Assert.Equal(0m, Month(outgoing, 2026, 11));
+        Assert.Equal(Values.RoundForDisplay(60m * 52 / 12 / 6), Month(outgoing, 2026, 12));
+    }
+
+    [Fact]
+    public void Pauses_start_and_resume_on_payment_dates()
+    {
+        var outgoing = Create(900, PaymentSchedule.Monthly);
+
+        Assert.Throws<InvalidOperationException>(() => outgoing.Pause(new DateOnly(2026, 11, 16), null, "Mid-month"));
+        Assert.Throws<InvalidOperationException>(() => outgoing.Pause(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 16), "Two weeks"));
+        Assert.Throws<ArgumentOutOfRangeException>(() => outgoing.PauseFor(new DateOnly(2026, 11, 1), 0, "Nothing"));
+        Assert.True(outgoing.IsPaymentDate(new DateOnly(2026, 11, 1)));
+        Assert.False(outgoing.IsPaymentDate(new DateOnly(2025, 11, 1)));
     }
 
     [Fact]
@@ -101,25 +155,32 @@ public class OutgoingTests
 
         Assert.Equal(20m, Month(outgoing, 2027, 6));
         Assert.Contains(outgoing.Corrections, c => c.Before.Contains("until further notice", StringComparison.Ordinal) && c.After!.Contains("until 2027-05-01", StringComparison.Ordinal));
+        Assert.Throws<InvalidOperationException>(() => outgoing.CorrectStatusPeriod(pause.Id, OutgoingStatusReason.Paused, new DateOnly(2026, 11, 2), null, "x", "y"));
     }
 
-    [Fact]
-    public void Ending_mid_month_is_pro_rata_and_nothing_after()
+    [Theory]
+    [InlineData("2026-11-01", 0)]
+    [InlineData("2026-11-02", 30)]
+    [InlineData("2026-11-16", 30)]
+    public void Ending_counts_the_month_only_if_its_payment_is_before_the_end(string endsFrom, decimal november)
     {
         var outgoing = Create(30, PaymentSchedule.Monthly);
-        outgoing.End(new DateOnly(2026, 11, 16), "Cancelled");
+        outgoing.End(DateOnly.Parse(endsFrom), "Cancelled");
 
-        Assert.Equal(15m, Month(outgoing, 2026, 11));
+        Assert.Equal(november, Month(outgoing, 2026, 11));
         Assert.Equal(0m, Month(outgoing, 2026, 12));
-        Assert.Equal(new DateOnly(2026, 11, 16), outgoing.EndsOn);
+        Assert.Equal(DateOnly.Parse(endsFrom), outgoing.EndsOn);
     }
 
     [Fact]
-    public void Leap_february_is_pro_rata_over_29_days()
+    public void Month_end_payment_days_are_clamped()
     {
-        var outgoing = Create(290, PaymentSchedule.Monthly, new DateOnly(2028, 2, 15));
+        var outgoing = Create(100, PaymentSchedule.Monthly, new DateOnly(2026, 1, 31));
+        outgoing.Pause(new DateOnly(2026, 2, 28), new DateOnly(2026, 3, 31), "February off");
 
-        Assert.Equal(150m, Month(outgoing, 2028, 2));
+        Assert.Equal(new[] { new DateOnly(2026, 2, 28) }, outgoing.CountingDaysIn(2026, 2));
+        Assert.Equal(0m, Month(outgoing, 2026, 2));
+        Assert.Equal(100m, Month(outgoing, 2026, 3));
     }
 
     // ---- Payment and renewal dates ----
@@ -189,7 +250,7 @@ public class OutgoingTests
         Assert.False(noAlert.IsComingUp(new DateOnly(2027, 3, 1)));
 
         var paused = Outgoing.Create(Household, Details(new DateOnly(2026, 3, 3)) with { RenewalDate = new DateOnly(2026, 3, 3), AlertPeriod = AlertPeriod.SixMonths }, 40, PaymentSchedule.Monthly, "Start");
-        paused.Pause(new DateOnly(2027, 1, 1), null, "Frozen");
+        paused.Pause(new DateOnly(2027, 1, 3), null, "Frozen");
         Assert.False(paused.IsComingUp(new DateOnly(2027, 2, 1)));
     }
 

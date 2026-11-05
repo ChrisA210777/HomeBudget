@@ -67,6 +67,7 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     public const int ContactPhoneMaxLength = 30;
     public const int NotesMaxLength = 2000;
     public const int MaxRenewalEveryMonths = 120;
+    public const int MaxPausedPayments = 520;
 
     private readonly List<OutgoingAmountChange> _amountChanges = [];
     private readonly List<OutgoingStatusPeriod> _statusPeriods = [];
@@ -216,18 +217,62 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     public decimal MonthlyEquivalentOn(DateOnly date) =>
         _statusPeriods.Any(p => p.Covers(date)) ? 0m : AmountChangeOn(date)?.MonthlyEquivalent ?? 0m;
 
-    /// <summary>The monthly equivalent for a calendar month, pro-rata by day (ADR-011). Unrounded.</summary>
+    /// <summary>
+    /// The monthly equivalent for a calendar month (ADR-011). Unrounded.
+    /// <para>Each month is judged on the payments due in it (see <see cref="CountingDaysIn"/>): a payment
+    /// that's paused or after the end counts nothing, and the month it starts in counts in full. So a
+    /// monthly or yearly outgoing counts in full or not at all, and a weekly one loses the share of the
+    /// month's payments that are paused or after the end.</para>
+    /// </summary>
     public decimal MonthlyEquivalentForMonth(int year, int month)
     {
-        var days = DateTime.DaysInMonth(year, month);
-        var total = 0m;
-        for (var day = 1; day <= days; day++)
+        var days = CountingDaysIn(year, month).Where(d => d >= StartsOn).ToList();
+        return days.Count == 0 ? 0m : days.Sum(MonthlyEquivalentOn) / days.Count;
+    }
+
+    /// <summary>
+    /// The days that decide a month's amount. For a weekly schedule, its payment dates in the month
+    /// (or, when payments are further apart than a month, the latest one before the month ends). For
+    /// monthly or longer schedules, one day each month on the first payment's day of the month, because
+    /// those are averaged into every month.
+    /// </summary>
+    public IReadOnlyList<DateOnly> CountingDaysIn(int year, int month)
+    {
+        var first = new DateOnly(year, month, 1);
+        var last = first.AddMonths(1).AddDays(-1);
+        var schedule = (AmountChangeOn(last) ?? _amountChanges.MinBy(c => c.EffectiveFrom)!).Schedule;
+
+        if (schedule.Unit != PaymentUnit.Week)
         {
-            total += MonthlyEquivalentOn(new DateOnly(year, month, day));
+            return [new DateOnly(year, month, Math.Min(FirstPaymentDate.Day, DateTime.DaysInMonth(year, month)))];
         }
 
-        // Divide once so a month with no changes comes out exactly at the monthly equivalent.
-        return total / days;
+        var period = 7 * schedule.Every;
+        var dates = new List<DateOnly>();
+        var next = schedule.NextOnOrAfter(FirstPaymentDate, first);
+        for (var date = next; date <= last; date = date.AddDays(period))
+        {
+            dates.Add(date);
+        }
+
+        if (dates.Count == 0 && next > FirstPaymentDate)
+        {
+            dates.Add(next.AddDays(-period));
+        }
+
+        return dates;
+    }
+
+    /// <summary>Whether a payment is due on a date under the schedule in force then (ignoring pauses).</summary>
+    public bool IsPaymentDate(DateOnly date) =>
+        date >= StartsOn && AmountChangeOn(date)!.Schedule.NextOnOrAfter(FirstPaymentDate, date) == date;
+
+    /// <summary>The payment after <paramref name="date"/>, ignoring pauses.</summary>
+    public DateOnly PaymentAfter(DateOnly date)
+    {
+        var from = date < StartsOn ? StartsOn : date.AddDays(1);
+        var schedule = (AmountChangeOn(from) ?? _amountChanges.MinBy(c => c.EffectiveFrom)!).Schedule;
+        return schedule.NextOnOrAfter(FirstPaymentDate, from);
     }
 
     /// <summary>The next payment on or after a date, or <c>null</c> if none is due (ended, or paused until further notice).</summary>
@@ -304,9 +349,33 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
 
     // ---- Pauses and ending ----------------------------------------------------------
 
-    /// <summary>Pauses payments from a date until <paramref name="resumesOn"/> (or until further notice).</summary>
-    public OutgoingStatusPeriod Pause(DateOnly from, DateOnly? resumesOn, string comment) =>
-        AddStatusPeriod(OutgoingStatusReason.Paused, from, resumesOn, comment);
+    /// <summary>
+    /// Pauses whole payments: from the payment on <paramref name="from"/> until the payment on
+    /// <paramref name="resumesOn"/> (or until further notice). Both must be payment dates.
+    /// </summary>
+    public OutgoingStatusPeriod Pause(DateOnly from, DateOnly? resumesOn, string comment)
+    {
+        EnsurePausedOnPaymentDates(from, resumesOn);
+        return AddStatusPeriod(OutgoingStatusReason.Paused, from, resumesOn, comment);
+    }
+
+    /// <summary>Skips <paramref name="payments"/> payments, starting with the one on <paramref name="firstSkipped"/>.</summary>
+    public OutgoingStatusPeriod PauseFor(DateOnly firstSkipped, int payments, string comment)
+    {
+        if (payments is < 1 or > MaxPausedPayments)
+        {
+            throw new ArgumentOutOfRangeException(nameof(payments), $"A pause skips from 1 to {MaxPausedPayments} payments.");
+        }
+
+        EnsurePausedOnPaymentDates(firstSkipped, resumesOn: null);
+        var resumesOn = firstSkipped;
+        for (var i = 0; i < payments; i++)
+        {
+            resumesOn = PaymentAfter(resumesOn);
+        }
+
+        return Pause(firstSkipped, resumesOn, comment);
+    }
 
     /// <summary>Stops the outgoing from a date. It stays in the history for earlier months.</summary>
     public OutgoingStatusPeriod End(DateOnly from, string comment) =>
@@ -315,6 +384,11 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     public void CorrectStatusPeriod(Guid periodId, OutgoingStatusReason reason, DateOnly startDate, DateOnly? resumesOn, string comment, string correctionReason)
     {
         var period = FindStatusPeriod(periodId);
+        if (reason == OutgoingStatusReason.Paused)
+        {
+            EnsurePausedOnPaymentDates(startDate, resumesOn);
+        }
+
         EnsureNoOverlap(startDate, resumesOn, exceptId: periodId);
 
         var before = period.Describe();
@@ -348,6 +422,19 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         if (_amountChanges.Any(c => c.EffectiveFrom == date && c.Id != exceptId))
         {
             throw new InvalidOperationException("There's already an amount change on that date. Change that one instead.");
+        }
+    }
+
+    private void EnsurePausedOnPaymentDates(DateOnly from, DateOnly? resumesOn)
+    {
+        if (!IsPaymentDate(from))
+        {
+            throw new InvalidOperationException("A pause has to start on a payment date.");
+        }
+
+        if (resumesOn is { } resumes && resumes > from && !IsPaymentDate(resumes))
+        {
+            throw new InvalidOperationException("A pause has to resume on a payment date.");
         }
     }
 

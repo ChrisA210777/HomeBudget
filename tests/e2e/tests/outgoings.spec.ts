@@ -46,14 +46,11 @@ test("an outgoing added from the home page shows in this month's list", async ({
   await expect(page.getByRole('heading', { level: 1, name: 'Outgoings' })).toBeVisible();
   await expect(page.getByText('Car insurance was added.')).toBeVisible();
   const item = page.getByTestId('outgoing-item').filter({ hasText: 'Car insurance' });
-  // It starts today, so this month only counts the days from today (£40 a month in a full month).
+  // It starts this month, so this month counts in full (ADR-011).
+  await expect(item.getByTestId('outgoing-monthly')).toHaveText('£40.00');
   await expect(item.getByTestId('outgoing-paid')).toContainText('£480.00 a year');
   await expect(item.getByTestId('outgoing-note').first()).toContainText('Starts');
-  const monthly = await item.getByTestId('outgoing-monthly').textContent();
-  await expect(page.getByTestId('total-essential')).toHaveText(monthly ?? '');
-
-  await page.getByTestId('next-month').click();
-  await expect(page.getByTestId('outgoing-item').filter({ hasText: 'Car insurance' }).getByTestId('outgoing-monthly')).toHaveText('£40.00');
+  await expect(page.getByTestId('total-essential')).toHaveText('£40.00');
 });
 
 test('the add form warns about card numbers', async ({ page }) => {
