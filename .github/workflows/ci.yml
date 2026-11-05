@@ -92,6 +92,17 @@ jobs:
       - name: Publish the app
         run: dotnet publish src/Budget.Server --configuration Release --output artifacts/server
 
+      - name: Show how index.html was published
+        run: |
+          echo "== index files in the published wwwroot"; ls -la artifacts/server/wwwroot | grep -i "index\|service-worker" || true
+          echo "== placeholders left in published index.html: $(grep -c '#\[' artifacts/server/wwwroot/index.html || true)"
+          echo "== index.html copies under the client's bin/obj without placeholders:"
+          grep -rL '#\[' --include='index.html' src/Budget.Client/bin src/Budget.Client/obj || true
+          echo "== index routes in the endpoints manifest:"
+          for f in artifacts/server/*.staticwebassets.endpoints.json; do
+            python3 -c "import json,sys; d=json.load(open(sys.argv[1])); [print(e['Route'], '->', e['AssetFile'], [s['Name'] for s in e.get('Selectors',[])]) for e in d['Endpoints'] if 'index' in e['Route'].lower()]" "$f"
+          done
+
       - name: Create a development HTTPS certificate
         run: dotnet dev-certs https
 
