@@ -71,14 +71,14 @@ public sealed class OutgoingAddTests : IDisposable
         Assert.Empty(cut.FindAll("[data-testid=monthly-equivalent]"));
 
         cut.Find("input[data-testid=amount]").Input("480");
-        Assert.Equal("£480.00 a month", cut.Find("[data-testid=monthly-equivalent]").TextContent.Trim());
+        cut.WaitForAssertion(() => Assert.Equal("£480.00 a month", cut.Find("[data-testid=monthly-equivalent]").TextContent.Trim()));
 
         await ChooseAsync(cut, Selects<PaymentUnitDto>(cut)[0], PaymentUnitDto.Year);
-        Assert.Equal("£480.00 a year = £40.00 a month", cut.Find("[data-testid=monthly-equivalent]").TextContent.Trim());
+        cut.WaitForAssertion(() => Assert.Equal("£480.00 a year = £40.00 a month", cut.Find("[data-testid=monthly-equivalent]").TextContent.Trim()));
 
         cut.Find("input[data-testid=amount]").Input("15");
         await ChooseAsync(cut, Selects<PaymentUnitDto>(cut)[0], PaymentUnitDto.Week);
-        Assert.Equal("£15.00 a week = £65.00 a month", cut.Find("[data-testid=monthly-equivalent]").TextContent.Trim());
+        cut.WaitForAssertion(() => Assert.Equal("£15.00 a week = £65.00 a month", cut.Find("[data-testid=monthly-equivalent]").TextContent.Trim()));
     }
 
     [Fact]

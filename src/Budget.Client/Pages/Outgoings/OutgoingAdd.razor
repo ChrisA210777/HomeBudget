@@ -76,17 +76,23 @@
                                      Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
                                      Error="Has(nameof(CreateOutgoingRequest.Amount))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Amount))"
                                      Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem" data-testid="amount" />
-                    <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
-                                     InputMode="InputMode.numeric" HideSpinButtons="true"
-                                     Error="Has(nameof(CreateOutgoingRequest.Every))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Every))"
-                                     Variant="Variant.Outlined" Style="width: 5.5rem" data-testid="every" />
-                    <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Unit"
-                               Variant="Variant.Outlined" Style="width: 8rem" data-testid="unit">
-                        @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
-                        {
-                            <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <div class="d-flex gap-2">
+                        <div style="width: 5.5rem">
+                            <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                             InputMode="InputMode.numeric" HideSpinButtons="true"
+                                             Error="Has(nameof(CreateOutgoingRequest.Every))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Every))"
+                                             Variant="Variant.Outlined" data-testid="every" />
+                        </div>
+                        <div style="width: 8rem">
+                            <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Unit"
+                                       Variant="Variant.Outlined" data-testid="unit">
+                                @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
+                                {
+                                    <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </div>
+                    </div>
                 </div>
                 @if (OutgoingValidator.DescribeMonthlyEquivalent(_amount, _every, _unit) is { } equivalent)
                 {
