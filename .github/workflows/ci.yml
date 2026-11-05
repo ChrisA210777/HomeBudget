@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      print_screens:
+        description: Print E2E screenshots into the log (for reviewing without downloading artifacts)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -131,6 +136,8 @@ jobs:
 
       - name: Run end-to-end tests
         working-directory: tests/e2e
+        env:
+          PRINT_SCREENS: ${{ inputs.print_screens == true }}
         run: npx playwright test
 
       - name: Show the app's log

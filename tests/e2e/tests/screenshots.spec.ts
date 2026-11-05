@@ -13,7 +13,14 @@ for (const theme of ['Light', 'Dark']) {
     for (const [name, path] of pages) {
       await page.goto(path);
       await settled(page);
-      await page.screenshot({ path: `screens/${testInfo.project.name}-${theme.toLowerCase()}-${name}.png`, fullPage: true });
+      const file = `${testInfo.project.name}-${theme.toLowerCase()}-${name}`;
+      await page.screenshot({ path: `screens/${file}.png`, fullPage: true });
+
+      // For reviewing from the CI log when artifacts can't be downloaded (opt-in, manual runs only).
+      if (process.env.PRINT_SCREENS === 'true') {
+        const jpeg = await page.screenshot({ type: 'jpeg', quality: 45, scale: 'css' });
+        console.log(`SCREEN ${file} ${jpeg.toString('base64')}`);
+      }
     }
   });
 }
