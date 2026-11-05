@@ -71,13 +71,17 @@
             </MudCard>
         </MudItem>
         <MudItem xs="12" sm="6">
-            <MudCard Outlined="true" Style="height: 100%" data-testid="categories-card">
+            <MudCard Outlined="true" Style="height: 100%" data-testid="outgoings-card">
                 <MudCardContent>
-                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" Class="mr-1" />Categories</MudText>
-                    <MudText Typo="Typo.body2">The groups your bills, savings and allowances go in.</MudText>
+                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" Class="mr-1" />Outgoings</MudText>
+                    <MudText Typo="Typo.body2">Bills, savings and spending allowances, and the categories they go in.</MudText>
                 </MudCardContent>
-                <MudCardActions>
-                    <MudButton Href="/outgoings/categories" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-categories">Go to categories</MudButton>
+                <MudCardActions Class="flex-wrap">
+                    @if (_household?.Role is not null and not "Viewer")
+                    {
+                        <MudButton Href="/outgoings/new" Color="Color.Primary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Add" data-testid="add-outgoing">Add an outgoing</MudButton>
+                    }
+                    <MudButton Href="/outgoings/categories" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-categories">Categories</MudButton>
                 </MudCardActions>
             </MudCard>
         </MudItem>

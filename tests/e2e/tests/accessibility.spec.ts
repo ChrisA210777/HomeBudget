@@ -23,7 +23,7 @@ for (const theme of ['Light', 'Dark']) {
       await signIn(page);
       const incomePage = await addIncome(page, 'Salary', '3000');
 
-      for (const path of ['/', '/income', '/income/new', '/people', '/outgoings/categories', new URL(incomePage).pathname]) {
+      for (const path of ['/', '/income', '/income/new', '/people', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname]) {
         await page.goto(path);
         await settled(page);
         await expectNoSeriousViolations(page, `${path} (${theme})`);
@@ -33,6 +33,9 @@ for (const theme of ['Light', 'Dark']) {
       await settled(page);
       await page.getByTestId('user-menu').getByRole('button').first().click();
       await expect(page.getByTestId('theme-dark')).toBeVisible();
+      // Let the menu finish fading in, or axe measures contrast against a half-transparent popover.
+      await expect(page.locator('.mud-popover-open').first()).toHaveCSS('opacity', '1');
+      await page.waitForTimeout(300);
       await expectNoSeriousViolations(page, `user menu (${theme})`);
     });
 
