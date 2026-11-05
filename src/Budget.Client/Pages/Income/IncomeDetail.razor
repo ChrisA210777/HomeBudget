@@ -147,7 +147,7 @@
 
                     <div class="d-flex justify-end gap-2">
                         <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="cancel">Cancel</MudButton>
-                        <MudButton Variant="Variant.Filled" Color="@(IsDelete ? Color.Error : Color.Primary)" OnClick="SaveAsync" Disabled="_saving" data-testid="save">
+                        <MudButton Variant="Variant.Filled" Color="@(IsDelete ? Color.Error : Color.Primary)" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">
                             @(IsDelete ? "Delete" : "Save")
                         </MudButton>
                     </div>
@@ -242,6 +242,10 @@
 </MudContainer>
 
 @code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
     private static readonly IncomeStatusReasonDto[] PeriodReasons = Enum.GetValues<IncomeStatusReasonDto>();
 
     [Parameter]

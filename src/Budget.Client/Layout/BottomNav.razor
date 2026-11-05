@@ -1,0 +1,11 @@
+@* Bottom navigation for phones (BUD-36). Hidden from 600px up, where the side drawer is used instead. *@
+
+<nav class="bottom-nav d-flex d-sm-none" aria-label="Main" data-testid="bottom-nav">
+    @foreach (var item in NavItems.All)
+    {
+        <NavLink href="@item.Href" Match="item.Match" class="bottom-nav-item" ActiveClass="active">
+            <MudIcon Icon="@item.Icon" Size="Size.Medium" aria-hidden="true" />
+            <span>@item.Label</span>
+        </NavLink>
+    }
+</nav>

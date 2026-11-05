@@ -21,10 +21,11 @@
     else
     {
         <MudPaper Outlined="true">
-            <MudList T="string" Dense="false">
+            @* A plain list: MudList is a selectable list box, which can't contain buttons. *@
+            <ul class="plain-list" aria-label="People in this household">
                 @foreach (var person in _people)
                 {
-                    <MudListItem T="string" data-testid="person">
+                    <li class="plain-list-item" data-testid="person">
                         @if (_editingId == person.Id)
                         {
                             <div class="d-flex align-center gap-2 flex-wrap">
@@ -37,7 +38,7 @@
                                               Margin="Margin.Dense"
                                               Class="flex-grow-1"
                                               data-testid="rename-name" />
-                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => SaveRenameAsync(person)" data-testid="rename-save">Save</MudButton>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => SaveRenameAsync(person)" Disabled="!Online" data-testid="rename-save">Save</MudButton>
                                 <MudButton Variant="Variant.Text" OnClick="CancelRename">Cancel</MudButton>
                             </div>
                         }
@@ -59,9 +60,9 @@
                                 }
                             </div>
                         }
-                    </MudListItem>
+                    </li>
                 }
-            </MudList>
+            </ul>
         </MudPaper>
 
         @if (_canEdit)
@@ -78,7 +79,7 @@
                                   Variant="Variant.Outlined"
                                   Class="flex-grow-1"
                                   data-testid="add-name" />
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AddAsync" Disabled="_saving" Class="mt-2" data-testid="add-person">Add</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AddAsync" Disabled="@(_saving || !Online)" Class="mt-2" data-testid="add-person">Add</MudButton>
                 </div>
             </MudPaper>
         }
@@ -86,6 +87,10 @@
 </MudContainer>
 
 @code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
     private HouseholdMembershipSummary? _household;
     private IReadOnlyList<PersonSummary>? _people;
     private bool _canEdit;

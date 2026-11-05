@@ -15,10 +15,14 @@ public sealed class BffAuthenticationStateProvider(UserSession session) : Authen
 
     private Task<AuthenticationState>? _state;
 
+    /// <summary>Whether the last check couldn't reach the server, so the person may in fact be signed in.</summary>
+    public bool ServerUnreachable { get; private set; }
+
     public override Task<AuthenticationState> GetAuthenticationStateAsync() => _state ??= LoadAsync();
 
     private async Task<AuthenticationState> LoadAsync()
     {
+        ServerUnreachable = false;
         try
         {
             var user = await session.GetCurrentUserAsync();
@@ -42,6 +46,7 @@ public sealed class BffAuthenticationStateProvider(UserSession session) : Authen
         catch (HttpRequestException)
         {
             // The server couldn't be reached; treat as signed out rather than crashing the app.
+            ServerUnreachable = true;
             return Anonymous;
         }
     }

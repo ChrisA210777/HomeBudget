@@ -55,6 +55,9 @@ public sealed class BudgetApiFactory : WebApplicationFactory<Program>, IAsyncLif
             {
                 [$"ConnectionStrings:{DependencyInjection.ConnectionStringName}"] = connectionString,
                 ["Database:MigrateOnStartup"] = "true",
+
+                // Only honoured in the Testing environment; set here to prove it stays off in Development.
+                ["TestSignIn:Enabled"] = "true",
             }));
 
         builder.ConfigureTestServices(services =>

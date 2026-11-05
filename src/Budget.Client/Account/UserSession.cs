@@ -10,8 +10,20 @@ public sealed class UserSession(IAccountApi accountApi)
 {
     private Task<CurrentUserResponse?>? _currentUser;
 
+    /// <summary>Raised when the cached user or households change, e.g. after a rename.</summary>
+    public event EventHandler? Changed;
+
     /// <returns>The signed-in user, or <c>null</c> if nobody is signed in.</returns>
-    public Task<CurrentUserResponse?> GetCurrentUserAsync() => _currentUser ??= accountApi.GetCurrentUserAsync();
+    public Task<CurrentUserResponse?> GetCurrentUserAsync()
+    {
+        // A failed request (e.g. while offline) isn't kept, so the next call tries again.
+        if (_currentUser is null || _currentUser.IsFaulted || _currentUser.IsCanceled)
+        {
+            _currentUser = accountApi.GetCurrentUserAsync();
+        }
+
+        return _currentUser;
+    }
 
     /// <returns>The household the user is working in, or <c>null</c> if they have none.</returns>
     public async Task<HouseholdMembershipSummary?> GetActiveHouseholdAsync()
@@ -32,5 +44,6 @@ public sealed class UserSession(IAccountApi accountApi)
             .Select(h => h.HouseholdId == householdId ? h with { Name = name } : h)
             .ToList();
         _currentUser = Task.FromResult<CurrentUserResponse?>(user with { Households = households });
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 }

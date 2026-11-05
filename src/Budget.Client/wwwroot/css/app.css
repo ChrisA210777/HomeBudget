@@ -33,11 +33,141 @@ body {
 }
 
 /* Keep a long name from pushing the app bar off a narrow phone screen. */
-.user-menu-name {
+.user-menu .mud-menu-button-activator {
+    max-width: 45vw;
+}
+
+.user-menu .mud-menu-button-activator {
+    text-transform: none;
+}
+
+.user-menu .mud-menu-button-activator .mud-button-label {
     display: inline-block;
-    max-width: 40vw;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    vertical-align: bottom;
+}
+
+.user-menu .mud-menu-button-activator .mud-button-icon-start {
+    display: inline-flex;
+    vertical-align: middle;
+}
+
+/* Read by screen readers but not shown. */
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ---- App shell (BUD-36) ---- */
+
+.app-title {
+    display: inline-flex;
+    gap: 0.4rem;
+    min-width: 0;
+    min-height: 44px;
+    align-self: center;
+    align-items: center;
+    color: inherit;
+    text-decoration: none;
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+.app-household {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 50vw;
+    font-weight: 400;
+}
+
+.app-title-separator {
+    opacity: 0.7;
+}
+
+/* Phones: the bottom bar replaces the side drawer. */
+@media (max-width: 599.98px) {
+    .app-drawer {
+        display: none !important;
+    }
+
+    .mud-layout .mud-main-content.app-main {
+        margin-left: 0 !important;
+        padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    }
+}
+
+.bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1100;
+    padding-bottom: env(safe-area-inset-bottom);
+    background-color: var(--mud-palette-surface);
+    border-top: 1px solid var(--mud-palette-lines-default);
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.bottom-nav-item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 56px;
+    color: var(--mud-palette-text-secondary);
+    text-decoration: none;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.bottom-nav-item.active {
+    color: var(--mud-palette-primary);
+}
+
+.bottom-nav-item:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: -4px;
+}
+
+/* Touch targets of at least 44×44px (BUD-36). */
+.mud-icon-button {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+@media (max-width: 599.98px), (pointer: coarse) {
+    .mud-button-root:not(.mud-icon-button) {
+        min-height: 44px;
+    }
+}
+
+.mud-nav-link {
+    min-height: 48px;
+}
+
+/* A list of rows with dividers, for content that has its own buttons (e.g. the People page). */
+.plain-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.plain-list-item {
+    padding: 8px 16px;
+}
+
+.plain-list-item + .plain-list-item {
+    border-top: 1px solid var(--mud-palette-lines-default);
 }

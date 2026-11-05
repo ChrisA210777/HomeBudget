@@ -21,11 +21,16 @@ public partial class ClientHostingTests(BudgetApiFactory factory) : IntegrationT
         var html = await GetPageAsync(client, path);
 
         Assert.Contains("<div id=\"app\">", html, StringComparison.Ordinal);
+
+        // Build-time placeholders aren't filled in when the server hosts the client, and a page
+        // that still has them never starts (it requests "_framework/blazor.webassembly").
+        Assert.DoesNotContain("#[", html, StringComparison.Ordinal);
     }
 
     [Theory]
     [InlineData("/api/does-not-exist")]
     [InlineData("/bff/does-not-exist")]
+    [InlineData("/account/does-not-exist")]
     public async Task Unknown_api_routes_return_not_found_rather_than_the_app_shell(string path)
     {
         using var client = CreateClient();

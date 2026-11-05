@@ -25,9 +25,10 @@ var app = builder.Build();
 // First, so everything after sees the original scheme and host (e.g. a dev tunnel's https URL).
 app.UseForwardedHeadersIfEnabled();
 
-// In Development the database is created and migrated on startup. Deployed environments
+// In Development (and the end-to-end Testing environment) the database is created and migrated on startup. Deployed environments
 // apply migrations from the pipeline using the migration bundle instead (see ADR-003).
-if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+if ((app.Environment.IsDevelopment() || app.Environment.IsEnvironment(TestSignInEndpoint.EnvironmentName))
+    && app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await app.Services.ApplyMigrationsAsync();
 }
@@ -58,13 +59,18 @@ app.MapHealthChecks(ApiRoutes.Health);
 
 // Feature endpoints, one group per feature folder (see ADR-004).
 app.MapAccountEndpoints();
+if (TestSignInEndpoint.IsEnabled(app.Environment, app.Configuration))
+{
+    app.MapTestSignIn();
+}
 app.MapHouseholdEndpoints();
 app.MapIncomeStreamEndpoints();
 app.MapPeopleEndpoints();
 
-// Unknown API routes are 404s, not the client app's page.
+// Unknown server routes are 404s, not the client app's page.
 app.MapFallback("/api/{**path}", () => Results.NotFound());
 app.MapFallback("/bff/{**path}", () => Results.NotFound());
+app.MapFallback("/account/{**path}", () => Results.NotFound());
 
 // Any other GET is a client-side route: serve the Blazor app and let its router handle it.
 app.MapFallbackToFile("index.html")
