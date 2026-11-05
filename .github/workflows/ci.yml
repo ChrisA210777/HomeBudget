@@ -29,6 +29,14 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Check the Azure templates
+        run: |
+          az bicep install
+          az bicep build --file infra/main.bicep --stdout > /dev/null 2> bicep.log || true
+          az bicep build-params --file infra/dev.bicepparam --stdout > /dev/null 2>> bicep.log || true
+          cat bicep.log
+          if grep -Eq "Warning|Error" bicep.log; then echo "::error::Fix the Bicep warnings above"; exit 1; fi
+
       - name: Restore
         run: dotnet restore HomeBudget.slnx
 

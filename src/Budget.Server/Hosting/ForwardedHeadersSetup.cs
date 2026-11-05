@@ -18,10 +18,24 @@ public static class ForwardedHeadersSetup
         var section = configuration.GetSection(SectionName);
         services.Configure<ForwardedHeadersOptions>(options =>
         {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 
-            // The tunnel connects from localhost, which is trusted by default. Hosts are limited to
-            // the tunnel domains so a request can't claim to be any site it likes.
+            // A dev tunnel rewrites the Host header, so its original host comes in X-Forwarded-Host.
+            // App Service keeps the Host header, so it doesn't need (or trust) this.
+            if (section.GetValue("ForwardHost", defaultValue: true))
+            {
+                options.ForwardedHeaders |= ForwardedHeaders.XForwardedHost;
+            }
+
+            // Only localhost is trusted by default, which suits a tunnel running on the same machine.
+            // On App Service the front end is the only way in, so its (changing) addresses are trusted.
+            if (section.GetValue<bool>("TrustAllProxies"))
+            {
+                options.KnownIPNetworks.Clear();
+                options.KnownProxies.Clear();
+            }
+
+            // Hosts are limited to the tunnel domains so a request can't claim to be any site it likes.
             var allowedHosts = section.GetSection("AllowedHosts").Get<string[]>() ?? [];
             foreach (var host in allowedHosts)
             {

@@ -93,6 +93,10 @@ EF Core migrations live in `src/Budget.Infrastructure/Persistence/Migrations`. A
 
 A test fails if the model has changes that aren't in a migration. CI also builds a self-contained migration bundle (`efbundle` artifact), which the deployment pipeline uses to apply migrations.
 
+## Hosting
+
+Dev runs in Azure on free tiers, deployed by GitHub Actions after CI passes on `main`. The templates, one-off setup and trade-offs are in [infra/README.md](infra/README.md).
+
 ## Conventions
 
 - Nullable reference types are on and warnings are treated as errors.
