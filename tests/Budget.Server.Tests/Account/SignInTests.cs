@@ -38,6 +38,18 @@ public class SignInTests(BudgetApiFactory factory) : IntegrationTestBase(factory
     }
 
     [Fact]
+    public async Task The_end_to_end_test_sign_in_does_not_exist_outside_the_Testing_environment()
+    {
+        // The test factory runs the app in Development, with the flag on, to prove the
+        // environment check alone keeps it out.
+        using var client = CreateClient(followRedirects: false);
+
+        using var response = await client.GetAsync(new Uri("/account/test-sign-in?name=Mallory", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Login_with_an_unknown_provider_returns_not_found()
     {
         using var client = CreateClient(followRedirects: false);

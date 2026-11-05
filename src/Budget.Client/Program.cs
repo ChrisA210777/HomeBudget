@@ -2,6 +2,7 @@ using Budget.Client;
 using Budget.Client.Account;
 using Budget.Client.Households;
 using Budget.Client.Income;
+using Budget.Client.Layout;
 using Budget.Client.People;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -24,6 +25,8 @@ builder.Services.AddScoped<IHouseholdApi, HouseholdApi>();
 builder.Services.AddScoped<IIncomeApi, IncomeApi>();
 builder.Services.AddScoped<IPeopleApi, PeopleApi>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<ThemePreference>();
+builder.Services.AddScoped<Connectivity>();
 
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();

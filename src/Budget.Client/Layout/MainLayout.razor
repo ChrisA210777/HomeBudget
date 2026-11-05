@@ -1,29 +1,203 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject UserSession Session
+@inject ThemePreference ThemePreference
+@inject Connectivity Connectivity
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
 
-@* Placeholder shell. The responsive navigation, household switcher and user menu arrive in BUD-36. *@
+@* The app shell (BUD-36): app bar, side drawer on tablets and desktops, bottom bar on phones. *@
 
-<MudThemeProvider />
+<MudThemeProvider @ref="_themeProvider" Theme="AppTheme.Theme" IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Typo="Typo.h6" Class="mr-4">Home Budget</MudLink>
         <AuthorizeView>
             <Authorized>
-                <MudButton Href="/income" Color="Color.Inherit" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Payments" aria-label="Income">
-                    <span class="d-none d-sm-inline">Income</span>
-                </MudButton>
-                <MudButton Href="/people" Color="Color.Inherit" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.People" aria-label="People">
-                    <span class="d-none d-sm-inline">People</span>
-                </MudButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" Class="d-none d-sm-flex mr-1"
+                               aria-label="@(_drawerOpen ? "Hide navigation" : "Show navigation")" aria-expanded="@(_drawerOpen ? "true" : "false")"
+                               OnClick="ToggleDrawer" data-testid="drawer-toggle" />
             </Authorized>
         </AuthorizeView>
+        <a href="/" class="app-title" data-testid="app-title">
+            <span class="@(_household is null ? "" : "d-none d-sm-inline")">Home Budget</span>
+            @if (_household is not null)
+            {
+                <span class="app-title-separator d-none d-sm-inline" aria-hidden="true">·</span>
+                <span class="app-household" data-testid="appbar-household">@_household.Name</span>
+            }
+        </a>
         <MudSpacer />
         <UserMenu />
     </MudAppBar>
-    <MudMainContent>
-        @Body
+
+    <AuthorizeView>
+        <Authorized>
+            <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always" Elevation="0" Class="app-drawer" data-testid="side-nav">
+                <MudNavMenu aria-label="Main">
+                    @foreach (var item in NavItems.All)
+                    {
+                        <MudNavLink Href="@item.Href" Match="item.Match" Icon="@item.Icon">@item.Label</MudNavLink>
+                    }
+                </MudNavMenu>
+            </MudDrawer>
+        </Authorized>
+    </AuthorizeView>
+
+    <MudMainContent Class="app-main">
+        @if (!Connectivity.IsOnline)
+        {
+            <MudAlert Severity="Severity.Warning" Square="true" Dense="true" Icon="@Icons.Material.Filled.CloudOff" data-testid="offline-banner">
+                You're offline. You can look around, but changes can't be saved until you're back online.
+            </MudAlert>
+        }
+        @if (Connectivity.UpdateAvailable)
+        {
+            <MudAlert Severity="Severity.Info" Square="true" Dense="true" Icon="@Icons.Material.Filled.SystemUpdate" data-testid="update-banner">
+                <div class="d-flex align-center flex-wrap gap-2">
+                    <span>A new version of Home Budget is available.</span>
+                    <MudButton Variant="Variant.Filled" Color="Color.Info" Size="Size.Small" OnClick="Connectivity.ApplyUpdateAsync" data-testid="update-reload">Reload</MudButton>
+                </div>
+            </MudAlert>
+        }
+
+        <CascadingValue Value="Connectivity.IsOnline" Name="Online">
+            <ErrorBoundary @ref="_errorBoundary" @key="_bodyKey">
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent>
+                    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-6">
+                        <MudAlert Severity="Severity.Error" data-testid="page-error">
+                            @(Connectivity.IsOnline
+                                ? "Something went wrong loading this page."
+                                : "This page couldn't load because you're offline.")
+                        </MudAlert>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-2" OnClick="Retry" data-testid="page-retry">Try again</MudButton>
+                    </MudContainer>
+                </ErrorContent>
+            </ErrorBoundary>
+        </CascadingValue>
     </MudMainContent>
+
+    <AuthorizeView>
+        <Authorized>
+            <BottomNav />
+        </Authorized>
+    </AuthorizeView>
 </MudLayout>
+
+@code {
+    private MudThemeProvider? _themeProvider;
+    private ErrorBoundary? _errorBoundary;
+    private HouseholdMembershipSummary? _household;
+    private bool _drawerOpen = true;
+    private bool _systemIsDark;
+    private bool _isDarkMode;
+    private int _bodyKey;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ThemePreference.Changed += OnThemeChanged;
+        Connectivity.Changed += OnConnectivityChanged;
+        Connectivity.Reconnected += OnReconnected;
+        Session.Changed += OnSessionChanged;
+
+        await ThemePreference.LoadAsync();
+        ApplyTheme();
+        await LoadHouseholdAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await Connectivity.StartAsync();
+
+        if (_themeProvider is not null)
+        {
+            _systemIsDark = await _themeProvider.GetSystemDarkModeAsync();
+            await _themeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
+            ApplyTheme();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadHouseholdAsync()
+    {
+        try
+        {
+            _household = await Session.GetActiveHouseholdAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _household = null;
+        }
+    }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private void ApplyTheme() => _isDarkMode = ThemePreference.Mode switch
+    {
+        ThemeMode.Dark => true,
+        ThemeMode.Light => false,
+        _ => _systemIsDark,
+    };
+
+    private Task OnSystemDarkModeChanged(bool isDark)
+    {
+        _systemIsDark = isDark;
+        ApplyTheme();
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        ApplyTheme();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnConnectivityChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+    private void OnSessionChanged(object? sender, EventArgs e) => _ = InvokeAsync(async () =>
+    {
+        await LoadHouseholdAsync();
+        StateHasChanged();
+    });
+
+    /// <summary>Back online: reload what couldn't load while offline.</summary>
+    private void OnReconnected(object? sender, EventArgs e) => _ = InvokeAsync(async () =>
+    {
+        if (AuthenticationStateProvider is BffAuthenticationStateProvider { ServerUnreachable: true })
+        {
+            // The app started offline, so it doesn't know who's signed in yet. Start again.
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        await LoadHouseholdAsync();
+        Retry();
+    });
+
+    /// <summary>Re-creates the page so it loads its data again.</summary>
+    private void Retry()
+    {
+        _errorBoundary?.Recover();
+        _bodyKey++;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        ThemePreference.Changed -= OnThemeChanged;
+        Connectivity.Changed -= OnConnectivityChanged;
+        Connectivity.Reconnected -= OnReconnected;
+        Session.Changed -= OnSessionChanged;
+    }
+}

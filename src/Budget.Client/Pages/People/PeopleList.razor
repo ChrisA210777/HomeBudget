@@ -37,7 +37,7 @@
                                               Margin="Margin.Dense"
                                               Class="flex-grow-1"
                                               data-testid="rename-name" />
-                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => SaveRenameAsync(person)" data-testid="rename-save">Save</MudButton>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => SaveRenameAsync(person)" Disabled="!Online" data-testid="rename-save">Save</MudButton>
                                 <MudButton Variant="Variant.Text" OnClick="CancelRename">Cancel</MudButton>
                             </div>
                         }
@@ -78,7 +78,7 @@
                                   Variant="Variant.Outlined"
                                   Class="flex-grow-1"
                                   data-testid="add-name" />
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AddAsync" Disabled="_saving" Class="mt-2" data-testid="add-person">Add</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AddAsync" Disabled="@(_saving || !Online)" Class="mt-2" data-testid="add-person">Add</MudButton>
                 </div>
             </MudPaper>
         }
@@ -86,6 +86,10 @@
 </MudContainer>
 
 @code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
     private HouseholdMembershipSummary? _household;
     private IReadOnlyList<PersonSummary>? _people;
     private bool _canEdit;

@@ -1,5 +1,6 @@
-@* The signed-in user's name with a menu holding "Sign out". Shown in the app bar on every screen size. *@
+@* The signed-in user's name with a menu holding the theme choice and "Sign out". Shown in the app bar on every screen size. *@
 @inject IAccountApi AccountApi
+@inject ThemePreference ThemePreference
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
@@ -17,6 +18,17 @@
                 </MudButton>
             </ActivatorContent>
             <ChildContent>
+                <MudText Typo="Typo.overline" Class="px-4 pt-2" id="theme-heading">Theme</MudText>
+                @foreach (var option in ThemeOptions)
+                {
+                    <MudMenuItem Icon="@(ThemePreference.Mode == option.Mode ? Icons.Material.Filled.Check : option.Icon)"
+                                 OnClick="() => ThemePreference.SetAsync(option.Mode)"
+                                 aria-checked="@(ThemePreference.Mode == option.Mode ? "true" : "false")"
+                                 data-testid="@($"theme-{option.Mode.ToString().ToLowerInvariant()}")">
+                        @option.Label
+                    </MudMenuItem>
+                }
+                <MudDivider Class="my-1" />
                 <MudMenuItem Icon="@Icons.Material.Filled.Logout"
                              OnClick="SignOutAsync"
                              Disabled="_signingOut"
@@ -29,6 +41,13 @@
 </AuthorizeView>
 
 @code {
+    private static readonly (ThemeMode Mode, string Label, string Icon)[] ThemeOptions =
+    [
+        (ThemeMode.System, "Use device setting", Icons.Material.Filled.SettingsBrightness),
+        (ThemeMode.Light, "Light", Icons.Material.Filled.LightMode),
+        (ThemeMode.Dark, "Dark", Icons.Material.Filled.DarkMode),
+    ];
+
     private bool _signingOut;
 
     private async Task SignOutAsync()

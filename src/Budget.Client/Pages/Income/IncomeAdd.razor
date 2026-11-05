@@ -56,7 +56,7 @@
 
                 <div class="d-flex justify-end gap-2 mt-2">
                     <MudButton Variant="Variant.Text" Href="/income">Cancel</MudButton>
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving" data-testid="save">Add income</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">Add income</MudButton>
                 </div>
             </MudStack>
         </MudPaper>
@@ -64,6 +64,10 @@
 </MudContainer>
 
 @code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
     private const string NameHelp = "For example, “Chris – salary”";
 
     private HouseholdMembershipSummary? _household;

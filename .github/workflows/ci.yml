@@ -60,3 +60,83 @@ jobs:
         with:
           name: efbundle
           path: artifacts/efbundle
+
+  # End-to-end and accessibility tests (BUD-40): publish the app, run it in the Testing
+  # environment against a throwaway SQL Server, and drive it with Playwright.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      sql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "E2e_Only_Pa55!"
+          MSSQL_PID: Developer
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'E2e_Only_Pa55!' -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      E2E_BASE_URL: https://localhost:7180
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Publish the app
+        run: dotnet publish src/Budget.Server --configuration Release --output artifacts/server
+
+      - name: Create a development HTTPS certificate
+        run: dotnet dev-certs https
+
+      - name: Start the app
+        working-directory: artifacts/server
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+          TestSignIn__Enabled: "true"
+          Database__MigrateOnStartup: "true"
+          ConnectionStrings__Budget: "Server=localhost,1433;Database=HomeBudgetE2E;User Id=sa;Password=E2e_Only_Pa55!;TrustServerCertificate=True;Encrypt=False"
+        run: |
+          nohup dotnet Budget.Server.dll --urls "$E2E_BASE_URL" > ../server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -skf "$E2E_BASE_URL/health" > /dev/null; then echo "App is up"; exit 0; fi
+            sleep 2
+          done
+          echo "The app didn't start"; cat ../server.log; exit 1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        working-directory: tests/e2e
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run end-to-end tests
+        working-directory: tests/e2e
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+            artifacts/server.log
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-screens
+          path: tests/e2e/screens

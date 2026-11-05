@@ -14,7 +14,7 @@
             <MudTextField @bind-Value="_newName" Label="Household name" Variant="Variant.Outlined" Margin="Margin.Dense" AutoFocus="true"
                           MaxLength="HouseholdValidator.NameMaxLength" Immediate="true" OnKeyDown="OnRenameKeyDownAsync"
                           Error="_error is not null" ErrorText="@_error" Class="flex-grow-1" data-testid="rename-input" />
-            <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Primary" aria-label="Save name" OnClick="SaveNameAsync" Disabled="_saving" Class="mt-1" data-testid="rename-save" />
+            <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Primary" aria-label="Save name" OnClick="SaveNameAsync" Disabled="@(_saving || !Online)" Class="mt-1" data-testid="rename-save" />
             <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Cancel rename" OnClick="CancelRename" Class="mt-1" data-testid="rename-cancel" />
         </div>
     }
@@ -74,6 +74,10 @@
 </MudContainer>
 
 @code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
     private HouseholdMembershipSummary? _household;
     private bool _renaming;
     private bool _saving;
@@ -111,7 +115,7 @@
 
     private async Task SaveNameAsync()
     {
-        if (_saving)
+        if (_saving || !Online)
         {
             return;
         }

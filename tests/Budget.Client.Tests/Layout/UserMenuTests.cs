@@ -17,6 +17,7 @@ public sealed class UserMenuTests : IDisposable
     {
         _context.Services.AddMudServices();
         _context.Services.AddSingleton<IAccountApi>(_accountApi);
+        _context.Services.AddScoped<ThemePreference>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
     }
@@ -62,6 +63,25 @@ public sealed class UserMenuTests : IDisposable
 
         Assert.Equal("http://localhost/", Navigation.Uri);
         snackbars.WaitForAssertion(() => Assert.Contains("Couldn't sign out", snackbars.Markup, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Offers_light_dark_and_device_themes_and_remembers_the_choice()
+    {
+        var popovers = _context.RenderComponent<MudPopoverProvider>();
+        var cut = _context.RenderComponent<UserMenu>();
+        var preference = _context.Services.GetRequiredService<ThemePreference>();
+
+        cut.Find("[data-testid=user-menu-button]").Click();
+        Assert.Equal("true", popovers.WaitForElement("[data-testid=theme-system]").GetAttribute("aria-checked"));
+        popovers.Find("[data-testid=theme-dark]").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal(ThemeMode.Dark, preference.Mode);
+            Assert.Single(_context.JSInterop.Invocations, i =>
+                i.Identifier == "localStorage.setItem" && Equals(i.Arguments[0], "budget.theme") && Equals(i.Arguments[1], "Dark"));
+        });
     }
 
     public void Dispose() => _context.Dispose();

@@ -1,0 +1,12 @@
+{
+  "name": "home-budget-e2e",
+  "private": true,
+  "description": "End-to-end and accessibility tests for Home Budget (BUD-40). See README.md.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.63.0"
+  }
+}
