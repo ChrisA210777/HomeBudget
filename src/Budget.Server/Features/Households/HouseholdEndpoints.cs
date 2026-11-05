@@ -13,6 +13,7 @@ public static class HouseholdEndpoints
         var household = app.MapGroup(HouseholdRoutes.Base);
 
         household.MapGet("/", GetHouseholdAsync).RequireAuthorization(HouseholdPolicies.Viewer);
+        household.MapPut("/", RenameAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapGet("/members", GetMembersAsync).RequireAuthorization(HouseholdPolicies.Viewer);
 
         return app;
@@ -33,6 +34,29 @@ public static class HouseholdEndpoints
         return members
             .Select(m => new HouseholdMemberSummary(m.UserId, m.DisplayName, m.Email, m.Role.ToString(), m.IsOwner, m.JoinedAt))
             .ToList();
+    }
+
+    private static async Task<IResult> RenameAsync(Guid householdId, RenameHouseholdRequest request, ClaimsPrincipal principal, BudgetDbContext db)
+    {
+        var errors = HouseholdValidator.Validate(request);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var household = await db.Households.SingleAsync(h => h.Id == householdId);
+        if (request.PreviousName is { } previous && !string.Equals(previous, household.Name, StringComparison.Ordinal))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Someone else has renamed this household.",
+                detail: $"It's now called \"{household.Name}\".");
+        }
+
+        household.Rename(request.Name);
+        await db.SaveChangesAsync();
+
+        return await GetHouseholdAsync(householdId, principal, db);
     }
 
     private static async Task<IResult> GetHouseholdAsync(Guid householdId, ClaimsPrincipal principal, BudgetDbContext db)

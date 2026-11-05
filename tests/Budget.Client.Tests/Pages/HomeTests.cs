@@ -1,7 +1,10 @@
 using Budget.Client.Account;
+using Budget.Client.Households;
 using Budget.Client.Pages;
 using Budget.Shared.Account;
+using Budget.Shared.Households;
 using Bunit.TestDoubles;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 
@@ -11,11 +14,13 @@ public sealed class HomeTests : IDisposable
 {
     private readonly TestContext _context = new();
     private readonly StubAccountApi _accountApi = new();
+    private readonly FakeHouseholdApi _householdApi = new();
 
     public HomeTests()
     {
         _context.Services.AddMudServices();
         _context.Services.AddSingleton<IAccountApi>(_accountApi);
+        _context.Services.AddSingleton<IHouseholdApi>(_householdApi);
         _context.Services.AddScoped<UserSession>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
@@ -63,10 +68,122 @@ public sealed class HomeTests : IDisposable
         Assert.Empty(cut.FindAll("[data-testid=household-role]"));
     }
 
+    [Fact]
+    public void Links_to_income_and_people()
+    {
+        var cut = _context.RenderComponent<Home>();
+
+        Assert.Equal("/income", cut.Find("[data-testid=go-to-income]").GetAttribute("href"));
+        Assert.Equal("/people", cut.Find("[data-testid=go-to-people]").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void Admins_can_rename_the_household_in_place()
+    {
+        var householdId = UseHousehold("Admin");
+        var cut = _context.RenderComponent<Home>();
+
+        cut.Find("[data-testid=rename-household]").Click();
+        Assert.Equal("My Household", cut.Find("input[data-testid=rename-input]").GetAttribute("value"));
+        cut.Find("input[data-testid=rename-input]").Input("Smith Family");
+        cut.Find("[data-testid=rename-save]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal("Smith Family", cut.Find("h1").TextContent.Trim()));
+        var (id, request) = Assert.Single(_householdApi.Renames);
+        Assert.Equal(householdId, id);
+        Assert.Equal("Smith Family", request.Name);
+        Assert.Equal("My Household", request.PreviousName);
+    }
+
+    [Fact]
+    public void Enter_saves_and_Escape_cancels()
+    {
+        UseHousehold("Admin");
+        var cut = _context.RenderComponent<Home>();
+
+        cut.Find("[data-testid=rename-household]").Click();
+        cut.Find("input[data-testid=rename-input]").Input("Smiths");
+        cut.Find("input[data-testid=rename-input]").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        Assert.Equal("My Household", cut.Find("h1").TextContent.Trim());
+        Assert.Empty(_householdApi.Renames);
+
+        cut.Find("[data-testid=rename-household]").Click();
+        cut.Find("input[data-testid=rename-input]").Input("Smiths");
+        cut.Find("input[data-testid=rename-input]").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+        cut.WaitForAssertion(() => Assert.Equal("Smiths", cut.Find("h1").TextContent.Trim()));
+    }
+
+    [Fact]
+    public void A_blank_name_is_rejected_before_anything_is_sent()
+    {
+        UseHousehold("Admin");
+        var cut = _context.RenderComponent<Home>();
+
+        cut.Find("[data-testid=rename-household]").Click();
+        cut.Find("input[data-testid=rename-input]").Input("  ");
+        cut.Find("[data-testid=rename-save]").Click();
+
+        Assert.Empty(_householdApi.Renames);
+        Assert.Contains("Enter a name for the household.", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Someone_elses_rename_is_shown_rather_than_overwritten()
+    {
+        UseHousehold("Admin");
+        _householdApi.ConflictName = "The Smiths";
+        var cut = _context.RenderComponent<Home>();
+
+        cut.Find("[data-testid=rename-household]").Click();
+        cut.Find("input[data-testid=rename-input]").Input("Smith Family");
+        cut.Find("[data-testid=rename-save]").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal("The Smiths", cut.Find("h1").TextContent.Trim());
+            Assert.Contains("The Smiths", cut.Find("[data-testid=rename-conflict]").TextContent, StringComparison.Ordinal);
+        });
+    }
+
+    [Theory]
+    [InlineData("User")]
+    [InlineData("Viewer")]
+    public void Only_admins_see_the_rename_action(string role)
+    {
+        UseHousehold(role, isOwner: false);
+
+        var cut = _context.RenderComponent<Home>();
+
+        Assert.Empty(cut.FindAll("[data-testid=rename-household]").ToList());
+    }
+
     public void Dispose() => _context.Dispose();
+
+    private Guid UseHousehold(string role, bool isOwner = true)
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", role, isOwner));
+        return householdId;
+    }
 
     private static CurrentUserResponse UserWith(Guid activeHouseholdId, HouseholdMembershipSummary household) =>
         new(Guid.NewGuid(), "Chris Austin", "chris@outlook.com", [household], activeHouseholdId);
+
+    private sealed class FakeHouseholdApi : IHouseholdApi
+    {
+        public List<(Guid Id, RenameHouseholdRequest Request)> Renames { get; } = [];
+
+        public string? ConflictName { get; set; }
+
+        public Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request)
+        {
+            Renames.Add((householdId, request));
+            var noErrors = new Dictionary<string, string[]>();
+            return Task.FromResult(ConflictName is { } current
+                ? new RenameHouseholdResult(null, noErrors, current)
+                : new RenameHouseholdResult(new HouseholdResponse(householdId, request.Name.Trim(), "GBP", "Admin", true, 1), noErrors));
+        }
+    }
 
     private sealed class StubAccountApi : IAccountApi
     {

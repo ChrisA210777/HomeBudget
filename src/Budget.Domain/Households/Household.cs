@@ -48,6 +48,9 @@ public sealed class Household : AuditableEntity
         return household;
     }
 
+    /// <summary>Renames the household. The name is trimmed and must be 1 to <see cref="NameMaxLength"/> characters.</summary>
+    public void Rename(string name) => Name = NormaliseName(name);
+
     /// <summary>Adds someone to the household with the given role. They can't already be a member.</summary>
     /// <remarks>The household's members must be loaded.</remarks>
     public HouseholdMember AddMember(Guid userId, HouseholdRole role, DateTimeOffset now)

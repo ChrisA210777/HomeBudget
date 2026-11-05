@@ -1,5 +1,6 @@
 using Budget.Client;
 using Budget.Client.Account;
+using Budget.Client.Households;
 using Budget.Client.Income;
 using Budget.Client.People;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -19,6 +20,7 @@ builder.Services.AddScoped(_ => new HttpClient(new CsrfHeaderHandler { InnerHand
 });
 builder.Services.AddScoped<IAccountApi, AccountApi>();
 builder.Services.AddScoped<UserSession>();
+builder.Services.AddScoped<IHouseholdApi, HouseholdApi>();
 builder.Services.AddScoped<IIncomeApi, IncomeApi>();
 builder.Services.AddScoped<IPeopleApi, PeopleApi>();
 builder.Services.AddSingleton(TimeProvider.System);
