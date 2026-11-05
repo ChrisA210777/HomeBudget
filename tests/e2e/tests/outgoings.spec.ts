@@ -29,7 +29,7 @@ async function choose(page: Page, testId: string, option: string): Promise<void>
   await expect(page.locator('.mud-popover-open .mud-list-item')).toHaveCount(0);
 }
 
-test('an outgoing added from the home page shows in this month's list', async ({ page }) => {
+test("an outgoing added from the home page shows in this month's list", async ({ page }) => {
   await signIn(page);
   await page.getByTestId('add-outgoing').click();
   await settled(page);
