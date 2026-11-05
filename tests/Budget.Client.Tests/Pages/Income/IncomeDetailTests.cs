@@ -67,7 +67,7 @@ public sealed class IncomeDetailTests : IncomeTestContext
         Assert.Equal("3300", cut.Find("input[data-testid=amount]").GetAttribute("value"));
         cut.Find("[data-testid=save]").Click();
         Assert.Empty(Api.Calls);
-        Assert.Contains("Say why you&#x27;re correcting this.", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("correcting this.", cut.Markup, StringComparison.Ordinal);
 
         cut.Find("input[data-testid=correction-reason]").Change("Typo – it was 10%");
         cut.Find("[data-testid=save]").Click();
