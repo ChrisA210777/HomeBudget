@@ -176,6 +176,12 @@ body {
     border-top: 1px solid var(--mud-palette-lines-default);
 }
 
+/* An inline "are you sure?" for removing a member (BUD-28). */
+.confirm-panel {
+    border: 1px solid var(--mud-palette-error);
+    border-radius: var(--mud-default-borderradius);
+}
+
 /* An outgoing coming up for renewal (BUD-50, BUD-52). */
 .outgoing-coming-up {
     border-left: 4px solid var(--mud-palette-warning);

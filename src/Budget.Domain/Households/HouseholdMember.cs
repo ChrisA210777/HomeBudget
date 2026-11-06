@@ -20,6 +20,8 @@ public sealed class HouseholdMember : AuditableEntity
 
     public DateTimeOffset JoinedAt { get; private set; }
 
+    internal void ChangeRole(HouseholdRole role) => Role = role;
+
     internal static HouseholdMember CreateOwner(Guid householdId, Guid userId, DateTimeOffset now) =>
         Create(householdId, userId, HouseholdRole.Admin, isOwner: true, now);
 

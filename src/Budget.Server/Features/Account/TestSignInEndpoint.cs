@@ -1,6 +1,9 @@
 using System.Security.Claims;
+using Budget.Domain.Households;
 using Budget.Infrastructure.Identity;
+using Budget.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Budget.Server.Features.Account;
 
@@ -24,12 +27,21 @@ public static class TestSignInEndpoint
         return app;
     }
 
-    /// <summary>Finds or creates the person (with their own household, as on a real first sign-in) and signs them in.</summary>
+    /// <summary>
+    /// Finds or creates the person (with their own household, as on a real first sign-in) and signs them in.
+    /// With <paramref name="joinHouseholdOf"/>, they're also added to the household owned by that test person, with
+    /// <paramref name="joinAs"/> (default User), and it becomes their active household. Until invitations exist
+    /// (BUD-23), this is how the tests get a household with several members.
+    /// </summary>
     private static async Task<IResult> SignInAsync(
         string name,
         string? returnUrl,
+        string? joinHouseholdOf,
+        string? joinAs,
         SignInManager<ApplicationUser> signInManager,
-        ExternalUserProvisioner provisioner)
+        ExternalUserProvisioner provisioner,
+        BudgetDbContext db,
+        TimeProvider clock)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -48,6 +60,28 @@ public static class TestSignInEndpoint
         if (user is null)
         {
             return Results.Problem("Could not create the test user.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(joinHouseholdOf))
+        {
+            var role = Enum.TryParse<HouseholdRole>(joinAs, out var parsed) && Enum.IsDefined(parsed) ? parsed : HouseholdRole.User;
+            var owner = await signInManager.UserManager.FindByLoginAsync(ProviderName, joinHouseholdOf.Trim().ToUpperInvariant());
+            var household = owner is null
+                ? null
+                : await db.Households.Include(h => h.Members).FirstOrDefaultAsync(h => h.Members.Any(m => m.UserId == owner.Id && m.IsOwner));
+            if (household is null)
+            {
+                return Results.BadRequest();
+            }
+
+            if (household.Members.All(m => m.UserId != user.Id))
+            {
+                household.AddMember(user.Id, role, clock.GetUtcNow());
+            }
+
+            var tracked = await db.Users.SingleAsync(u => u.Id == user.Id);
+            tracked.LastActiveHouseholdId = household.Id;
+            await db.SaveChangesAsync();
         }
 
         await signInManager.SignInAsync(user, isPersistent: true, authenticationMethod: ProviderName);

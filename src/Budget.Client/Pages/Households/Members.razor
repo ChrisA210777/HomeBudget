@@ -5,6 +5,8 @@
 @inject UserSession Session
 @inject IHouseholdApi HouseholdApi
 @inject TimeProvider Clock
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
 <PageTitle>Members · Home Budget</PageTitle>
 
@@ -14,6 +16,11 @@
     <MudText Typo="Typo.body2" Class="mb-4">
         Everyone who can sign in to @(_household?.Name ?? "this household"), and what they can do.
     </MudText>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" ShowCloseIcon="true" CloseIconClicked="() => _error = null" data-testid="member-error">@_error</MudAlert>
+    }
 
     @if (_members is null)
     {
@@ -25,13 +32,14 @@
             <ul class="plain-list" aria-label="Members of this household">
                 @foreach (var member in _members)
                 {
+                    var isYou = member.UserId == _userId;
                     <li class="plain-list-item" data-testid="member">
                         <div class="d-flex align-start gap-2">
                             <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Secondary" Class="mt-1" aria-hidden="true" />
                             <div class="flex-grow-1" style="min-width: 0">
                                 <div class="d-flex align-center flex-wrap gap-1">
                                     <MudText Typo="Typo.body1" data-testid="member-name">@member.DisplayName</MudText>
-                                    @if (member.UserId == _userId)
+                                    @if (isYou)
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Class="ma-0" data-testid="member-you">You</MudChip>
                                     }
@@ -50,10 +58,71 @@
                                 }
                             </div>
                         </div>
+
+                        @if (_isAdmin && !member.IsOwner)
+                        {
+                            @if (_removingId == member.UserId)
+                            {
+                                <div class="mt-3 pa-3 confirm-panel" role="group" aria-label="@($"Remove {member.DisplayName}")" data-testid="remove-confirm">
+                                    <MudText Typo="Typo.body2" Class="mb-2">
+                                        @(isYou ? "Remove yourself from this household?" : $"Remove {member.DisplayName} from this household?")
+                                        They'll lose access straight away. Any person linked to their login stays, with their income and outgoings.
+                                    </MudText>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="() => RemoveAsync(member)" Disabled="@(_saving || !Online)" data-testid="remove-yes">Remove</MudButton>
+                                        <MudButton Variant="Variant.Text" OnClick="() => _removingId = null" data-testid="remove-cancel">Cancel</MudButton>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-flex align-center gap-2 mt-2 flex-wrap">
+                                    <div style="width: 9rem">
+                                        <MudSelect T="string" Value="member.Role" ValueChanged="role => ChangeRoleAsync(member, role)" Label="Role" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                   Disabled="@(_saving || !Online)" data-testid="role-select">
+                                            @foreach (var role in MemberRoles.All)
+                                            {
+                                                <MudSelectItem T="string" Value="role">@role</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </div>
+                                    <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.PersonRemove" OnClick="() => _removingId = member.UserId"
+                                               Disabled="!Online" aria-label="@($"Remove {member.DisplayName}")" data-testid="remove-member">Remove</MudButton>
+                                </div>
+                            }
+                        }
                     </li>
                 }
             </ul>
         </MudPaper>
+
+        @if (_household is not null)
+        {
+            <MudPaper Outlined="true" Class="pa-4 mt-4" data-testid="leave-section">
+                <MudText Typo="Typo.subtitle1" Class="mb-1">Leave this household</MudText>
+                @if (_household.IsOwner)
+                {
+                    <MudText Typo="Typo.body2" data-testid="owner-cant-leave">
+                        As the owner, you can't leave. Handing ownership to someone else is coming later; until then you can delete the household instead.
+                    </MudText>
+                }
+                else if (_confirmLeave)
+                {
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        Leave @_household.Name? You'll lose access straight away, and an Admin would need to invite you again.
+                    </MudText>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="LeaveAsync" Disabled="@(_saving || !Online)" data-testid="leave-yes">Leave</MudButton>
+                        <MudButton Variant="Variant.Text" OnClick="() => _confirmLeave = false" data-testid="leave-cancel">Cancel</MudButton>
+                    </div>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="mb-2">You'll stop seeing this household's budget.</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Logout" OnClick="() => _confirmLeave = true" Disabled="!Online" data-testid="leave">Leave household</MudButton>
+                }
+            </MudPaper>
+        }
 
         <MudText Typo="Typo.subtitle2" Class="mt-6 mb-1">What each role can do</MudText>
         <ul class="mud-typography mud-typography-body2 pl-5" data-testid="role-help">
@@ -66,21 +135,88 @@
 </MudContainer>
 
 @code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
     private HouseholdMembershipSummary? _household;
     private IReadOnlyList<HouseholdMemberSummary>? _members;
     private Guid? _userId;
+    private bool _isAdmin;
+    private bool _saving;
+    private string? _error;
+    private Guid? _removingId;
+    private bool _confirmLeave;
 
     protected override async Task OnInitializedAsync()
     {
         _userId = (await Session.GetCurrentUserAsync())?.Id;
         _household = await Session.GetActiveHouseholdAsync();
-        _members = _household is null ? [] : await HouseholdApi.GetMembersAsync(_household.HouseholdId);
+        _isAdmin = _household?.Role == MemberRoles.Admin;
+        await LoadAsync();
     }
+
+    private async Task LoadAsync() =>
+        _members = _household is null ? [] : await HouseholdApi.GetMembersAsync(_household.HouseholdId);
+
+    private async Task ChangeRoleAsync(HouseholdMemberSummary member, string role)
+    {
+        if (role == member.Role)
+        {
+            return;
+        }
+
+        // Your own role changes what the whole app lets you do, so reload it.
+        await SaveAsync(
+            () => HouseholdApi.ChangeRoleAsync(_household!.HouseholdId, member.UserId, role),
+            $"{member.DisplayName} is now {Article(role)} {role}.",
+            reloadAppAt: member.UserId == _userId ? "/members" : null);
+    }
+
+    private Task RemoveAsync(HouseholdMemberSummary member) =>
+        SaveAsync(
+            () => HouseholdApi.RemoveMemberAsync(_household!.HouseholdId, member.UserId),
+            $"{member.DisplayName} was removed.",
+            reloadAppAt: member.UserId == _userId ? "/" : null);
+
+    // Back to the home page, which opens another of your households.
+    private Task LeaveAsync() =>
+        SaveAsync(() => HouseholdApi.LeaveAsync(_household!.HouseholdId), $"You've left {_household!.Name}.", reloadAppAt: "/");
+
+    /// <summary>Saves a change, then reloads the list, or the whole app when your own access has changed.</summary>
+    private async Task SaveAsync(Func<Task<string?>> save, string done, string? reloadAppAt)
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            _error = await save();
+            _removingId = null;
+            _confirmLeave = false;
+            if (_error is null)
+            {
+                Snackbar.Add(done, Severity.Success);
+                if (reloadAppAt is not null)
+                {
+                    Navigation.NavigateTo(reloadAppAt, forceLoad: true);
+                    return;
+                }
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string Article(string role) => role == MemberRoles.Admin ? "an" : "a";
 
     private static Color RoleColor(string role) => role switch
     {
-        "Admin" => Color.Primary,
-        "User" => Color.Secondary,
+        MemberRoles.Admin => Color.Primary,
+        MemberRoles.User => Color.Secondary,
         _ => Color.Default,
     };
 }

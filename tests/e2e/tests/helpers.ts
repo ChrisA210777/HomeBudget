@@ -82,3 +82,13 @@ export async function typeOutgoingName(page: Page, name: string): Promise<void> 
   await page.getByTestId('name').fill(name);
   await page.getByTestId('name').press('Escape');
 }
+
+/**
+ * Signs in as a new person who also joins the household owned by <paramref name="ownerName"/> with
+ * <paramref name="role"/>, using the test sign-in (until invitations exist, BUD-23).
+ */
+export async function signInAsMemberOf(page: Page, ownerName: string, role: 'Viewer' | 'User' | 'Admin', name = uniqueName('Member')): Promise<string> {
+  await page.goto(`/account/test-sign-in?name=${encodeURIComponent(name)}&joinHouseholdOf=${encodeURIComponent(ownerName)}&joinAs=${role}&returnUrl=%2F`);
+  await expect(page.getByTestId('welcome')).toContainText(name);
+  return name;
+}

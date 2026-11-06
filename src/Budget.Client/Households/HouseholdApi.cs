@@ -21,12 +21,63 @@ public interface IHouseholdApi
 
     /// <returns>The household's members, owner first, then by name.</returns>
     Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId);
+
+    /// <returns><c>null</c> on success, otherwise why it was refused.</returns>
+    Task<string?> ChangeRoleAsync(Guid householdId, Guid userId, string role);
+
+    /// <returns><c>null</c> on success, otherwise why it was refused.</returns>
+    Task<string?> RemoveMemberAsync(Guid householdId, Guid userId);
+
+    /// <summary>The signed-in user leaves the household.</summary>
+    /// <returns><c>null</c> on success, otherwise why it was refused.</returns>
+    Task<string?> LeaveAsync(Guid householdId);
 }
 
 public sealed class HouseholdApi(HttpClient http) : IHouseholdApi
 {
     public async Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId) =>
         await http.GetFromJsonAsync<List<HouseholdMemberSummary>>(new Uri(MemberRoutes.Members(householdId), UriKind.Relative)) ?? [];
+
+    public async Task<string?> ChangeRoleAsync(Guid householdId, Guid userId, string role)
+    {
+        using var response = await http.PutAsJsonAsync(new Uri(MemberRoutes.Role(householdId, userId), UriKind.Relative), new ChangeRoleRequest { Role = role });
+        return await RefusalAsync(response);
+    }
+
+    public async Task<string?> RemoveMemberAsync(Guid householdId, Guid userId)
+    {
+        using var response = await http.DeleteAsync(new Uri(MemberRoutes.Member(householdId, userId), UriKind.Relative));
+        return await RefusalAsync(response);
+    }
+
+    public async Task<string?> LeaveAsync(Guid householdId)
+    {
+        using var response = await http.DeleteAsync(new Uri(MemberRoutes.Membership(householdId), UriKind.Relative));
+        return await RefusalAsync(response);
+    }
+
+    /// <summary>Turns a 400 into its message and a 404 into "no longer a member"; anything else unexpected throws.</summary>
+    private static async Task<string?> RefusalAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>();
+            return problem?.Errors?.Values.SelectMany(v => v).FirstOrDefault() ?? problem?.Title ?? "That change isn't allowed.";
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return "They're no longer a member of this household.";
+        }
+
+        response.EnsureSuccessStatusCode();
+        throw new InvalidOperationException("Unreachable.");
+    }
 
     public async Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request)
     {
@@ -52,6 +103,13 @@ public sealed class HouseholdApi(HttpClient http) : IHouseholdApi
 
         response.EnsureSuccessStatusCode();
         throw new InvalidOperationException("Unreachable.");
+    }
+
+    private sealed class ProblemResponse
+    {
+        public string? Title { get; set; }
+
+        public Dictionary<string, string[]>? Errors { get; set; }
     }
 
     private sealed class ValidationProblemResponse

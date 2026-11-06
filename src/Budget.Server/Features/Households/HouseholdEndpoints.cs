@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Budget.Domain.Households;
 using Budget.Infrastructure.Persistence;
 using Budget.Shared.Households;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,9 @@ public static class HouseholdEndpoints
         household.MapGet("/", GetHouseholdAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         household.MapPut("/", RenameAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapGet("/members", GetMembersAsync).RequireAuthorization(HouseholdPolicies.Viewer);
+        household.MapPut("/members/{userId:guid}/role", ChangeRoleAsync).RequireAuthorization(HouseholdPolicies.Admin);
+        household.MapDelete("/members/{userId:guid}", RemoveMemberAsync).RequireAuthorization(HouseholdPolicies.Admin);
+        household.MapDelete("/membership", LeaveAsync).RequireAuthorization(HouseholdPolicies.Viewer);
 
         return app;
     }
@@ -35,6 +39,85 @@ public static class HouseholdEndpoints
             .Select(m => new HouseholdMemberSummary(m.UserId, m.DisplayName, m.Email, m.Role.ToString(), m.IsOwner, m.JoinedAt))
             .ToList();
     }
+
+    private static async Task<IResult> ChangeRoleAsync(Guid householdId, Guid userId, ChangeRoleRequest request, BudgetDbContext db)
+    {
+        if (!Enum.TryParse<HouseholdRole>(request.Role, ignoreCase: false, out var role) || !Enum.IsDefined(role))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(ChangeRoleRequest.Role)] = ["Choose Viewer, User or Admin."],
+            });
+        }
+
+        var household = await db.Households.Include(h => h.Members).SingleAsync(h => h.Id == householdId);
+        if (household.Members.All(m => m.UserId != userId))
+        {
+            return Results.NotFound();
+        }
+
+        try
+        {
+            household.ChangeRole(userId, role);
+        }
+        catch (HouseholdMembershipException ex)
+        {
+            return Refused(ex);
+        }
+
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+    }
+
+    private static Task<IResult> RemoveMemberAsync(Guid householdId, Guid userId, BudgetDbContext db) =>
+        RemoveAsync(householdId, userId, db);
+
+    private static Task<IResult> LeaveAsync(Guid householdId, ClaimsPrincipal principal, BudgetDbContext db) =>
+        RemoveAsync(householdId, Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!), db);
+
+    /// <summary>
+    /// Removes a member. Their linked person stays, with its income and outgoings, but is no longer linked
+    /// to their login. If this was their active household, they're moved to another of theirs.
+    /// </summary>
+    private static async Task<IResult> RemoveAsync(Guid householdId, Guid userId, BudgetDbContext db)
+    {
+        var household = await db.Households.Include(h => h.Members).SingleAsync(h => h.Id == householdId);
+        if (household.Members.All(m => m.UserId != userId))
+        {
+            return Results.NotFound();
+        }
+
+        try
+        {
+            household.RemoveMember(userId);
+        }
+        catch (HouseholdMembershipException ex)
+        {
+            return Refused(ex);
+        }
+
+        foreach (var person in await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId == userId).ToListAsync())
+        {
+            person.Unlink();
+        }
+
+        var user = await db.Users.SingleAsync(u => u.Id == userId);
+        if (user.LastActiveHouseholdId == householdId)
+        {
+            user.LastActiveHouseholdId = await db.HouseholdMembers
+                .Where(m => m.UserId == userId && m.HouseholdId != householdId)
+                .Join(db.Households, m => m.HouseholdId, h => h.Id, (_, h) => h)
+                .OrderBy(h => h.Name)
+                .Select(h => (Guid?)h.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+    }
+
+    private static IResult Refused(HouseholdMembershipException ex) =>
+        Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: ex.Message);
 
     private static async Task<IResult> RenameAsync(Guid householdId, RenameHouseholdRequest request, ClaimsPrincipal principal, BudgetDbContext db)
     {
