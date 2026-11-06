@@ -75,7 +75,7 @@ public sealed class BudgetPageTests : IDisposable
 
         cut.WaitForAssertion(() => Assert.Equal(new (int?, int?)[] { (2026, 11), (2026, 12), (2027, 1) }, _api.Requests));
         Assert.Equal("January 2027", Text(cut, "month-name"));
-        Assert.Equal("/outgoings?month=2027-01&category=eeeeeeee-0000-0000-0000-000000000001", cut.FindAll("[data-testid=category-link]")[0].GetAttribute("href"));
+        Assert.Equal("/outgoings?month=2027-01&category=eeeeeeee-0000-0000-0000-000000000001", cut.FindAll("[data-testid=category-link]").ToList()[0].GetAttribute("href"));
     }
 
     [Fact]
