@@ -23,6 +23,7 @@ public static class OutgoingEndpoints
         outgoings.MapGet("/", GetMonthAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapPost("/", CreateAsync).RequireAuthorization(HouseholdPolicies.User);
         outgoings.MapGet("/paid-from", PaidFromNamesAsync).RequireAuthorization(HouseholdPolicies.Viewer);
+        outgoings.MapGet("/reference-labels", ReferenceLabelsAsync).RequireAuthorization(HouseholdPolicies.Viewer);
 
         OutgoingDetailEndpoints.Map(outgoings);
         return app;
@@ -143,6 +144,18 @@ public static class OutgoingEndpoints
     }
 
     internal static string Day(DateOnly date) => date.ToString("d MMM yyyy", Display);
+
+    /// <summary>Reference names used in the household, most used first (BUD-56).</summary>
+    private static async Task<IReadOnlyList<string>> ReferenceLabelsAsync(BudgetDbContext db) =>
+        (await db.Outgoings
+            .Where(o => o.ReferenceLabel != null)
+            .Select(o => o.ReferenceLabel!)
+            .ToListAsync())
+        .GroupBy(l => l, StringComparer.CurrentCultureIgnoreCase)
+        .OrderByDescending(g => g.Count())
+        .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
+        .Select(g => g.Key)
+        .ToList();
 
     private static async Task<IReadOnlyList<string>> PaidFromNamesAsync(BudgetDbContext db) =>
         (await db.Outgoings

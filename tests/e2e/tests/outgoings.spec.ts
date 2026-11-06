@@ -74,3 +74,32 @@ test('the budget shows what is left and links to a category', async ({ page }) =
   await expect(page.getByTestId('category-filter')).toContainText('Housing');
   await expect(page.getByTestId('outgoing-name')).toHaveText(['Council tax']);
 });
+
+test('amounts show pennies, Every is centred and the period is labelled Period', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/outgoings/new');
+  await settled(page);
+
+  const amount = page.getByTestId('amount');
+  await amount.fill('12');
+  await amount.press('Tab');
+  await expect(amount).toHaveValue('12.00');
+
+  await amount.fill('12.5');
+  await amount.press('Tab');
+  await expect(amount).toHaveValue('12.50');
+
+  await expect(page.getByTestId('every')).toHaveCSS('text-align', 'center');
+  await expect(page.locator('.mud-select').filter({ has: page.getByTestId('unit') }).first()).toContainText('Period');
+});
+
+test('reference names are suggested as you type', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/outgoings/new');
+  await settled(page);
+
+  await page.getByTestId('toggle-details').click();
+  await page.getByTestId('reference-label').fill('memb');
+  await page.locator('.mud-popover-open .mud-list-item').filter({ hasText: 'Membership number' }).first().click();
+  await expect(page.getByTestId('reference-label')).toHaveValue('Membership number');
+});

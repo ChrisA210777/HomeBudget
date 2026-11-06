@@ -157,6 +157,31 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     }
 
     [Fact]
+    public async Task Reference_names_are_suggested_most_used_first()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var housing = await CategoryIdAsync(householdId, "Housing");
+        using var client = CreateClient(signedInAs: ownerId);
+        foreach (var label in new[] { "Account number", "Policy number", "policy number", null, "Policy number" })
+        {
+            (await client.PostAsJsonAsync(Url(OutgoingRoutes.Outgoings(householdId)), Valid(housing) with { ReferenceLabel = label })).Dispose();
+        }
+
+        var labels = await client.GetFromJsonAsync<List<string>>(Url(OutgoingRoutes.ReferenceLabels(householdId)));
+
+        Assert.Equal(2, labels!.Count);
+        Assert.Equal("policy number", labels[0], ignoreCase: true);
+        Assert.Equal("Account number", labels[1]);
+    }
+
+    [Fact]
+    public async Task Reference_names_are_only_the_households_own()
+    {
+        await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, OutgoingRoutes.ReferenceLabels);
+        await AssertMinimumRoleAsync(HttpMethod.Get, OutgoingRoutes.ReferenceLabels, HouseholdRole.Viewer);
+    }
+
+    [Fact]
     public Task Only_users_and_admins_can_add() =>
         AssertMinimumRoleAsync(HttpMethod.Post, OutgoingRoutes.Outgoings, HouseholdRole.User, () => new CreateOutgoingRequest());
 

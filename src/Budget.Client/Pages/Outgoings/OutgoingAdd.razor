@@ -92,19 +92,19 @@
                 @if (!IsEdit)
                 {
                     <div class="d-flex gap-2 flex-wrap align-start">
-                        <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount" Immediate="true"
+                        <MudNumericField T="decimal?" @bind-Value="_amount" Format="F2" Label="Amount" Immediate="true"
                                          Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
                                          Error="Has(nameof(CreateOutgoingRequest.Amount))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Amount))"
                                          Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem" data-testid="amount" />
                         <div class="d-flex gap-2">
                             <div style="width: 5.5rem">
-                                <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                <MudNumericField T="int" @bind-Value="_every" Class="every-field" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
                                                  InputMode="InputMode.numeric" HideSpinButtons="true"
                                                  Error="Has(nameof(CreateOutgoingRequest.Every))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Every))"
                                                  Variant="Variant.Outlined" data-testid="every" />
                             </div>
                             <div style="width: 8rem">
-                                <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Unit"
+                                <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Period"
                                            Variant="Variant.Outlined" data-testid="unit">
                                     @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
                                     {
@@ -178,8 +178,9 @@
                                      ShowProgressIndicator="false" Variant="Variant.Outlined" data-testid="paid-from" />
 
                     <div class="d-flex gap-2 flex-wrap">
-                        <MudTextField @bind-Value="_referenceLabel" Label="Reference name" Placeholder="e.g. Policy number"
-                                      MaxLength="OutgoingValidator.ReferenceLabelMaxLength" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-label" />
+                        <MudAutocomplete T="string" @bind-Value="_referenceLabel" SearchFunc="SearchReferenceLabelsAsync" CoerceValue="true" CoerceText="false"
+                                         Label="Reference name" Placeholder="e.g. Policy number" MaxLength="OutgoingValidator.ReferenceLabelMaxLength"
+                                         ShowProgressIndicator="false" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-label" />
                         <MudTextField @bind-Value="_referenceValue" Label="Reference" Immediate="true"
                                       MaxLength="OutgoingValidator.ReferenceValueMaxLength" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-value" />
                     </div>
@@ -233,6 +234,7 @@
     private IReadOnlyList<OutgoingCategorySummary> _categories = [];
     private IReadOnlyList<PersonSummary> _people = [];
     private IReadOnlyList<string> _paidFromNames = [];
+    private IReadOnlyList<string> _referenceLabels = [];
     private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
     private bool _loaded;
     private bool _canEdit;
@@ -276,9 +278,11 @@
             var categories = CategoryApi.ListAsync(_household.HouseholdId);
             var people = PeopleApi.ListAsync(_household.HouseholdId);
             var paidFrom = OutgoingApi.PaidFromNamesAsync(_household.HouseholdId);
+            var referenceLabels = OutgoingApi.ReferenceLabelsAsync(_household.HouseholdId);
             var allCategories = await categories;
             _people = await people;
             _paidFromNames = await paidFrom;
+            _referenceLabels = await referenceLabels;
 
             if (OutgoingId is { } id)
             {
@@ -328,6 +332,9 @@
             _renews = false;
         }
     }
+
+    private Task<IEnumerable<string>> SearchReferenceLabelsAsync(string? text, CancellationToken cancellationToken) =>
+        Task.FromResult<IEnumerable<string>>(OutgoingValidator.SuggestReferenceLabels(_referenceLabels, text));
 
     private Task<IEnumerable<string>> SearchPaidFromAsync(string? text, CancellationToken cancellationToken)
     {

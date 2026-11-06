@@ -85,13 +85,13 @@
                         case Mode.ChangeAmount:
                         case Mode.CorrectAmount:
                             <div class="d-flex gap-2 flex-wrap align-start">
-                                <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount received" Immediate="true" Adornment="Adornment.Start" AdornmentText="£"
+                                <MudNumericField T="decimal?" @bind-Value="_amount" Format="F2" Label="Amount received" Immediate="true" Adornment="Adornment.Start" AdornmentText="£"
                                                  HelperText="@IncomeValidator.AmountHelp" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined"
                                                  Class="flex-grow-1" Style="min-width: 9rem"
                                                  Error="Has(nameof(SaveAmountChangeRequest.Amount))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.Amount))" data-testid="amount" />
                                 <div class="d-flex gap-2">
                                     <div style="width: 5.5rem">
-                                        <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                        <MudNumericField T="int" @bind-Value="_every" Class="every-field" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
                                                          InputMode="InputMode.numeric" HideSpinButtons="true" Variant="Variant.Outlined"
                                                          Error="Has(nameof(SaveAmountChangeRequest.Every))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.Every))" data-testid="every" />
                                     </div>
@@ -131,7 +131,7 @@
                             {
                                 <MudDatePicker @bind-Date="_endDate" Label="Until (leave blank if you don't know yet)" DateFormat="d MMM yyyy" Variant="Variant.Outlined" Clearable="true"
                                                Error="Has(nameof(SaveStatusPeriodRequest.EndDate))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.EndDate))" data-testid="end-date" />
-                                <MudNumericField T="decimal?" @bind-Value="_amount" Label="Reduced monthly pay (blank for none)" Adornment="Adornment.Start" AdornmentText="£"
+                                <MudNumericField T="decimal?" @bind-Value="_amount" Format="F2" Label="Reduced monthly pay (blank for none)" Adornment="Adornment.Start" AdornmentText="£"
                                                  InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined" Clearable="true"
                                                  Error="Has(nameof(SaveStatusPeriodRequest.ReducedMonthlyAmount))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.ReducedMonthlyAmount))" data-testid="amount" />
                             }

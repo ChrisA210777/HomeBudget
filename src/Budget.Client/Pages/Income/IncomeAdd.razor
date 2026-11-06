@@ -44,13 +44,13 @@
                 <MudText Typo="Typo.caption">Someone missing? <MudLink Href="/people">Add them on the People page</MudLink>.</MudText>
 
                 <div class="d-flex gap-2 flex-wrap align-start">
-                    <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount received" Immediate="true" HelperText="@IncomeValidator.AmountHelp"
+                    <MudNumericField T="decimal?" @bind-Value="_amount" Format="F2" Label="Amount received" Immediate="true" HelperText="@IncomeValidator.AmountHelp"
                                      Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
                                      Error="Has(nameof(CreateIncomeStreamRequest.Amount))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.Amount))"
                                      Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem" data-testid="amount" />
                     <div class="d-flex gap-2">
                         <div style="width: 5.5rem">
-                            <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                            <MudNumericField T="int" @bind-Value="_every" Class="every-field" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
                                              InputMode="InputMode.numeric" HideSpinButtons="true"
                                              Error="Has(nameof(CreateIncomeStreamRequest.Every))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.Every))"
                                              Variant="Variant.Outlined" data-testid="every" />
