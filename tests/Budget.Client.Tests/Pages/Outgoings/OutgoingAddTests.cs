@@ -131,8 +131,8 @@ public sealed class OutgoingAddTests : IDisposable
 
         await SetNameAsync(cut, "Insurance for the car");
 
-        Assert.Null(Selects<OutgoingPriorityDto?>(cut)[0].Instance.Value);
-        Assert.Equal(Guid.Empty, Selects<Guid>(cut)[0].Instance.Value);
+        Assert.Null(Selects<OutgoingPriorityDto?>(cut)[0].Instance.GetState(x => x.Value));
+        Assert.Equal(Guid.Empty, Selects<Guid>(cut)[0].Instance.GetState(x => x.Value));
     }
 
     [Fact]

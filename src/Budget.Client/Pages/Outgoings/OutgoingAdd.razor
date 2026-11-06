@@ -68,7 +68,7 @@
                     @* Free text, with common outgoings suggested as you type (BUD-54). Picking one fills in its usual settings. *@
                     <MudAutocomplete T="string" Value="_name" ValueChanged="NameChanged" SearchFunc="SearchCommonAsync" CoerceValue="true" CoerceText="false"
                                      Label="Name" HelperText="@NameHelpText" MaxLength="OutgoingValidator.NameMaxLength" MaxItems="10"
-                                     ShowProgressIndicator="false" Variant="Variant.Outlined"
+                                     ShowProgressIndicator="false" Variant="Variant.Outlined" AdornmentAriaLabel="Show suggested names"
                                      Error="Has(nameof(CreateOutgoingRequest.Name))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Name))" data-testid="name">
                         <ItemTemplate Context="suggestion">
                             <div class="d-flex align-center gap-2" style="width: 100%" data-testid="name-suggestion">
@@ -201,7 +201,7 @@
                     <div class="d-flex gap-2 flex-wrap">
                         <MudAutocomplete T="string" @bind-Value="_referenceLabel" SearchFunc="SearchReferenceLabelsAsync" CoerceValue="true" CoerceText="false"
                                          Label="Reference name" Placeholder="e.g. Policy number" MaxLength="OutgoingValidator.ReferenceLabelMaxLength"
-                                         ShowProgressIndicator="false" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-label" />
+                                         ShowProgressIndicator="false" Variant="Variant.Outlined" AdornmentAriaLabel="Show suggested reference names" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-label" />
                         <MudTextField @bind-Value="_referenceValue" Label="Reference" Immediate="true"
                                       MaxLength="OutgoingValidator.ReferenceValueMaxLength" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-value" />
                     </div>
