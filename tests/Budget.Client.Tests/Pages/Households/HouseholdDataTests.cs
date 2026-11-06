@@ -1,5 +1,8 @@
 using Budget.Client.Account;
+using Budget.Client.DataExport;
 using Budget.Client.Pages.Households;
+using Budget.Shared.DataExport;
+using Microsoft.AspNetCore.Components.Forms;
 using Budget.Client.Tests.TestDoubles;
 using Bunit.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,10 +14,12 @@ namespace Budget.Client.Tests.Pages.Households;
 public sealed class HouseholdDataTests : IDisposable
 {
     private readonly TestContext _context = new();
+    private readonly StubImportApi _importApi = new();
 
     public HouseholdDataTests()
     {
         _context.Services.AddMudServices();
+        _context.Services.AddSingleton<IImportApi>(_importApi);
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
     }
@@ -58,7 +63,67 @@ public sealed class HouseholdDataTests : IDisposable
         Assert.Empty(cut.FindAll("[data-testid=export-section]"));
     }
 
+    [Fact]
+    public void A_chosen_file_is_checked_and_summarised()
+    {
+        UseRole("Admin");
+        _importApi.Preview = new ImportPreviewResponse
+        {
+            CanImport = true,
+            FileVersion = 1,
+            HouseholdName = "The Austins",
+            CurrencyCode = "GBP",
+            ExportedAt = new DateTimeOffset(2026, 11, 6, 17, 30, 0, TimeSpan.Zero),
+            AppVersion = "1.0.0",
+            IncludesHistory = true,
+            Counts = new ImportCounts { People = 1, Categories = 16, Incomes = 2, Outgoings = 1, HistoryEntries = 5 },
+            Members = [new ImportMember("Chris Austin", "chris@example.com", "Admin", true)],
+        };
+        var cut = _context.RenderComponent<HouseholdData>();
+
+        cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromText("{ \"format\": \"home-budget-export\" }", "backup.json"));
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=import-ok]")));
+        Assert.Equal("{ \"format\": \"home-budget-export\" }", System.Text.Encoding.UTF8.GetString(_importApi.Uploaded!));
+        Assert.Equal("The Austins (GBP)", cut.Find("[data-testid=import-household]").TextContent.Trim());
+        Assert.Contains("1 person, 16 categories, 2 incomes and 1 outgoing", cut.Find("[data-testid=import-counts]").TextContent.Replace("\n", " ", StringComparison.Ordinal).Replace("  ", " ", StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.Contains("Chris Austin (chris@example.com) – Owner", cut.Find("[data-testid=import-members]").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Problems_with_a_file_are_listed_with_where_they_are()
+    {
+        UseRole("Admin");
+        _importApi.Preview = new ImportPreviewResponse
+        {
+            Errors = [new ImportProblem("outgoings[1].amountChanges[0].amount", "must be more than 0."), new ImportProblem(string.Empty, "Something general.")],
+            Warnings = ["This file is from an older version of Home Budget (format version 1) and was upgraded."],
+        };
+        var cut = _context.RenderComponent<HouseholdData>();
+
+        cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromText("{}", "bad.json"));
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=import-errors]")));
+        Assert.Equal(new[] { "outgoings[1].amountChanges[0].amount: must be more than 0.", "Something general." },
+            cut.FindAll("[data-testid=import-error]").Select(e => e.TextContent.Trim()));
+        Assert.NotNull(cut.Find("[data-testid=import-warning]"));
+        Assert.Empty(cut.FindAll("[data-testid=import-ok]"));
+    }
+
     public void Dispose() => _context.Dispose();
+
+    private sealed class StubImportApi : IImportApi
+    {
+        public ImportPreviewResponse Preview { get; set; } = new();
+
+        public byte[]? Uploaded { get; private set; }
+
+        public Task<ImportPreviewResponse> PreviewAsync(Guid householdId, byte[] file)
+        {
+            Uploaded = file;
+            return Task.FromResult(Preview);
+        }
+    }
 
     private void UseRole(string role, bool isOwner = true)
     {

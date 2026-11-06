@@ -1,7 +1,9 @@
 @page "/household/data"
 @attribute [Authorize]
+@using Budget.Client.DataExport
 @using Budget.Shared.DataExport
 @inject UserSession Session
+@inject IImportApi ImportApi
 
 <PageTitle>Your data · Home Budget</PageTitle>
 
@@ -38,6 +40,92 @@
             <MudButton Href="@ExportUrl" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download"
                        Disabled="!Online" download data-testid="download-json">Download (JSON)</MudButton>
         </MudPaper>
+
+        <MudPaper Class="pa-4 mt-4" Elevation="1" data-testid="import-section">
+            <MudText Typo="Typo.h6" Class="mb-1">Import data</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Choose a file you downloaded from Home Budget. It's checked and summarised first; nothing changes until you choose what to do with it.
+            </MudText>
+
+            <label class="mud-button-root mud-button mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-medium mud-ripple import-file-button">
+                <MudIcon Icon="@Icons.Material.Filled.UploadFile" Class="mr-2" aria-hidden="true" />
+                Choose a file (JSON)
+                <InputFile OnChange="CheckFileAsync" accept=".json,application/json" class="visually-hidden" disabled="@(_checking || !Online)" data-testid="import-file" />
+            </label>
+
+            @if (_checking)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-3" />
+            }
+
+            @if (_fileName is not null && _preview is not null)
+            {
+                <div class="mt-4" aria-live="polite" data-testid="import-preview">
+                    <MudText Typo="Typo.subtitle1"><strong>@_fileName</strong></MudText>
+
+                    @foreach (var warning in _preview.Warnings)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" data-testid="import-warning">@warning</MudAlert>
+                    }
+
+                    @if (_preview.Errors.Count > 0)
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mt-2" data-testid="import-errors">
+                            <MudText Typo="Typo.body2" Class="mb-1"><strong>This file can't be imported:</strong></MudText>
+                            <ul class="pl-4">
+                                @foreach (var error in _preview.Errors.Take(MaxErrorsShown))
+                                {
+                                    <li data-testid="import-error">@Describe(error)</li>
+                                }
+                            </ul>
+                            @if (_preview.Errors.Count > MaxErrorsShown)
+                            {
+                                <MudText Typo="Typo.body2" Class="mt-1">…and @(_preview.Errors.Count - MaxErrorsShown) more.</MudText>
+                            }
+                        </MudAlert>
+                    }
+
+                    @if (_preview.HouseholdName is not null)
+                    {
+                        <dl class="import-facts mt-3" data-testid="import-summary">
+                            <dt>Household</dt>
+                            <dd data-testid="import-household">@_preview.HouseholdName (@_preview.CurrencyCode)</dd>
+                            <dt>Exported</dt>
+                            <dd data-testid="import-exported">@_preview.ExportedAt?.ToLocalTime().ToString("d MMM yyyy, HH:mm") by Home Budget @_preview.AppVersion</dd>
+                            <dt>Contains</dt>
+                            <dd data-testid="import-counts">
+                                @Count(_preview.Counts.People, "person", "people"),
+                                @Count(_preview.Counts.Categories, "category", "categories"),
+                                @Count(_preview.Counts.Incomes, "income", "incomes") and
+                                @Count(_preview.Counts.Outgoings, "outgoing", "outgoings")
+                                (@Count(_preview.Counts.HistoryEntries, "amount, pause or correction", "amounts, pauses and corrections"))
+                            </dd>
+                            <dt>Includes</dt>
+                            <dd data-testid="import-options">@(_preview.IncludesHistory ? "Full history" : "Current and future items only")@(_preview.IncludesAudit ? ", with who recorded what" : string.Empty)</dd>
+                        </dl>
+
+                        @if (_preview.Members.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mt-2">Members in the file</MudText>
+                            <MudText Typo="Typo.caption" Class="d-block mb-1" Color="Color.Secondary">Logins can't come from a file, so these people would need inviting again.</MudText>
+                            <ul class="pl-4 mud-typography mud-typography-body2" data-testid="import-members">
+                                @foreach (var member in _preview.Members)
+                                {
+                                    <li>@member.DisplayName@(member.Email is null ? string.Empty : $" ({member.Email})") – @(member.IsOwner ? "Owner" : member.Role)</li>
+                                }
+                            </ul>
+                        }
+                    }
+
+                    @if (_preview.CanImport)
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mt-3" data-testid="import-ok">
+                            This file passed every check. Importing it as a new household, or in place of this household's data, is coming next.
+                        </MudAlert>
+                    }
+                </div>
+            }
+        </MudPaper>
     }
 </MudContainer>
 
@@ -50,7 +138,49 @@
     private bool _includeHistory;
     private bool _includeAudit;
 
+    private const int MaxErrorsShown = 20;
+
+    private bool _checking;
+    private string? _fileName;
+    private ImportPreviewResponse? _preview;
+
     private string ExportUrl => DataRoutes.Export(_household!.HouseholdId, _includeHistory, _includeAudit);
+
+    /// <summary>Reads the chosen file in the browser and sends it to be checked. It isn't kept anywhere.</summary>
+    private async Task CheckFileAsync(InputFileChangeEventArgs e)
+    {
+        _fileName = e.File.Name;
+        _preview = null;
+        if (e.File.Size > ExportFormat.MaxFileBytes)
+        {
+            _preview = Refused($"The file is too big. Exports are at most {ExportFormat.MaxFileBytes / (1024 * 1024)} MB.");
+            return;
+        }
+
+        _checking = true;
+        try
+        {
+            using var stream = e.File.OpenReadStream(ExportFormat.MaxFileBytes);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            _preview = await ImportApi.PreviewAsync(_household!.HouseholdId, memory.ToArray());
+        }
+        catch (HttpRequestException)
+        {
+            _preview = Refused("The file couldn't be checked. Check your connection and try again.");
+        }
+        finally
+        {
+            _checking = false;
+        }
+    }
+
+    private static ImportPreviewResponse Refused(string message) => new() { Errors = [new ImportProblem(string.Empty, message)] };
+
+    private static string Describe(ImportProblem problem) =>
+        string.IsNullOrEmpty(problem.Path) ? problem.Message : $"{problem.Path}: {problem.Message}";
+
+    private static string Count(int count, string one, string many) => $"{count} {(count == 1 ? one : many)}";
 
     protected override async Task OnInitializedAsync() =>
         _household = await Session.GetActiveHouseholdAsync() ?? new HouseholdMembershipSummary(Guid.Empty, string.Empty, "Viewer", false);

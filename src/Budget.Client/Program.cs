@@ -30,6 +30,7 @@ builder.Services.AddScoped<ICategoryApi, CategoryApi>();
 builder.Services.AddScoped<IOutgoingApi, OutgoingApi>();
 builder.Services.AddScoped<IRenewalApi, RenewalApi>();
 builder.Services.AddScoped<IBudgetApi, BudgetApi>();
+builder.Services.AddScoped<Budget.Client.DataExport.IImportApi, Budget.Client.DataExport.ImportApi>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ThemePreference>();
 builder.Services.AddScoped<Connectivity>();

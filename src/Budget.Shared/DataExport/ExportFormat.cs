@@ -60,4 +60,57 @@ public static class DataRoutes
     /// <summary>GET (Admins): download the household's data.</summary>
     public static string Export(Guid householdId, bool includeHistory, bool includeAudit) =>
         $"/api/households/{householdId}/export?history={(includeHistory ? "true" : "false")}&audit={(includeAudit ? "true" : "false")}";
+
+    /// <summary>POST (Admins) the file's bytes: checks it and says what's in it, without saving anything (BUD-67).</summary>
+    public static string Preview(Guid householdId) => $"/api/households/{householdId}/import/preview";
 }
+
+/// <summary>A problem with an import file and where it is, e.g. <c>outgoings[3].amountChanges[0].amount</c>.</summary>
+public sealed record ImportProblem(string Path, string Message);
+
+/// <summary>What an import file contains, and whether it can be imported (BUD-67).</summary>
+public sealed record ImportPreviewResponse
+{
+    /// <summary>True when there are no errors, so the file can be imported.</summary>
+    public bool CanImport { get; init; }
+
+    public IReadOnlyList<ImportProblem> Errors { get; init; } = [];
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    /// <summary>The format version the file was written in, if it could be read.</summary>
+    public int? FileVersion { get; init; }
+
+    public string? HouseholdName { get; init; }
+
+    public string? CurrencyCode { get; init; }
+
+    public DateTimeOffset? ExportedAt { get; init; }
+
+    public string? AppVersion { get; init; }
+
+    public bool IncludesHistory { get; init; }
+
+    public bool IncludesAudit { get; init; }
+
+    public ImportCounts Counts { get; init; } = new();
+
+    /// <summary>The members listed in the file, to invite again after importing.</summary>
+    public IReadOnlyList<ImportMember> Members { get; init; } = [];
+}
+
+public sealed record ImportCounts
+{
+    public int People { get; init; }
+
+    public int Categories { get; init; }
+
+    public int Incomes { get; init; }
+
+    public int Outgoings { get; init; }
+
+    /// <summary>Amount changes, status periods and corrections, across incomes and outgoings.</summary>
+    public int HistoryEntries { get; init; }
+}
+
+public sealed record ImportMember(string DisplayName, string? Email, string Role, bool IsOwner);

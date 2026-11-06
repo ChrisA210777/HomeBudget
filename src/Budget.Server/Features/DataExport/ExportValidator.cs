@@ -82,9 +82,15 @@ public static class ExportValidator
         }
 
         UniqueIds("people", export.People.Select(p => p.Id));
+        var personNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < export.People.Count; i++)
         {
-            Text($"people[{i}].displayName", export.People[i].DisplayName, Person.DisplayNameMaxLength);
+            var name = export.People[i].DisplayName;
+            Text($"people[{i}].displayName", name, Person.DisplayNameMaxLength);
+            if (!string.IsNullOrWhiteSpace(name) && !personNames.Add(name.Trim()))
+            {
+                Add($"people[{i}].displayName", $"\"{name}\" is used by more than one person.");
+            }
         }
 
         UniqueIds("categories", export.Categories.Select(c => c.Id));

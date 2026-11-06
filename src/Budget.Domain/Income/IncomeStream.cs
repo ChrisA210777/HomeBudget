@@ -142,6 +142,22 @@ public sealed class IncomeStream : AuditableEntity, IHouseholdOwned
         _statusPeriods.Remove(period);
     }
 
+    /// <summary>
+    /// Brings back a correction record from an exported file (BUD-61): what an entry was, what it became, and why.
+    /// It doesn't change any entry; the file already holds the corrected entries.
+    /// </summary>
+    public IncomeCorrection RestoreCorrection(IncomeEntryType entryType, Guid entryId, IncomeCorrectionAction action, string before, string? after, string reason)
+    {
+        if (!Enum.IsDefined(entryType) || !Enum.IsDefined(action))
+        {
+            throw new ArgumentOutOfRangeException(nameof(entryType), "Unknown kind of correction.");
+        }
+
+        var correction = IncomeCorrection.Create(Id, entryType, entryId, action, before, after, reason);
+        _corrections.Add(correction);
+        return correction;
+    }
+
     private IncomeAmountChange FindAmountChange(Guid id) =>
         _amountChanges.SingleOrDefault(c => c.Id == id) ?? throw new KeyNotFoundException("That amount change doesn't exist.");
 
