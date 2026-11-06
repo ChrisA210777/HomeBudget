@@ -211,12 +211,6 @@ public sealed class HomeTests : IDisposable
         Assert.Empty(cut.FindAll("[data-testid=income-card], [data-testid=people-card], [data-testid=outgoings-card]"));
     }
 
-    private void UseHousehold(string role)
-    {
-        var householdId = Guid.NewGuid();
-        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", role, IsOwner: role == "Admin"));
-    }
-
     [Fact]
     public void Admins_can_rename_the_household_in_place()
     {
