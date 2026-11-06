@@ -86,7 +86,7 @@ public sealed class HouseholdDataTests : IDisposable
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=import-ok]")));
         Assert.Equal("{ \"format\": \"home-budget-export\" }", System.Text.Encoding.UTF8.GetString(_importApi.Uploaded!));
         Assert.Equal("The Austins (GBP)", cut.Find("[data-testid=import-household]").TextContent.Trim());
-        Assert.Contains("1 person, 16 categories, 2 incomes and 1 outgoing", cut.Find("[data-testid=import-counts]").TextContent.Replace("\n", " ", StringComparison.Ordinal).Replace("  ", " ", StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.Contains("1 person, 16 categories, 2 incomes and 1 outgoing", System.Text.RegularExpressions.Regex.Replace(cut.Find("[data-testid=import-counts]").TextContent, @"\s+", " "), StringComparison.Ordinal);
         Assert.Contains("Chris Austin (chris@example.com) – Owner", cut.Find("[data-testid=import-members]").TextContent, StringComparison.Ordinal);
     }
 
