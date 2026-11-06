@@ -238,6 +238,12 @@ body {
     border-radius: var(--mud-default-borderradius);
 }
 
+/* A category's heading on the Outgoings list: its subtotal lines up with the amounts in the panel below,
+   which sit inside the panel's 1px border and the list item's 16px padding. */
+.category-heading {
+    padding: 0 17px 0 4px;
+}
+
 /* An outgoing coming up for renewal (BUD-50, BUD-52). */
 .outgoing-coming-up {
     border-left: 4px solid var(--mud-palette-warning);
