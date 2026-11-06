@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { addIncome, isPhone, settled, signIn } from './helpers';
+import { addIncome, isPhone, settled, signIn, uniqueName } from './helpers';
 
 test('shows the household in the app bar and navigation that suits the screen', async ({ page }, testInfo) => {
   await signIn(page);
@@ -73,4 +73,11 @@ test('signed-out people only see the sign-in page', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
   await expect(page.getByTestId('bottom-nav')).toHaveCount(0);
   await expect(page.getByTestId('side-nav')).toHaveCount(0);
+});
+
+test('the app bar and greeting use your first name', async ({ page }) => {
+  await signIn(page, uniqueName('Alexandra'));
+
+  await expect(page.getByTestId('welcome')).toHaveText('Welcome, Alexandra');
+  await expect(page.getByTestId('user-menu').getByRole('button').first()).toHaveText('Alexandra');
 });

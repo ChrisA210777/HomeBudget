@@ -124,11 +124,12 @@ public static class AccountEndpoints
                 orderby household.Name
 
                 // Across all the user's households, so the per-household filter doesn't apply here.
-                let personId = db.People.IgnoreQueryFilters()
+                let person = db.People.IgnoreQueryFilters()
                     .Where(p => p.HouseholdId == household.Id && p.LinkedUserId == user.Id)
-                    .Select(p => (Guid?)p.Id)
+                    .Select(p => new { p.Id, p.DisplayName })
                     .FirstOrDefault()
-                select new HouseholdMembershipSummary(household.Id, household.Name, member.Role.ToString(), member.IsOwner, personId))
+                select new HouseholdMembershipSummary(
+                    household.Id, household.Name, member.Role.ToString(), member.IsOwner, person == null ? null : person.Id, person == null ? null : person.DisplayName))
             .ToListAsync();
 
         // Fall back to another household if the last active one is gone or no longer theirs.

@@ -11,7 +11,8 @@ export function uniqueName(prefix: string): string {
 /** Signs in as a new person (who gets "My Household") and waits for the home page. */
 export async function signIn(page: Page, name = uniqueName('Tester')): Promise<string> {
   await page.goto(`/account/test-sign-in?name=${encodeURIComponent(name)}&returnUrl=%2F`);
-  await expect(page.getByTestId('welcome')).toContainText(name);
+  // Home greets you by your first name (your person's name), e.g. "Tester" for "Tester abc123".
+  await expect(page.getByTestId('welcome')).toContainText(name.split(' ')[0]);
   return name;
 }
 
@@ -89,6 +90,7 @@ export async function typeOutgoingName(page: Page, name: string): Promise<void> 
  */
 export async function signInAsMemberOf(page: Page, ownerName: string, role: 'Viewer' | 'User' | 'Admin', name = uniqueName('Member')): Promise<string> {
   await page.goto(`/account/test-sign-in?name=${encodeURIComponent(name)}&joinHouseholdOf=${encodeURIComponent(ownerName)}&joinAs=${role}&returnUrl=%2F`);
-  await expect(page.getByTestId('welcome')).toContainText(name);
+  // Home greets you by your first name (your person's name), e.g. "Tester" for "Tester abc123".
+  await expect(page.getByTestId('welcome')).toContainText(name.split(' ')[0]);
   return name;
 }

@@ -18,13 +18,13 @@ public class PersonTests
     }
 
     [Fact]
-    public void A_person_for_a_login_is_linked_to_it_and_uses_their_name()
+    public void A_person_for_a_login_is_linked_to_it_and_uses_their_first_name()
     {
         var userId = Guid.NewGuid();
 
         var person = Person.CreateForUser(HouseholdId, userId, "Chris Austin");
 
-        Assert.Equal("Chris Austin", person.DisplayName);
+        Assert.Equal("Chris", person.DisplayName);
         Assert.Equal(userId, person.LinkedUserId);
     }
 
@@ -35,6 +35,17 @@ public class PersonTests
     public void A_login_without_a_name_becomes_Me(string? name)
     {
         Assert.Equal("Me", Person.CreateForUser(HouseholdId, Guid.NewGuid(), name).DisplayName);
+    }
+
+    [Theory]
+    [InlineData("Chris Austin", "Chris")]
+    [InlineData("  Mary  Jane Smith ", "Mary")]
+    [InlineData("Austin, Chris", "Chris")]
+    [InlineData("Cher", "Cher")]
+    [InlineData("Austin,", "Austin")]
+    public void The_first_name_is_taken_from_the_login_name(string fullName, string expected)
+    {
+        Assert.Equal(expected, Person.FirstName(fullName));
     }
 
     [Fact]

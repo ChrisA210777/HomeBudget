@@ -36,7 +36,7 @@ public class HouseholdSwitchingApiTests(BudgetApiFactory factory) : IntegrationT
 
         var people = await client.GetFromJsonAsync<List<PersonSummary>>(Url(PeopleRoutes.People(created.Id)));
         var person = Assert.Single(people!);
-        Assert.Equal(("Chris Austin", userId), (person.DisplayName, person.LinkedUserId));
+        Assert.Equal(("Chris", userId), (person.DisplayName, person.LinkedUserId));
 
         var categories = await client.GetFromJsonAsync<List<OutgoingCategorySummary>>(Url(OutgoingCategoryRoutes.Categories(created.Id)));
         Assert.NotEmpty(categories!);

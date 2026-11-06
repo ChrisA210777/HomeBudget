@@ -1,5 +1,8 @@
-@* The signed-in user's name with a menu holding the theme choice and "Sign out". Shown in the app bar on every screen size. *@
+@* The signed-in user's name with a menu holding the theme choice and "Sign out". Shown in the app bar on every screen size.
+   The name is their person's name in the household they're in (e.g. "Chris"), falling back to their login's name. *@
+@implements IDisposable
 @inject IAccountApi AccountApi
+@inject UserSession Session
 @inject ThemePreference ThemePreference
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -9,11 +12,11 @@
         @* MudBlazor's own button activator: wrapping a button in ActivatorContent nests one control in another. *@
         <MudMenu AnchorOrigin="Origin.BottomRight"
                  TransformOrigin="Origin.TopRight"
-                 Label="@auth.User.Identity?.Name"
+                 Label="@(_personName ?? auth.User.Identity?.Name)"
                  StartIcon="@Icons.Material.Filled.AccountCircle"
                  Variant="Variant.Text"
                  Color="Color.Inherit"
-                 AriaLabel="@($"Account menu for {auth.User.Identity?.Name}")"
+                 AriaLabel="@($"Account menu for {_personName ?? auth.User.Identity?.Name}")"
                  Class="user-menu"
                  data-testid="user-menu">
             <ChildContent>
@@ -52,6 +55,34 @@
     ];
 
     private bool _signingOut;
+    private string? _personName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.Changed += OnSessionChanged;
+        await LoadPersonNameAsync();
+    }
+
+    private async Task LoadPersonNameAsync()
+    {
+        try
+        {
+            _personName = (await Session.GetActiveHouseholdAsync())?.PersonName;
+        }
+        catch (HttpRequestException)
+        {
+            // Offline: the login's name will do.
+            _personName = null;
+        }
+    }
+
+    private void OnSessionChanged(object? sender, EventArgs e) => _ = InvokeAsync(async () =>
+    {
+        await LoadPersonNameAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
 
     private async Task SignOutAsync()
     {

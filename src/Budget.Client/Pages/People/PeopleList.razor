@@ -172,6 +172,12 @@
         }
 
         _editingId = null;
+        if (person.IsYou)
+        {
+            // The app bar shows your own person's name.
+            await Session.SetPersonNameAsync(_household.HouseholdId, result.Saved!.DisplayName);
+        }
+
         await LoadAsync();
     }
 
