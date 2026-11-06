@@ -143,3 +143,16 @@ jobs:
             sleep 10
           done
           echo "::error::$url/health didn't respond"; exit 1
+
+      - name: Show why the app didn't start
+        if: failure() && steps.infra.outputs.app != ''
+        run: |
+          app="${{ steps.infra.outputs.app }}"
+          az webapp show --resource-group "$RESOURCE_GROUP" --name "$app" \
+            --query "{state: state, runtime: siteConfig.linuxFxVersion, startup: siteConfig.appCommandLine}" --output json || true
+          echo "== .NET runtimes App Service offers on Linux"
+          az webapp list-runtimes --os linux --output tsv | grep -i dotnet || true
+          echo "== The app's most recent logs"
+          az webapp log download --resource-group "$RESOURCE_GROUP" --name "$app" --log-file logs.zip \
+            && unzip -o -q logs.zip -d logs \
+            && find logs -type f -name '*.log' -newermt '-30 minutes' -print -exec tail -n 80 {} \; || true
