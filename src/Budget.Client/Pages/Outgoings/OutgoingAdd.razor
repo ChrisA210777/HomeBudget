@@ -196,7 +196,7 @@
 
                     <MudAutocomplete T="string" @bind-Value="_paidFrom" SearchFunc="SearchPaidFromAsync" CoerceValue="true" CoerceText="false"
                                      Label="Paid from" HelperText="The account's name, e.g. “Joint current account”" MaxLength="OutgoingValidator.PaidFromMaxLength"
-                                     ShowProgressIndicator="false" Variant="Variant.Outlined" data-testid="paid-from" />
+                                     ShowProgressIndicator="false" Variant="Variant.Outlined" AdornmentAriaLabel="Show suggested accounts" data-testid="paid-from" />
 
                     <div class="d-flex gap-2 flex-wrap">
                         <MudAutocomplete T="string" @bind-Value="_referenceLabel" SearchFunc="SearchReferenceLabelsAsync" CoerceValue="true" CoerceText="false"

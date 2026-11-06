@@ -131,8 +131,9 @@ public sealed class OutgoingAddTests : IDisposable
 
         await SetNameAsync(cut, "Insurance for the car");
 
-        Assert.Null(Selects<OutgoingPriorityDto?>(cut)[0].Instance.GetState(x => x.Value));
-        Assert.Equal(Guid.Empty, Selects<Guid>(cut)[0].Instance.GetState(x => x.Value));
+        // A suggestion would have opened the details with its reference name filled in.
+        Assert.Empty(cut.FindAll("[data-testid=reference-label]"));
+        Assert.Empty(cut.FindAll("[data-testid=renewal-date]"));
     }
 
     [Fact]
