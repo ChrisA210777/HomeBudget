@@ -1,0 +1,86 @@
+@page "/members"
+@attribute [Authorize]
+@using Budget.Client.Households
+@using Budget.Shared.Households
+@inject UserSession Session
+@inject IHouseholdApi HouseholdApi
+@inject TimeProvider Clock
+
+<PageTitle>Members · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/people" Class="mb-2">People</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-2">Members</h1>
+    <MudText Typo="Typo.body2" Class="mb-4">
+        Everyone who can sign in to @(_household?.Name ?? "this household"), and what they can do.
+    </MudText>
+
+    @if (_members is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudPaper Outlined="true">
+            <ul class="plain-list" aria-label="Members of this household">
+                @foreach (var member in _members)
+                {
+                    <li class="plain-list-item" data-testid="member">
+                        <div class="d-flex align-start gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Secondary" Class="mt-1" aria-hidden="true" />
+                            <div class="flex-grow-1" style="min-width: 0">
+                                <div class="d-flex align-center flex-wrap gap-1">
+                                    <MudText Typo="Typo.body1" data-testid="member-name">@member.DisplayName</MudText>
+                                    @if (member.UserId == _userId)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Class="ma-0" data-testid="member-you">You</MudChip>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrEmpty(member.Email))
+                                {
+                                    <MudText Typo="Typo.body2" Class="text-break" data-testid="member-email">@member.Email</MudText>
+                                }
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="member-joined">Joined @TimeZoneInfo.ConvertTime(member.JoinedAt, Clock.LocalTimeZone).ToString("d MMM yyyy")</MudText>
+                            </div>
+                            <div class="d-flex flex-column align-end gap-1">
+                                <MudChip T="string" Size="Size.Small" Color="RoleColor(member.Role)" Class="ma-0" data-testid="member-role">@member.Role</MudChip>
+                                @if (member.IsOwner)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Star" Class="ma-0" data-testid="member-owner">Owner</MudChip>
+                                }
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </MudPaper>
+
+        <MudText Typo="Typo.subtitle2" Class="mt-6 mb-1">What each role can do</MudText>
+        <ul class="mud-typography mud-typography-body2 pl-5" data-testid="role-help">
+            <li><strong>Viewer</strong>: sees the budget, income and outgoings, but can't change them.</li>
+            <li><strong>User</strong>: can also add and change people, income and outgoings.</li>
+            <li><strong>Admin</strong>: can also rename the household and manage its members.</li>
+            <li><strong>Owner</strong>: the Admin who created the household. Only they can delete it.</li>
+        </ul>
+    }
+</MudContainer>
+
+@code {
+    private HouseholdMembershipSummary? _household;
+    private IReadOnlyList<HouseholdMemberSummary>? _members;
+    private Guid? _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _userId = (await Session.GetCurrentUserAsync())?.Id;
+        _household = await Session.GetActiveHouseholdAsync();
+        _members = _household is null ? [] : await HouseholdApi.GetMembersAsync(_household.HouseholdId);
+    }
+
+    private static Color RoleColor(string role) => role switch
+    {
+        "Admin" => Color.Primary,
+        "User" => Color.Secondary,
+        _ => Color.Default,
+    };
+}

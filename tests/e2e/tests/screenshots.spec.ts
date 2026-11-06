@@ -10,7 +10,7 @@ for (const theme of ['Light', 'Dark']) {
     const incomePage = await addIncome(page, 'Chris – salary', '3000');
     const outgoingPage = await addOutgoing(page, 'Council tax', 'Housing', '150');
 
-    const pages: [string, string][] = [['home', '/'], ['budget', '/budget'], ['income', '/income'], ['income-detail', new URL(incomePage).pathname], ['people', '/people'], ['outgoings', '/outgoings'], ['categories', '/outgoings/categories'], ['add-outgoing', '/outgoings/new'], ['outgoing-detail', new URL(outgoingPage).pathname]];
+    const pages: [string, string][] = [['home', '/'], ['budget', '/budget'], ['income', '/income'], ['income-detail', new URL(incomePage).pathname], ['people', '/people'], ['members', '/members'], ['outgoings', '/outgoings'], ['categories', '/outgoings/categories'], ['add-outgoing', '/outgoings/new'], ['outgoing-detail', new URL(outgoingPage).pathname]];
     for (const [name, path] of pages) {
       await page.goto(path);
       await settled(page);

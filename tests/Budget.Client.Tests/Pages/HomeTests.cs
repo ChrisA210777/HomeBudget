@@ -238,6 +238,9 @@ public sealed class HomeTests : IDisposable
 
         public string? ConflictName { get; set; }
 
+        public Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId) =>
+            Task.FromResult<IReadOnlyList<HouseholdMemberSummary>>([]);
+
         public Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request)
         {
             Renames.Add((householdId, request));
