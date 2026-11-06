@@ -146,8 +146,11 @@ jobs:
 
       - name: Show why the app didn't start
         if: failure() && steps.infra.outputs.app != ''
+        # Passed through the environment, not pasted into the script (CodeQL: code injection).
+        env:
+          APP: ${{ steps.infra.outputs.app }}
         run: |
-          app="${{ steps.infra.outputs.app }}"
+          app="$APP"
           az webapp show --resource-group "$RESOURCE_GROUP" --name "$app" \
             --query "{state: state, runtime: siteConfig.linuxFxVersion, startup: siteConfig.appCommandLine}" --output json || true
           echo "== .NET runtimes App Service offers on Linux"
