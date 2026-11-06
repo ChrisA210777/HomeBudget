@@ -216,6 +216,8 @@ public sealed class RecordingHouseholdApi : Budget.Client.Households.IHouseholdA
                 new Dictionary<string, string[]>()));
     }
 
+    public Task<Budget.Shared.Households.HouseholdSetupResponse> GetSetupAsync(Guid householdId) => throw new NotSupportedException();
+
     public Task<bool> SwitchToAsync(Guid householdId)
     {
         SwitchedTo.Add(householdId);

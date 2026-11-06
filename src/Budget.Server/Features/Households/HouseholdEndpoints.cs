@@ -20,6 +20,7 @@ public static class HouseholdEndpoints
         household.MapGet("/", GetHouseholdAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         household.MapPut("/", RenameAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapDelete("/", DeleteAsync).RequireAuthorization(HouseholdPolicies.Owner);
+        household.MapGet("/setup", GetSetupAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         household.MapGet("/members", GetMembersAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         household.MapPut("/members/{userId:guid}/role", ChangeRoleAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapDelete("/members/{userId:guid}", RemoveMemberAsync).RequireAuthorization(HouseholdPolicies.Admin);
@@ -44,6 +45,13 @@ public static class HouseholdEndpoints
             .Select(m => new HouseholdMemberSummary(m.UserId, m.DisplayName, m.Email, m.Role.ToString(), m.IsOwner, m.JoinedAt))
             .ToList();
     }
+
+    /// <summary>Counts for the home page's getting-started prompts (BUD-68), including items not started yet or ended.</summary>
+    private static async Task<HouseholdSetupResponse> GetSetupAsync(Guid householdId, BudgetDbContext db) =>
+        new(
+            await db.IncomeStreams.CountAsync(i => i.HouseholdId == householdId),
+            await db.Outgoings.CountAsync(o => o.HouseholdId == householdId),
+            await db.People.CountAsync(p => p.HouseholdId == householdId));
 
     /// <summary>
     /// Creates another household (BUD-21), set up as on sign-up: the caller is its owner and an Admin, with a

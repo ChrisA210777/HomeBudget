@@ -16,6 +16,9 @@
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
     <div class="d-flex align-center flex-wrap gap-2 mb-2">
         <h1 class="mud-typography mud-typography-h4 flex-grow-1">Outgoings</h1>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Category" Href="/outgoings/categories" data-testid="go-to-categories">
+            Categories
+        </MudButton>
         @if (_canEdit)
         {
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/outgoings/new" data-testid="add-outgoing">
