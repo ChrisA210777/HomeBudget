@@ -153,6 +153,43 @@ public sealed class MembersTests : IDisposable
         Assert.Equal("http://localhost/", navigation.Uri);
     }
 
+    [Fact]
+    public void Only_the_owner_can_delete_the_household()
+    {
+        var cut = Render("Admin", isOwner: false);
+
+        Assert.Empty(cut.FindAll("[data-testid=delete-section]"));
+    }
+
+    [Fact]
+    public void Deleting_needs_the_household_name_typed_then_reloads_the_app_at_home()
+    {
+        var cut = Render("Admin", isOwner: true);
+        var navigation = _context.Services.GetRequiredService<NavigationManager>();
+
+        cut.Find("[data-testid=delete-household]").Click();
+        Assert.True(cut.Find("[data-testid=delete-yes]").HasAttribute("disabled"));
+
+        cut.Find("input[data-testid=delete-name]").Input("my household ");
+        cut.Find("[data-testid=delete-yes]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal([FakeAccountApi.HouseholdId], _api.Deleted));
+        Assert.Equal("http://localhost/", navigation.Uri);
+    }
+
+    [Fact]
+    public void Cancelling_a_delete_deletes_nothing()
+    {
+        var cut = Render("Admin", isOwner: true);
+
+        cut.Find("[data-testid=delete-household]").Click();
+        cut.Find("input[data-testid=delete-name]").Input("My Household");
+        cut.Find("[data-testid=delete-cancel]").Click();
+
+        Assert.Empty(_api.Deleted);
+        Assert.NotNull(cut.Find("[data-testid=delete-household]"));
+    }
+
     public void Dispose() => _context.Dispose();
 
     private IRenderedComponent<Members> Render(string role, bool isOwner)
@@ -219,6 +256,14 @@ public sealed class MembersTests : IDisposable
         {
             Removed.Add(userId);
             return Task.FromResult(Refusal);
+        }
+
+        public List<Guid> Deleted { get; } = [];
+
+        public Task DeleteAsync(Guid householdId)
+        {
+            Deleted.Add(householdId);
+            return Task.CompletedTask;
         }
 
         public Task<string?> LeaveAsync(Guid householdId)

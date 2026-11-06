@@ -229,6 +229,17 @@ public sealed class HomeTests : IDisposable
         return householdId;
     }
 
+    [Fact]
+    public void Someone_with_no_household_is_offered_to_create_one()
+    {
+        _accountApi.User = new CurrentUserResponse(Guid.NewGuid(), "Chris Austin", "chris@outlook.com", [], null);
+
+        var cut = _context.RenderComponent<Home>();
+
+        cut.WaitForAssertion(() => Assert.Equal("/households/new", cut.Find("[data-testid=no-household-create]").GetAttribute("href")));
+        Assert.Empty(cut.FindAll("[data-testid=budget-card]"));
+    }
+
     private static CurrentUserResponse UserWith(Guid activeHouseholdId, HouseholdMembershipSummary household) =>
         new(Guid.NewGuid(), "Chris Austin", "chris@outlook.com", [household], activeHouseholdId);
 
@@ -246,6 +257,8 @@ public sealed class HomeTests : IDisposable
         public Task<string?> RemoveMemberAsync(Guid householdId, Guid userId) => throw new NotSupportedException();
 
         public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
+
+        public Task DeleteAsync(Guid householdId) => throw new NotSupportedException();
 
         public Task<CreateHouseholdResult> CreateAsync(CreateHouseholdRequest request) => throw new NotSupportedException();
 

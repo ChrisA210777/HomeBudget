@@ -233,4 +233,6 @@ public sealed class RecordingHouseholdApi : Budget.Client.Households.IHouseholdA
     public Task<string?> RemoveMemberAsync(Guid householdId, Guid userId) => throw new NotSupportedException();
 
     public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
+
+    public Task DeleteAsync(Guid householdId) => throw new NotSupportedException();
 }
