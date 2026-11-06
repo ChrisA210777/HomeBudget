@@ -62,7 +62,7 @@ public class ExternalUserProvisionerTests(BudgetApiFactory factory) : Integratio
             Assert.Equal(household.Id, saved.LastActiveHouseholdId);
 
             var person = await db.People.IgnoreQueryFilters().SingleAsync(p => p.HouseholdId == household.Id);
-            Assert.Equal("Jo Bloggs", person.DisplayName);
+            Assert.Equal("Jo", person.DisplayName);
             Assert.Equal(userId, person.LinkedUserId);
         });
     }

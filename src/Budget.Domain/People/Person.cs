@@ -65,7 +65,7 @@ public sealed class Person : AuditableEntity, IHouseholdOwned
             name = name[(comma + 1)..].Trim();
         }
 
-        var first = name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        var first = name.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
         return string.IsNullOrEmpty(first) ? "Me" : first;
     }
 
