@@ -69,7 +69,9 @@ public sealed class OutgoingListTests : IDisposable
 
         var insurance = Item(cut, "Car insurance");
         Assert.Contains("outgoing-coming-up", insurance.ClassName, StringComparison.Ordinal);
-        Assert.Contains("Renews 15 Nov 2026", insurance.QuerySelector("[data-testid=outgoing-coming-up]")!.TextContent, StringComparison.Ordinal);
+        var badge = insurance.QuerySelector("[data-testid=outgoing-coming-up]")!;
+        Assert.Contains("Renews in 10 days", badge.TextContent, StringComparison.Ordinal);
+        Assert.Contains("needs renewing by 15 Nov 2026", badge.GetAttribute("title"), StringComparison.Ordinal);
         Assert.DoesNotContain("outgoing-coming-up", Item(cut, "Mortgage").ClassName, StringComparison.Ordinal);
     }
 

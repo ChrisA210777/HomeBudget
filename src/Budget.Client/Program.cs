@@ -28,6 +28,7 @@ builder.Services.AddScoped<IIncomeApi, IncomeApi>();
 builder.Services.AddScoped<IPeopleApi, PeopleApi>();
 builder.Services.AddScoped<ICategoryApi, CategoryApi>();
 builder.Services.AddScoped<IOutgoingApi, OutgoingApi>();
+builder.Services.AddScoped<IRenewalApi, RenewalApi>();
 builder.Services.AddScoped<IBudgetApi, BudgetApi>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ThemePreference>();

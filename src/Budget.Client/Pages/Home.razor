@@ -2,12 +2,15 @@
 @attribute [Authorize]
 @using Budget.Client.Budgeting
 @using Budget.Client.Households
+@using Budget.Client.Outgoings
 @using Budget.Shared.Budgeting
 @using Budget.Shared.Households
 @using Budget.Shared.Income
+@using Budget.Shared.Outgoings
 @inject UserSession Session
 @inject IHouseholdApi HouseholdApi
 @inject IBudgetApi BudgetApi
+@inject IRenewalApi RenewalApi
 
 <PageTitle>Home Budget</PageTitle>
 
@@ -83,6 +86,30 @@
                 </MudCardActions>
             </MudCard>
         </MudItem>
+        @if (_renewals is { Count: > 0 })
+        {
+            <MudItem xs="12">
+                <MudCard Outlined="true" data-testid="coming-up-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.EventRepeat" Size="Size.Small" Class="mr-1" />Coming up</MudText>
+                        <ul class="plain-list" aria-label="Renewals coming up">
+                            @foreach (var renewal in _renewals)
+                            {
+                                <li class="py-2" data-testid="coming-up">
+                                    <div class="d-flex align-start gap-2">
+                                        <div class="flex-grow-1" style="min-width: 0">
+                                            <MudLink Href="@($"/outgoings/{renewal.Id}")" Typo="Typo.body1" data-testid="coming-up-name">@renewal.Name</MudLink>
+                                            <MudText Typo="Typo.body2" data-testid="coming-up-text">@OutgoingValidator.DescribeRenewal(renewal.Name, renewal.RenewalDate, renewal.AutoRenews)</MudText>
+                                        </div>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ma-0" data-testid="coming-up-days">@OutgoingValidator.RenewsIn(renewal.DaysUntil)</MudChip>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
         <MudItem xs="12" sm="6">
             <MudCard Outlined="true" Style="height: 100%" data-testid="income-card">
                 <MudCardContent>
@@ -137,13 +164,17 @@
     private string? _notice;
 
     private BudgetMonthResponse? _budget;
+    private IReadOnlyList<RenewalComingUp>? _renewals;
 
     protected override async Task OnInitializedAsync()
     {
         _household = await Session.GetActiveHouseholdAsync();
         if (_household is not null)
         {
-            _budget = await BudgetApi.GetMonthAsync(_household.HouseholdId);
+            var budget = BudgetApi.GetMonthAsync(_household.HouseholdId);
+            var renewals = RenewalApi.ComingUpAsync(_household.HouseholdId);
+            _budget = await budget;
+            _renewals = await renewals;
         }
     }
 

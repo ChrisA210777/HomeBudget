@@ -149,6 +149,26 @@ public static partial class OutgoingValidator
         return errors.ToDictionary(e => e.Key, e => e.Value.ToArray());
     }
 
+    /// <summary>"Renews today", "Renews tomorrow" or "Renews in 12 days" (BUD-52).</summary>
+    public static string RenewsIn(int days) => days switch
+    {
+        <= 0 => "Renews today",
+        1 => "Renews tomorrow",
+        _ => $"Renews in {days} days",
+    };
+
+    /// <summary>
+    /// What to do about a renewal: "Car insurance renews automatically on 3 Mar – cancel or switch
+    /// before then if you want to." or "TV Licence needs renewing by 3 Mar." (BUD-52).
+    /// </summary>
+    public static string DescribeRenewal(string name, DateOnly renewalDate, bool autoRenews)
+    {
+        var date = renewalDate.ToString("d MMM yyyy", CultureInfo.InvariantCulture);
+        return autoRenews
+            ? $"{name} renews automatically on {date} – cancel or switch before then if you want to."
+            : $"{name} needs renewing by {date}.";
+    }
+
     /// <summary>Common reference names, suggested after the household's own (BUD-56).</summary>
     public static readonly IReadOnlyList<string> CommonReferenceLabels =
     [

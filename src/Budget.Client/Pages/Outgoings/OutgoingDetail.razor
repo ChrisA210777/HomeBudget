@@ -54,7 +54,8 @@
         @if (d.IsComingUp && d.NextRenewal is { } comingUp)
         {
             <MudAlert Severity="Severity.Warning" Dense="true" Class="my-2" data-testid="outgoing-coming-up">
-                Renews @IncomeDates.Format(comingUp)@(d.AutoRenews ? " automatically" : string.Empty). Now's the time to check the price or shop around.
+                <b>@OutgoingValidator.RenewsIn(comingUp.DayNumber - DateOnly.FromDateTime(Clock.GetLocalNow().DateTime).DayNumber).</b>
+                @OutgoingValidator.DescribeRenewal(d.Name, comingUp, d.AutoRenews)
             </MudAlert>
         }
 

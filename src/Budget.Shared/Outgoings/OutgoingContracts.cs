@@ -87,6 +87,9 @@ public static class OutgoingRoutes
     /// <summary>PUT: correct a pause or ending. DELETE (with a reason): remove one recorded by mistake.</summary>
     public static string StatusPeriod(Guid householdId, Guid outgoingId, Guid periodId) => $"{StatusPeriods(householdId, outgoingId)}/{periodId}";
 
+    /// <summary>GET: outgoings coming up for renewal now, soonest first (BUD-52).</summary>
+    public static string ComingUp(Guid householdId) => $"{Outgoings(householdId)}/coming-up";
+
     /// <summary>GET: the reference names (e.g. "Policy number") already used in the household, most used first.</summary>
     public static string ReferenceLabels(Guid householdId) => $"{Outgoings(householdId)}/reference-labels";
 
@@ -347,7 +350,8 @@ public sealed record OutgoingMonthItem(
     DateOnly StartsOn,
     DateOnly? EndsOn,
     DateOnly? NextRenewal,
-    bool IsComingUp);
+    bool IsComingUp,
+    bool AutoRenews = false);
 
 /// <summary>Totals for a set of outgoings, each rounded once from the exact amounts.</summary>
 public sealed record OutgoingTotals(decimal Total, decimal Essential, decimal Preferred, decimal Optional)
@@ -370,3 +374,16 @@ public sealed record OutgoingTotals(decimal Total, decimal Essential, decimal Pr
     public static decimal Subtotal(IEnumerable<OutgoingMonthItem> items) =>
         Math.Round(items.Sum(i => i.ExactMonthlyAmount), 2, MidpointRounding.AwayFromZero);
 }
+
+/// <summary>An outgoing in its reminder period before renewing (BUD-52).</summary>
+/// <param name="DaysUntil">Days from today until <paramref name="RenewalDate"/>; 0 means today.</param>
+public sealed record RenewalComingUp(
+    Guid Id,
+    string Name,
+    DateOnly RenewalDate,
+    int DaysUntil,
+    bool AutoRenews,
+    decimal Amount,
+    int Every,
+    PaymentUnitDto Unit,
+    string CurrencyCode);
