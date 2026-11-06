@@ -3,6 +3,7 @@ using Budget.Client.Pages.Households;
 using Budget.Client.Tests.TestDoubles;
 using Bunit.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
+using MudBlazor;
 using MudBlazor.Services;
 
 namespace Budget.Client.Tests.Pages.Households;
@@ -32,13 +33,14 @@ public sealed class HouseholdDataTests : IDisposable
     }
 
     [Fact]
-    public void Ticking_the_options_adds_history_and_audit_details()
+    public async Task Ticking_the_options_adds_history_and_audit_details()
     {
         UseRole("Admin");
         var cut = _context.RenderComponent<HouseholdData>();
 
-        cut.Find("[data-testid=include-history] input").Change(true);
-        cut.Find("[data-testid=include-audit] input").Change(true);
+        var boxes = cut.FindComponents<MudCheckBox<bool>>();
+        await cut.InvokeAsync(() => boxes[0].Instance.ValueChanged.InvokeAsync(true));
+        await cut.InvokeAsync(() => boxes[1].Instance.ValueChanged.InvokeAsync(true));
 
         Assert.EndsWith("/export?history=true&audit=true", cut.Find("a[data-testid=download-json]").GetAttribute("href"), StringComparison.Ordinal);
     }
