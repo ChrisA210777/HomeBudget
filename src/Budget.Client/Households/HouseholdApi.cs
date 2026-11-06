@@ -18,10 +18,16 @@ public sealed record RenameHouseholdResult(HouseholdResponse? Household, IReadOn
 public interface IHouseholdApi
 {
     Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request);
+
+    /// <returns>The household's members, owner first, then by name.</returns>
+    Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId);
 }
 
 public sealed class HouseholdApi(HttpClient http) : IHouseholdApi
 {
+    public async Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId) =>
+        await http.GetFromJsonAsync<List<HouseholdMemberSummary>>(new Uri(MemberRoutes.Members(householdId), UriKind.Relative)) ?? [];
+
     public async Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request)
     {
         var url = new Uri(HouseholdRoutes.Household(householdId), UriKind.Relative);
