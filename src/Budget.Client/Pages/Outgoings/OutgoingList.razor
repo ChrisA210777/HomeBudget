@@ -159,8 +159,9 @@
                                         }
                                         @if (item.IsComingUp && item.NextRenewal is { } renewal)
                                         {
-                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.EventRepeat" Class="ma-0 mt-1" data-testid="outgoing-coming-up">
-                                                Renews @renewal.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.EventRepeat" Class="ma-0 mt-1"
+                                                     title="@OutgoingValidator.DescribeRenewal(item.Name, renewal, item.AutoRenews)" data-testid="outgoing-coming-up">
+                                                @OutgoingValidator.RenewsIn(renewal.DayNumber - Today.DayNumber)
                                             </MudChip>
                                         }
                                     </div>
@@ -203,6 +204,8 @@
     private OutgoingKindDto? _kind;
     private OutgoingPriorityDto? _priority;
     private string _person = EveryoneKey;
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
     private bool IsFiltered => _category is not null || _kind is not null || _priority is not null || _person != EveryoneKey;
 

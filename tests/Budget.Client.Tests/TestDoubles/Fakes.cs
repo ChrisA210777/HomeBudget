@@ -1,6 +1,7 @@
 using Budget.Client.Account;
 using Budget.Client.Budgeting;
 using Budget.Client.Income;
+using Budget.Client.Outgoings;
 using Budget.Client.People;
 using Budget.Shared.Account;
 using Budget.Shared.Budgeting;
@@ -188,3 +189,10 @@ public sealed class FakeBudgetApi : IBudgetApi
         ]);
 }
 
+/// <summary>Renewals coming up, settable per test (none by default).</summary>
+public sealed class FakeRenewalApi : IRenewalApi
+{
+    public IReadOnlyList<RenewalComingUp> ComingUp { get; set; } = [];
+
+    public Task<IReadOnlyList<RenewalComingUp>> ComingUpAsync(Guid householdId) => Task.FromResult(ComingUp);
+}

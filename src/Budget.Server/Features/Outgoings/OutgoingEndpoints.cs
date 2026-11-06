@@ -23,6 +23,7 @@ public static class OutgoingEndpoints
         outgoings.MapGet("/", GetMonthAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapPost("/", CreateAsync).RequireAuthorization(HouseholdPolicies.User);
         outgoings.MapGet("/paid-from", PaidFromNamesAsync).RequireAuthorization(HouseholdPolicies.Viewer);
+        outgoings.MapGet("/coming-up", ComingUpAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapGet("/reference-labels", ReferenceLabelsAsync).RequireAuthorization(HouseholdPolicies.Viewer);
 
         OutgoingDetailEndpoints.Map(outgoings);
@@ -89,7 +90,8 @@ public static class OutgoingEndpoints
                     o.StartsOn,
                     o.EndsOn,
                     o.NextRenewalOnOrAfter(today),
-                    o.IsComingUp(today));
+                    o.IsComingUp(today),
+                    o.AutoRenews);
             })
             .OrderBy(i => i.CategorySortOrder)
             .ThenBy(i => i.CategoryName, StringComparer.CurrentCultureIgnoreCase)
@@ -144,6 +146,33 @@ public static class OutgoingEndpoints
     }
 
     internal static string Day(DateOnly date) => date.ToString("d MMM yyyy", Display);
+
+    /// <summary>Outgoings in their reminder period before renewing, soonest first (BUD-52).</summary>
+    private static async Task<IReadOnlyList<RenewalComingUp>> ComingUpAsync(Guid householdId, BudgetDbContext db, TimeProvider time)
+    {
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
+        var candidates = await db.Outgoings
+            .Where(o => o.RenewalDate != null && o.AlertPeriod != AlertPeriod.None)
+            .Include(o => o.AmountChanges)
+            .Include(o => o.StatusPeriods)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .ToListAsync();
+
+        return candidates
+            .Where(o => o.IsComingUp(today))
+            .Select(o =>
+            {
+                var renewal = o.NextRenewalOnOrAfter(today)!.Value;
+                var paid = o.AmountChangeOn(today)!;
+                return new RenewalComingUp(
+                    o.Id, o.Name, renewal, renewal.DayNumber - today.DayNumber, o.AutoRenews, paid.Amount, paid.Every, (PaymentUnitDto)paid.Unit, currency);
+            })
+            .OrderBy(r => r.RenewalDate)
+            .ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
 
     /// <summary>Reference names used in the household, most used first (BUD-56).</summary>
     private static async Task<IReadOnlyList<string>> ReferenceLabelsAsync(BudgetDbContext db) =>

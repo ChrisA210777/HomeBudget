@@ -157,6 +157,72 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     }
 
     [Fact]
+    public async Task Renewals_coming_up_are_listed_soonest_first()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var insurance = await CategoryIdAsync(householdId, "Insurance");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = today.AddYears(-1);
+
+        Outgoing Renewing(string name, int inDays, AlertPeriod alert, bool autoRenews) =>
+            Outgoing.Create(householdId, Details(name, insurance, start) with
+            {
+                RenewalDate = today.AddDays(inDays),
+                AlertPeriod = alert,
+                AutoRenews = autoRenews,
+            }, 120m, PaymentSchedule.Yearly, "Start");
+
+        var car = Renewing("Car insurance", 20, AlertPeriod.OneMonth, autoRenews: true);
+        var tv = Renewing("TV Licence", 3, AlertPeriod.OneWeek, autoRenews: false);
+        var later = Renewing("Home insurance", 60, AlertPeriod.OneMonth, autoRenews: true);
+        var noReminder = Renewing("Breakdown cover", 2, AlertPeriod.None, autoRenews: true);
+        var paused = Renewing("Gym", 5, AlertPeriod.OneMonth, autoRenews: true);
+        paused.Pause(start, null, "Not going");
+        await ExecuteDbContextAsync(async db =>
+        {
+            db.Outgoings.AddRange(car, tv, later, noReminder, paused);
+            await db.SaveChangesAsync();
+        });
+        using var client = CreateClient(signedInAs: ownerId);
+
+        var comingUp = (await client.GetFromJsonAsync<List<RenewalComingUp>>(Url(OutgoingRoutes.ComingUp(householdId))))!;
+
+        Assert.Equal(new[] { "TV Licence", "Car insurance" }, comingUp.Select(r => r.Name));
+        Assert.Equal((today.AddDays(3), 3, false), (comingUp[0].RenewalDate, comingUp[0].DaysUntil, comingUp[0].AutoRenews));
+        Assert.Equal((20, true, 120m, PaymentUnitDto.Year), (comingUp[1].DaysUntil, comingUp[1].AutoRenews, comingUp[1].Amount, comingUp[1].Unit));
+    }
+
+    [Fact]
+    public async Task A_past_renewal_date_rolls_forward_by_the_cycle()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var insurance = await CategoryIdAsync(householdId, "Insurance");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var outgoing = Outgoing.Create(householdId, Details("Car insurance", insurance, today.AddYears(-2)) with
+        {
+            RenewalDate = today.AddDays(10).AddYears(-1),
+            AlertPeriod = AlertPeriod.OneMonth,
+        }, 480m, PaymentSchedule.Yearly, "Start");
+        await ExecuteDbContextAsync(async db =>
+        {
+            db.Outgoings.Add(outgoing);
+            await db.SaveChangesAsync();
+        });
+        using var client = CreateClient(signedInAs: ownerId);
+
+        var comingUp = (await client.GetFromJsonAsync<List<RenewalComingUp>>(Url(OutgoingRoutes.ComingUp(householdId))))!;
+
+        Assert.Equal(today.AddDays(10), Assert.Single(comingUp).RenewalDate);
+    }
+
+    [Fact]
+    public async Task Anyone_in_the_household_can_see_renewals_but_not_other_households()
+    {
+        await AssertMinimumRoleAsync(HttpMethod.Get, OutgoingRoutes.ComingUp, HouseholdRole.Viewer);
+        await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, OutgoingRoutes.ComingUp);
+    }
+
+    [Fact]
     public async Task Reference_names_are_suggested_most_used_first()
     {
         var (ownerId, householdId) = await CreateHouseholdOwnerAsync();

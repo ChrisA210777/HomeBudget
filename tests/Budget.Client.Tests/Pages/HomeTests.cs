@@ -1,10 +1,12 @@
 using Budget.Client.Account;
 using Budget.Client.Budgeting;
 using Budget.Client.Households;
+using Budget.Client.Outgoings;
 using Budget.Client.Pages;
 using Budget.Client.Tests.TestDoubles;
 using Budget.Shared.Account;
 using Budget.Shared.Households;
+using Budget.Shared.Outgoings;
 using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +20,7 @@ public sealed class HomeTests : IDisposable
     private readonly StubAccountApi _accountApi = new();
     private readonly FakeHouseholdApi _householdApi = new();
     private readonly FakeBudgetApi _budgetApi = new();
+    private readonly FakeRenewalApi _renewalApi = new();
 
     public HomeTests()
     {
@@ -25,6 +28,7 @@ public sealed class HomeTests : IDisposable
         _context.Services.AddSingleton<IAccountApi>(_accountApi);
         _context.Services.AddSingleton<IHouseholdApi>(_householdApi);
         _context.Services.AddSingleton<IBudgetApi>(_budgetApi);
+        _context.Services.AddSingleton<IRenewalApi>(_renewalApi);
         _context.Services.AddScoped<UserSession>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
@@ -41,6 +45,36 @@ public sealed class HomeTests : IDisposable
         Assert.Equal("£1,290.00", cut.Find("[data-testid=home-left]").TextContent.Trim());
         Assert.Contains("£3,000.00 in, £1,710.00 out", cut.Find("[data-testid=budget-card]").TextContent, StringComparison.Ordinal);
         Assert.Equal((null, null), _budgetApi.Requests.Single());
+    }
+
+    [Fact]
+    public void Renewals_coming_up_are_listed_soonest_first_with_what_to_do()
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", "Viewer", IsOwner: false));
+        _renewalApi.ComingUp =
+        [
+            new(Guid.NewGuid(), "Car insurance", new DateOnly(2027, 3, 3), 12, AutoRenews: true, 480m, 1, PaymentUnitDto.Year, "GBP"),
+            new(Guid.NewGuid(), "TV Licence", new DateOnly(2027, 3, 20), 29, AutoRenews: false, 174.50m, 1, PaymentUnitDto.Year, "GBP"),
+        ];
+
+        var cut = _context.RenderComponent<Home>();
+
+        var texts = cut.FindAll("[data-testid=coming-up-text]").Select(e => e.TextContent.Trim()).ToList();
+        Assert.Equal("Car insurance renews automatically on 3 Mar 2027 – cancel or switch before then if you want to.", texts[0]);
+        Assert.Equal("TV Licence needs renewing by 20 Mar 2027.", texts[1]);
+        Assert.Equal(new[] { "Renews in 12 days", "Renews in 29 days" }, cut.FindAll("[data-testid=coming-up-days]").Select(e => e.TextContent.Trim()));
+    }
+
+    [Fact]
+    public void There_is_no_coming_up_card_when_nothing_is_due()
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", "Admin", IsOwner: true));
+
+        var cut = _context.RenderComponent<Home>();
+
+        Assert.Empty(cut.FindAll("[data-testid=coming-up-card]"));
     }
 
     [Fact]
