@@ -99,6 +99,10 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
                     b.Property<string>("Comment")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -113,6 +117,9 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("EffectiveFrom")
                         .HasColumnType("date");
 
+                    b.Property<int>("Every")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("IncomeStreamId")
                         .HasColumnType("uniqueidentifier");
 
@@ -122,9 +129,10 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<decimal>("MonthlyNetAmount")
-                        .HasPrecision(19, 4)
-                        .HasColumnType("decimal(19,4)");
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
 
                     b.HasKey("Id");
 
