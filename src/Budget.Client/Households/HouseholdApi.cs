@@ -37,6 +37,9 @@ public interface IHouseholdApi
     /// <returns>The household's members, owner first, then by name.</returns>
     Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId);
 
+    /// <returns>How many incomes, outgoings and people the household has.</returns>
+    Task<HouseholdSetupResponse> GetSetupAsync(Guid householdId);
+
     /// <returns><c>null</c> on success, otherwise why it was refused.</returns>
     Task<string?> ChangeRoleAsync(Guid householdId, Guid userId, string role);
 
@@ -77,6 +80,10 @@ public sealed class HouseholdApi(HttpClient http) : IHouseholdApi
         response.EnsureSuccessStatusCode();
         return true;
     }
+
+    public async Task<HouseholdSetupResponse> GetSetupAsync(Guid householdId) =>
+        await http.GetFromJsonAsync<HouseholdSetupResponse>(new Uri(HouseholdRoutes.Setup(householdId), UriKind.Relative))
+        ?? new HouseholdSetupResponse(0, 0, 0);
 
     public async Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId) =>
         await http.GetFromJsonAsync<List<HouseholdMemberSummary>>(new Uri(MemberRoutes.Members(householdId), UriKind.Relative)) ?? [];

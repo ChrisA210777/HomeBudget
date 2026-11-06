@@ -10,7 +10,13 @@ public static class HouseholdRoutes
 
     /// <summary>GET: the household's details and the caller's role in it. PUT (Admins): rename it.</summary>
     public static string Household(Guid householdId) => $"/api/households/{householdId}";
+
+    /// <summary>GET (any member): how far the household has got setting up, for the home page's prompts (BUD-68).</summary>
+    public static string Setup(Guid householdId) => $"/api/households/{householdId}/setup";
 }
+
+/// <summary>How many of each thing the household has, whatever their dates.</summary>
+public sealed record HouseholdSetupResponse(int Incomes, int Outgoings, int People);
 
 /// <summary>A household as seen by one of its members.</summary>
 /// <param name="Role">The caller's role: Viewer, User or Admin.</param>

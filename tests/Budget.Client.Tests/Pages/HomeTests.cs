@@ -132,15 +132,89 @@ public sealed class HomeTests : IDisposable
     }
 
     [Fact]
-    public void Links_to_income_and_people()
+    public void A_new_household_is_prompted_to_add_income_outgoings_and_people_in_that_order()
     {
-        var householdId = Guid.NewGuid();
-        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", "Viewer", IsOwner: false));
+        UseHousehold("Admin");
+        _householdApi.Setup = new HouseholdSetupResponse(0, 0, 1);
 
         var cut = _context.RenderComponent<Home>();
 
-        Assert.Equal("/income", cut.Find("[data-testid=go-to-income]").GetAttribute("href"));
-        Assert.Equal("/people", cut.Find("[data-testid=go-to-people]").GetAttribute("href"));
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=getting-started]")));
+        var steps = cut.FindAll("[data-testid=getting-started] li").Select(li => li.GetAttribute("data-testid")).ToArray();
+        Assert.Equal(new[] { "setup-add-income", "setup-add-outgoing", "setup-add-people" }, steps);
+        Assert.Equal("/income/new", cut.Find("[data-testid=setup-add-income-go]").GetAttribute("href"));
+        Assert.Equal("/outgoings/new", cut.Find("[data-testid=setup-add-outgoing-go]").GetAttribute("href"));
+        Assert.Equal("/people", cut.Find("[data-testid=setup-add-people-go]").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void Only_the_steps_not_done_are_shown()
+    {
+        UseHousehold("User");
+        _householdApi.Setup = new HouseholdSetupResponse(2, 0, 3);
+
+        var cut = _context.RenderComponent<Home>();
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=setup-add-outgoing]")));
+        Assert.Empty(cut.FindAll("[data-testid=setup-add-income]"));
+        Assert.Empty(cut.FindAll("[data-testid=setup-add-people]"));
+    }
+
+    [Fact]
+    public void Theres_no_getting_started_card_once_everything_is_set_up()
+    {
+        UseHousehold("Admin");
+        _householdApi.Setup = new HouseholdSetupResponse(1, 1, 2);
+
+        var cut = _context.RenderComponent<Home>();
+
+        cut.WaitForAssertion(() => Assert.Equal(1, _householdApi.SetupCalls));
+        Assert.Empty(cut.FindAll("[data-testid=getting-started]"));
+        Assert.NotNull(cut.Find("[data-testid=budget-card]"));
+    }
+
+    [Fact]
+    public void Viewers_get_no_prompts_because_they_cant_add_anything()
+    {
+        UseHousehold("Viewer");
+        _householdApi.Setup = new HouseholdSetupResponse(0, 0, 1);
+
+        var cut = _context.RenderComponent<Home>();
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=budget-card]")));
+        Assert.Empty(cut.FindAll("[data-testid=getting-started]"));
+        Assert.Equal(0, _householdApi.SetupCalls);
+    }
+
+    [Fact]
+    public void Not_now_hides_the_people_step_and_is_remembered_on_this_device()
+    {
+        UseHousehold("Admin");
+        _householdApi.Setup = new HouseholdSetupResponse(1, 1, 1);
+
+        var cut = _context.RenderComponent<Home>();
+        cut.WaitForAssertion(() => cut.Find("[data-testid=setup-people-not-now]").Click());
+
+        Assert.Empty(cut.FindAll("[data-testid=getting-started]"));
+        Assert.Contains(_context.JSInterop.Invocations, i =>
+            i.Identifier == "localStorage.setItem" && i.Arguments[1] as string == "true");
+    }
+
+    [Fact]
+    public void The_menu_cards_are_gone()
+    {
+        UseHousehold("Admin");
+
+        var cut = _context.RenderComponent<Home>();
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=budget-card]")));
+        Assert.Empty(cut.FindAll("[data-testid=income-card], [data-testid=people-card], [data-testid=outgoings-card]"));
+    }
+
+    private void UseHousehold(string role)
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", role, IsOwner: role == "Admin"));
     }
 
     [Fact]
@@ -254,6 +328,16 @@ public sealed class HomeTests : IDisposable
 
         public Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId) =>
             Task.FromResult<IReadOnlyList<HouseholdMemberSummary>>([]);
+
+        public HouseholdSetupResponse Setup { get; set; } = new(1, 1, 2);
+
+        public int SetupCalls { get; private set; }
+
+        public Task<HouseholdSetupResponse> GetSetupAsync(Guid householdId)
+        {
+            SetupCalls++;
+            return Task.FromResult(Setup);
+        }
 
         public Task<string?> ChangeRoleAsync(Guid householdId, Guid userId, string role) => throw new NotSupportedException();
 

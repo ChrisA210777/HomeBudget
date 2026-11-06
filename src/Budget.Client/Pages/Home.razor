@@ -11,6 +11,7 @@
 @inject IHouseholdApi HouseholdApi
 @inject IBudgetApi BudgetApi
 @inject IRenewalApi RenewalApi
+@inject IJSRuntime JS
 
 <PageTitle>Home Budget</PageTitle>
 
@@ -69,6 +70,35 @@
     else
     {
         <MudGrid Spacing="2">
+            @if (Steps.Count > 0)
+            {
+                <MudItem xs="12">
+                    <MudCard Outlined="true" Class="getting-started" data-testid="getting-started">
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.Checklist" Size="Size.Small" Class="mr-1" aria-hidden="true" />Getting started</MudText>
+                            <ul class="plain-list" aria-label="Next steps">
+                                @foreach (var step in Steps)
+                                {
+                                    <li class="py-2" data-testid="@($"setup-{step.Id}")">
+                                        <div class="d-flex align-center gap-2 flex-wrap">
+                                            <MudIcon Icon="@step.Icon" Color="Color.Primary" aria-hidden="true" />
+                                            <div class="flex-grow-1" style="min-width: 12rem">
+                                                <MudText Typo="Typo.body1"><strong>@step.Title</strong></MudText>
+                                                <MudText Typo="Typo.body2">@step.Text</MudText>
+                                            </div>
+                                            <MudButton Href="@step.Href" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" data-testid="@($"setup-{step.Id}-go")">@step.Action</MudButton>
+                                            @if (step.Id == PeopleStep)
+                                            {
+                                                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="NotNowAsync" data-testid="setup-people-not-now">Not now</MudButton>
+                                            }
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
             <MudItem xs="12">
                 <MudCard Outlined="true" data-testid="budget-card">
                     <MudCardContent>
@@ -124,45 +154,6 @@
                     </MudCard>
                 </MudItem>
             }
-            <MudItem xs="12" sm="6">
-                <MudCard Outlined="true" Style="height: 100%" data-testid="income-card">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />Income</MudText>
-                        <MudText Typo="Typo.body2">See what comes in each month, and record pay changes and leave.</MudText>
-                    </MudCardContent>
-                    <MudCardActions>
-                        <MudButton Href="/income" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-income">Go to income</MudButton>
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudCard Outlined="true" Style="height: 100%" data-testid="people-card">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Class="mr-1" />People</MudText>
-                        <MudText Typo="Typo.body2">Everyone in the household, including those who don't sign in.</MudText>
-                    </MudCardContent>
-                    <MudCardActions>
-                        <MudButton Href="/people" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-people">Go to people</MudButton>
-                        <MudButton Href="/members" Color="Color.Primary" Variant="Variant.Text" data-testid="go-to-members">Members</MudButton>
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudCard Outlined="true" Style="height: 100%" data-testid="outgoings-card">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" Class="mr-1" />Outgoings</MudText>
-                        <MudText Typo="Typo.body2">Bills, savings and spending allowances, and the categories they go in.</MudText>
-                    </MudCardContent>
-                    <MudCardActions Class="flex-wrap">
-                        @if (_household?.Role is not null and not "Viewer")
-                        {
-                            <MudButton Href="/outgoings/new" Color="Color.Primary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Add" data-testid="add-outgoing">Add an outgoing</MudButton>
-                        }
-                        <MudButton Href="/outgoings/categories" Color="Color.Primary" Variant="Variant.Text" data-testid="go-to-categories">Categories</MudButton>
-                        <MudButton Href="/outgoings" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-outgoings">Go to outgoings</MudButton>
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
         </MudGrid>
     }
 </MudContainer>
@@ -180,6 +171,11 @@
     private string? _error;
     private string? _notice;
 
+    private const string PeopleStep = "add-people";
+    private const string PeopleStepDismissedKey = "budget.setup.people.dismissed";
+
+    private HouseholdSetupResponse? _setup;
+    private bool _peopleStepDismissed;
     private BudgetMonthResponse? _budget;
     private IReadOnlyList<RenewalComingUp>? _renewals;
 
@@ -190,11 +186,75 @@
         {
             var budget = BudgetApi.GetMonthAsync(_household.HouseholdId);
             var renewals = RenewalApi.ComingUpAsync(_household.HouseholdId);
+            var setup = _household.Role == "Viewer" ? null : HouseholdApi.GetSetupAsync(_household.HouseholdId);
+            _peopleStepDismissed = await IsPeopleStepDismissedAsync();
             _budget = await budget;
             _renewals = await renewals;
+            _setup = setup is null ? null : await setup;
         }
 
         _loaded = true;
+    }
+
+    private sealed record SetupStep(string Id, string Icon, string Title, string Text, string Action, string Href);
+
+    /// <summary>The getting-started steps not done yet, in order (BUD-68). Viewers can't add anything, so they get none.</summary>
+    private List<SetupStep> Steps
+    {
+        get
+        {
+            var steps = new List<SetupStep>();
+            if (_setup is null)
+            {
+                return steps;
+            }
+
+            if (_setup.Incomes == 0)
+            {
+                steps.Add(new("add-income", Icons.Material.Filled.Payments, "Add your income",
+                    "What comes in each month, after tax and other deductions.", "Add income", "/income/new"));
+            }
+
+            if (_setup.Outgoings == 0)
+            {
+                steps.Add(new("add-outgoing", Icons.Material.Filled.ReceiptLong, "Add your outgoings",
+                    "Bills, savings and spending allowances, so you can see what's left.", "Add an outgoing", "/outgoings/new"));
+            }
+
+            if (_setup.People <= 1 && !_peopleStepDismissed)
+            {
+                steps.Add(new(PeopleStep, Icons.Material.Filled.People, "Add the people in your household",
+                    "Partners or children whose income or bills you track. They don't need to sign in.", "Add people", "/people"));
+            }
+
+            return steps;
+        }
+    }
+
+    // Remembered on this device only, so it's a light touch: some households are one person.
+    private async Task<bool> IsPeopleStepDismissedAsync()
+    {
+        try
+        {
+            return await JS.InvokeAsync<string?>("localStorage.getItem", $"{PeopleStepDismissedKey}.{_household!.HouseholdId}") == "true";
+        }
+        catch (JSException)
+        {
+            return false;
+        }
+    }
+
+    private async Task NotNowAsync()
+    {
+        _peopleStepDismissed = true;
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", $"{PeopleStepDismissedKey}.{_household!.HouseholdId}", "true");
+        }
+        catch (JSException)
+        {
+            // Not saved (e.g. private browsing): it's hidden until the page is reloaded.
+        }
     }
 
     private void StartRename()

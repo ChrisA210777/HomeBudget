@@ -222,6 +222,8 @@ public sealed class MembersTests : IDisposable
 
         public Task<CreateHouseholdResult> CreateAsync(CreateHouseholdRequest request) => throw new NotSupportedException();
 
+        public Task<HouseholdSetupResponse> GetSetupAsync(Guid householdId) => throw new NotSupportedException();
+
         public Task<bool> SwitchToAsync(Guid householdId) => throw new NotSupportedException();
 
         public Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request) =>

@@ -4,7 +4,7 @@ import { addOutgoing, choose, settled, signIn, typeOutgoingName } from './helper
 
 test("an outgoing added from the home page shows in this month's list", async ({ page }) => {
   await signIn(page);
-  await page.getByTestId('add-outgoing').click();
+  await page.getByTestId('setup-add-outgoing-go').click();
   await settled(page);
 
   await typeOutgoingName(page, 'Insurance for the car');
