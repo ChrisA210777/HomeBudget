@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Components.Forms;
 using Budget.Client.Tests.TestDoubles;
 using Bunit.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components;
 using MudBlazor;
 using MudBlazor.Services;
 
@@ -110,6 +111,49 @@ public sealed class HouseholdDataTests : IDisposable
         Assert.Empty(cut.FindAll("[data-testid=import-ok]"));
     }
 
+    [Fact]
+    public void A_checked_file_can_be_imported_as_a_new_household_named_and_linked_to_you()
+    {
+        UseRole("Admin");
+        var chris = Guid.NewGuid();
+        _importApi.Preview = GoodPreview(new ImportPerson(Guid.NewGuid(), "Jane", "jane@example.com", false), new ImportPerson(chris, "Chris", "chris@outlook.com", true));
+        var cut = _context.RenderComponent<HouseholdData>();
+        cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromText("{}", "backup.json"));
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=import-new-household]")));
+
+        Assert.Equal("The Austins", cut.Find("input[data-testid=import-name]").GetAttribute("value"));
+        cut.Find("input[data-testid=import-name]").Input("Austins (restored)");
+        cut.Find("[data-testid=import-new-household]").Click();
+
+        // The person the file links to your email is chosen for you.
+        cut.WaitForAssertion(() => Assert.Equal(("Austins (restored)", (Guid?)chris), _importApi.Imported.Select(i => (i.Name, i.Me)).Single()));
+        var navigation = _context.Services.GetRequiredService<NavigationManager>();
+        Assert.Equal("http://localhost/?imported=true", navigation.Uri);
+    }
+
+    [Fact]
+    public void A_failed_import_is_explained_and_nothing_moves_on()
+    {
+        UseRole("Admin");
+        _importApi.Preview = GoodPreview();
+        _importApi.Result = new ImportResultResponse { Errors = [new ImportProblem("household.currencyCode", "Only GBP households are supported at the moment.")] };
+        var cut = _context.RenderComponent<HouseholdData>();
+        cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromText("{}", "backup.json"));
+        cut.WaitForAssertion(() => cut.Find("[data-testid=import-new-household]").Click());
+
+        cut.WaitForAssertion(() => Assert.Contains("Only GBP households", cut.Find("[data-testid=import-failed]").TextContent, StringComparison.Ordinal));
+        Assert.Equal("http://localhost/", _context.Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    private static ImportPreviewResponse GoodPreview(params ImportPerson[] people) => new()
+    {
+        CanImport = true,
+        FileVersion = 1,
+        HouseholdName = "The Austins",
+        CurrencyCode = "GBP",
+        People = people,
+    };
+
     public void Dispose() => _context.Dispose();
 
     private sealed class StubImportApi : IImportApi
@@ -122,6 +166,16 @@ public sealed class HouseholdDataTests : IDisposable
         {
             Uploaded = file;
             return Task.FromResult(Preview);
+        }
+
+        public List<(byte[] File, string? Name, Guid? Me)> Imported { get; } = [];
+
+        public ImportResultResponse Result { get; set; } = new() { HouseholdId = Guid.NewGuid(), HouseholdName = "The Austins" };
+
+        public Task<ImportResultResponse> ImportAsNewHouseholdAsync(Guid householdId, byte[] file, string? name, Guid? me)
+        {
+            Imported.Add((file, name, me));
+            return Task.FromResult(Result);
         }
     }
 
