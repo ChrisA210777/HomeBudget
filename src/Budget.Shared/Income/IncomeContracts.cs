@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Budget.Shared.Outgoings;
 
 namespace Budget.Shared.Income;
 
@@ -47,8 +48,14 @@ public sealed record CreateIncomeStreamRequest
 
     public Guid PersonId { get; init; }
 
-    public decimal? MonthlyNetAmount { get; init; }
+    /// <summary>What's received each time, after tax and other deductions.</summary>
+    public decimal? Amount { get; init; }
 
+    public int Every { get; init; } = 1;
+
+    public PaymentUnitDto Unit { get; init; } = PaymentUnitDto.Month;
+
+    /// <summary>The first payment; the income starts from this date.</summary>
     public DateOnly? StartsOn { get; init; }
 
     /// <summary>Optional; defaults to "Starting amount".</summary>
@@ -66,7 +73,11 @@ public sealed record UpdateIncomeStreamRequest
 
 public sealed record SaveAmountChangeRequest
 {
-    public decimal? MonthlyNetAmount { get; init; }
+    public decimal? Amount { get; init; }
+
+    public int Every { get; init; } = 1;
+
+    public PaymentUnitDto Unit { get; init; } = PaymentUnitDto.Month;
 
     public DateOnly? EffectiveFrom { get; init; }
 
@@ -112,7 +123,9 @@ public sealed record IncomeMonthResponse(int Year, int Month, IReadOnlyList<Inco
 
 /// <summary>
 /// One income in a month. <see cref="Notes"/> explain why the month differs from the usual amount,
-/// e.g. "Unpaid leave 3 Nov – 17 Nov" or "Changes to £3,300.00 from 16 Nov".
+/// e.g. "Unpaid leave 3 Nov – 17 Nov" or "Changes to £3,300.00 a month from 16 Nov".
+/// <para><see cref="UsualAmount"/> is the usual monthly equivalent; <see cref="ReceivedAmount"/>,
+/// <see cref="Every"/> and <see cref="Unit"/> are what's actually received, e.g. £102.20 every 4 weeks.</para>
 /// </summary>
 public sealed record IncomeMonthItem(
     Guid Id,
@@ -121,6 +134,9 @@ public sealed record IncomeMonthItem(
     string PersonName,
     decimal AmountForMonth,
     decimal? UsualAmount,
+    decimal? ReceivedAmount,
+    int Every,
+    PaymentUnitDto Unit,
     IReadOnlyList<string> Notes,
     DateOnly StartsOn,
     DateOnly? EndsOn);
@@ -132,6 +148,9 @@ public sealed record IncomeStreamDetails(
     Guid PersonId,
     string PersonName,
     decimal AmountToday,
+    decimal ReceivedAmount,
+    int Every,
+    PaymentUnitDto Unit,
     DateOnly StartsOn,
     DateOnly? EndsOn,
     IReadOnlyList<AmountChangeEntry> AmountChanges,
@@ -140,10 +159,14 @@ public sealed record IncomeStreamDetails(
     string CurrencyCode,
     string Version);
 
+/// <param name="MonthlyAmount">The monthly equivalent of <paramref name="Amount"/> every <paramref name="Every"/> <paramref name="Unit"/>s, rounded.</param>
 public sealed record AmountChangeEntry(
     Guid Id,
     DateOnly EffectiveFrom,
-    decimal MonthlyNetAmount,
+    decimal Amount,
+    int Every,
+    PaymentUnitDto Unit,
+    decimal MonthlyAmount,
     string Comment,
     string? RecordedBy,
     DateTimeOffset RecordedAt,

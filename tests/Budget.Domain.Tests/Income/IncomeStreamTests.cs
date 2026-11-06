@@ -1,4 +1,5 @@
 using Budget.Domain.Income;
+using Budget.Domain.Outgoings;
 
 namespace Budget.Domain.Tests.Income;
 
@@ -12,6 +13,39 @@ public class IncomeStreamTests
 
     private static decimal Month(IncomeStream stream, int year, int month) =>
         IncomeTimeline.RoundForDisplay(stream.AmountForMonth(year, month));
+
+    [Fact]
+    public void Four_weekly_income_is_averaged_into_the_month()
+    {
+        // Child Benefit: £102.20 every 4 weeks is 13 payments a year, so £102.20 × 13 ÷ 12 a month.
+        var benefit = IncomeStream.Create(HouseholdId, PersonId, "Child Benefit", 102.20m, new DateOnly(2026, 1, 5), "Starting amount",
+            new PaymentSchedule(4, PaymentUnit.Week));
+
+        Assert.Equal(110.72m, Month(benefit, 2026, 11));
+        Assert.Equal(110.72m, Month(benefit, 2026, 12));
+        Assert.Equal("102.20 every 4 weeks from 2026-01-05 (Starting amount)", benefit.AmountChanges.Single().Describe());
+    }
+
+    [Fact]
+    public void Leave_is_still_pro_rated_by_day_on_the_monthly_equivalent()
+    {
+        var weekly = IncomeStream.Create(HouseholdId, PersonId, "Weekly wage", 600m, new DateOnly(2026, 1, 5), "Starting amount", PaymentSchedule.Weekly);
+        weekly.AddStatusPeriod(IncomeStatusReason.UnpaidLeave, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 15), null, "Unpaid leave");
+
+        // £600 a week = £2,600 a month; half of November unpaid.
+        Assert.Equal(1300m, Month(weekly, 2026, 11));
+    }
+
+    [Fact]
+    public void Switching_from_monthly_to_annual_is_a_new_amount_change()
+    {
+        var stream = Salary(3000m);
+        stream.ChangeAmount(new DateOnly(2026, 12, 1), 6000m, "Annual bonus scheme instead", PaymentSchedule.Yearly);
+
+        Assert.Equal(3000m, Month(stream, 2026, 11));
+        Assert.Equal(500m, Month(stream, 2026, 12));
+        Assert.Throws<ArgumentOutOfRangeException>(() => stream.ChangeAmount(new DateOnly(2027, 1, 1), 1m, "Bad", new PaymentSchedule(0, PaymentUnit.Week)));
+    }
 
     [Fact]
     public void A_whole_month_with_no_changes_is_exactly_the_monthly_amount()

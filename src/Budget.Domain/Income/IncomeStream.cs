@@ -1,5 +1,6 @@
 using Budget.Domain.Common;
 using Budget.Domain.Households;
+using Budget.Domain.Outgoings;
 
 namespace Budget.Domain.Income;
 
@@ -44,7 +45,7 @@ public sealed class IncomeStream : AuditableEntity, IHouseholdOwned
     public DateOnly? EndsOn => _statusPeriods.Where(p => p.Reason == IncomeStatusReason.Ended).Select(p => (DateOnly?)p.StartDate).Min();
 
     public static IncomeStream Create(
-        Guid householdId, Guid personId, string name, decimal monthlyNetAmount, DateOnly startsOn, string comment)
+        Guid householdId, Guid personId, string name, decimal amount, DateOnly startsOn, string comment, PaymentSchedule? schedule = null)
     {
         if (householdId == Guid.Empty)
         {
@@ -54,7 +55,7 @@ public sealed class IncomeStream : AuditableEntity, IHouseholdOwned
         var stream = new IncomeStream { Id = Guid.CreateVersion7(), HouseholdId = householdId };
         stream.Rename(name);
         stream.ChangePerson(personId);
-        stream._amountChanges.Add(IncomeAmountChange.Create(stream.Id, startsOn, monthlyNetAmount, comment));
+        stream._amountChanges.Add(IncomeAmountChange.Create(stream.Id, startsOn, amount, schedule ?? PaymentSchedule.Monthly, comment));
         return stream;
     }
 
@@ -77,21 +78,21 @@ public sealed class IncomeStream : AuditableEntity, IHouseholdOwned
 
     // Amount changes
 
-    public IncomeAmountChange ChangeAmount(DateOnly effectiveFrom, decimal monthlyNetAmount, string comment)
+    public IncomeAmountChange ChangeAmount(DateOnly effectiveFrom, decimal amount, string comment, PaymentSchedule? schedule = null)
     {
         EnsureNoAmountChangeOn(effectiveFrom, exceptId: null);
-        var change = IncomeAmountChange.Create(Id, effectiveFrom, monthlyNetAmount, comment);
+        var change = IncomeAmountChange.Create(Id, effectiveFrom, amount, schedule ?? PaymentSchedule.Monthly, comment);
         _amountChanges.Add(change);
         return change;
     }
 
-    public void CorrectAmountChange(Guid changeId, DateOnly effectiveFrom, decimal monthlyNetAmount, string comment, string reason)
+    public void CorrectAmountChange(Guid changeId, DateOnly effectiveFrom, decimal amount, string comment, string reason, PaymentSchedule? schedule = null)
     {
         var change = FindAmountChange(changeId);
         EnsureNoAmountChangeOn(effectiveFrom, exceptId: changeId);
 
         var before = change.Describe();
-        change.Update(effectiveFrom, monthlyNetAmount, comment);
+        change.Update(effectiveFrom, amount, schedule ?? PaymentSchedule.Monthly, comment);
         _corrections.Add(IncomeCorrection.Create(Id, IncomeEntryType.AmountChange, changeId, IncomeCorrectionAction.Edited, before, change.Describe(), reason));
     }
 

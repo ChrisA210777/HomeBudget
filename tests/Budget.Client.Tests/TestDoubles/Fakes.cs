@@ -132,12 +132,15 @@ public static class IncomeSamples
         StaticPeopleApi.ChrisId,
         "Chris Austin",
         AmountToday: 3000m,
+        ReceivedAmount: 3000m,
+        Every: 1,
+        Unit: PaymentUnitDto.Month,
         StartsOn: new DateOnly(2026, 1, 1),
         EndsOn: null,
         AmountChanges:
         [
-            new(FirstChangeId, new DateOnly(2026, 1, 1), 3000m, "Starting amount", "Chris Austin", DateTimeOffset.UnixEpoch, IsUpcoming: false, IsFirst: true),
-            new(RiseId, new DateOnly(2026, 12, 1), 3300m, "10% pay rise", "Chris Austin", DateTimeOffset.UnixEpoch, IsUpcoming: true, IsFirst: false),
+            new(FirstChangeId, new DateOnly(2026, 1, 1), 3000m, 1, PaymentUnitDto.Month, 3000m, "Starting amount", "Chris Austin", DateTimeOffset.UnixEpoch, IsUpcoming: false, IsFirst: true),
+            new(RiseId, new DateOnly(2026, 12, 1), 3300m, 1, PaymentUnitDto.Month, 3300m, "10% pay rise", "Chris Austin", DateTimeOffset.UnixEpoch, IsUpcoming: true, IsFirst: false),
         ],
         StatusPeriods:
         [

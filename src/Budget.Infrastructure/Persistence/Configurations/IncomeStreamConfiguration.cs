@@ -55,6 +55,9 @@ public sealed class IncomeAmountChangeConfiguration : IEntityTypeConfiguration<I
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).ValueGeneratedNever();
         builder.Property(c => c.Comment).HasMaxLength(IncomeStream.CommentMaxLength).IsRequired();
+        builder.Property(c => c.Unit).HasConversion<string>().HasMaxLength(10);
+        builder.Ignore(c => c.Schedule);
+        builder.Ignore(c => c.MonthlyEquivalent);
 
         // One amount change per stream per date.
         builder.HasIndex(c => new { c.IncomeStreamId, c.EffectiveFrom }).IsUnique();

@@ -1,10 +1,12 @@
 using System.Globalization;
 using Budget.Domain.Income;
+using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
 using Budget.Infrastructure.Persistence.Configurations;
 using Budget.Server.Features.Households;
 using Budget.Shared.Households;
 using Budget.Shared.Income;
+using Budget.Shared.Outgoings;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -79,6 +81,9 @@ public static class IncomeStreamEndpoints
                 people.GetValueOrDefault(x.Stream.PersonId) ?? string.Empty,
                 IncomeTimeline.RoundForDisplay(x.Amount),
                 UsualAmount(x.Stream, last),
+                ReceivedOn(x.Stream, last).Amount,
+                ReceivedOn(x.Stream, last).Every,
+                (PaymentUnitDto)ReceivedOn(x.Stream, last).Unit,
                 Notes(x.Stream, first, last, currency),
                 x.Stream.StartsOn,
                 x.Stream.EndsOn))
@@ -107,7 +112,7 @@ public static class IncomeStreamEndpoints
         }
 
         var comment = string.IsNullOrWhiteSpace(request.Comment) ? IncomeValidator.DefaultStartingComment : request.Comment;
-        var stream = IncomeStream.Create(householdId, request.PersonId, request.Name, request.MonthlyNetAmount!.Value, request.StartsOn!.Value, comment);
+        var stream = IncomeStream.Create(householdId, request.PersonId, request.Name, request.Amount!.Value, request.StartsOn!.Value, comment, Schedule(request.Every, request.Unit));
         db.IncomeStreams.Add(stream);
         await db.SaveChangesAsync();
 
@@ -146,13 +151,13 @@ public static class IncomeStreamEndpoints
         Guid householdId, Guid incomeStreamId, SaveAmountChangeRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, incomeStreamId, request.Version, Errors(IncomeValidator.Validate(request, isCorrection: false)), time,
             errorKey: nameof(request.EffectiveFrom),
-            stream => stream.ChangeAmount(request.EffectiveFrom!.Value, request.MonthlyNetAmount!.Value, request.Comment));
+            stream => stream.ChangeAmount(request.EffectiveFrom!.Value, request.Amount!.Value, request.Comment, Schedule(request.Every, request.Unit)));
 
     private static Task<IResult> CorrectAmountChangeAsync(
         Guid householdId, Guid incomeStreamId, Guid entryId, SaveAmountChangeRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, incomeStreamId, request.Version, Errors(IncomeValidator.Validate(request, isCorrection: true)), time,
             errorKey: nameof(request.EffectiveFrom),
-            stream => stream.CorrectAmountChange(entryId, request.EffectiveFrom!.Value, request.MonthlyNetAmount!.Value, request.Comment, request.CorrectionReason!));
+            stream => stream.CorrectAmountChange(entryId, request.EffectiveFrom!.Value, request.Amount!.Value, request.Comment, request.CorrectionReason!, Schedule(request.Every, request.Unit)));
 
     private static Task<IResult> DeleteAmountChangeAsync(
         Guid householdId, Guid incomeStreamId, Guid entryId, [FromBody] DeleteEntryRequest request, BudgetDbContext db, TimeProvider time) =>
@@ -269,6 +274,7 @@ public static class IncomeStreamEndpoints
         var personName = await db.People.Where(p => p.Id == stream.PersonId).Select(p => p.DisplayName).SingleOrDefaultAsync();
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
         var version = db.Entry(stream).Property<byte[]>(IncomeStreamConfiguration.RowVersion).CurrentValue;
+        var received = ReceivedOn(stream, today);
 
         return new IncomeStreamDetails(
             stream.Id,
@@ -276,12 +282,16 @@ public static class IncomeStreamEndpoints
             stream.PersonId,
             personName ?? string.Empty,
             IncomeTimeline.RoundForDisplay(stream.AmountOn(today)),
+            received.Amount,
+            received.Every,
+            (PaymentUnitDto)received.Unit,
             stream.StartsOn,
             stream.EndsOn,
             stream.AmountChanges
                 .OrderByDescending(c => c.EffectiveFrom)
                 .Select(c => new AmountChangeEntry(
-                    c.Id, c.EffectiveFrom, c.MonthlyNetAmount, c.Comment, NameOf(c.CreatedBy), c.CreatedAt, c.EffectiveFrom > today, c.EffectiveFrom == stream.StartsOn))
+                    c.Id, c.EffectiveFrom, c.Amount, c.Every, (PaymentUnitDto)c.Unit, IncomeTimeline.RoundForDisplay(c.MonthlyEquivalent), c.Comment,
+                    NameOf(c.CreatedBy), c.CreatedAt, c.EffectiveFrom > today, c.EffectiveFrom == stream.StartsOn))
                 .ToList(),
             stream.StatusPeriods
                 .OrderByDescending(p => p.StartDate)
@@ -296,6 +306,13 @@ public static class IncomeStreamEndpoints
             version is null ? string.Empty : Convert.ToBase64String(version));
     }
 
+    /// <summary>The amount change in force on a date (or the first, before it starts): what's actually received.</summary>
+    private static IncomeAmountChange ReceivedOn(IncomeStream stream, DateOnly date) =>
+        stream.AmountChanges.Where(c => c.EffectiveFrom <= date).MaxBy(c => c.EffectiveFrom)
+        ?? stream.AmountChanges.MinBy(c => c.EffectiveFrom)!;
+
+    private static PaymentSchedule Schedule(int every, PaymentUnitDto unit) => new(every, (PaymentUnit)unit);
+
     /// <summary>The month's usual amount (its latest amount, ignoring leave), or null before it starts.</summary>
     private static decimal? UsualAmount(IncomeStream stream, DateOnly last) =>
         stream.StartsOn > last ? null : IncomeTimeline.RoundForDisplay(IncomeTimeline.AmountOn(stream.AmountChanges, [], last));
@@ -309,7 +326,7 @@ public static class IncomeStreamEndpoints
         {
             notes.Add((change.EffectiveFrom, change.EffectiveFrom == stream.StartsOn
                 ? $"Starts {Day(change.EffectiveFrom)}"
-                : $"Changes to {Money.Format(change.MonthlyNetAmount, currency)} from {Day(change.EffectiveFrom)}"));
+                : $"Changes to {Money.Format(change.Amount, currency)} {OutgoingValidator.DescribeSchedule(change.Every, (PaymentUnitDto)change.Unit)} from {Day(change.EffectiveFrom)}"));
         }
 
         foreach (var period in stream.StatusPeriods.Where(p => p.Overlaps(first, last)))
