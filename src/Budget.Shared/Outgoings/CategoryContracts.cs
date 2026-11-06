@@ -10,11 +10,15 @@ public static class OutgoingCategoryRoutes
 }
 
 /// <param name="OutgoingCount">How many outgoings use it; a category in use can't be deleted.</param>
-public sealed record OutgoingCategorySummary(Guid Id, string Name, bool IsHidden, int OutgoingCount);
+/// <param name="Icon">A key from <see cref="CategoryIcons"/>.</param>
+public sealed record OutgoingCategorySummary(Guid Id, string Name, bool IsHidden, int OutgoingCount, string Icon = CategoryIcons.Default);
 
 public sealed record AddCategoryRequest
 {
     public string Name { get; init; } = string.Empty;
+
+    /// <summary>A key from <see cref="CategoryIcons"/>; <c>null</c> for the usual icon for that name.</summary>
+    public string? Icon { get; init; }
 }
 
 public sealed record UpdateCategoryRequest
@@ -22,12 +26,21 @@ public sealed record UpdateCategoryRequest
     public string Name { get; init; } = string.Empty;
 
     public bool IsHidden { get; init; }
+
+    /// <summary>A key from <see cref="CategoryIcons"/>; <c>null</c> keeps the current icon.</summary>
+    public string? Icon { get; init; }
 }
 
 /// <summary>Shared by the form and the API.</summary>
 public static class CategoryValidator
 {
     public const int NameMaxLength = 50;
+
+    /// <returns>An error keyed by "Icon" if the icon isn't one of <see cref="CategoryIcons.All"/>; empty when valid or not given.</returns>
+    public static IReadOnlyDictionary<string, string[]> ValidateIcon(string? icon) =>
+        icon is null || CategoryIcons.IsKnown(icon)
+            ? new Dictionary<string, string[]>()
+            : new Dictionary<string, string[]> { ["Icon"] = ["Choose one of the icons shown."] };
 
     /// <returns>Error messages keyed by "Name"; empty when valid.</returns>
     public static IReadOnlyDictionary<string, string[]> ValidateName(string? name)

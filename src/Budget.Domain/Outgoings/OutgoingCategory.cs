@@ -33,6 +33,32 @@ public sealed class OutgoingCategory : AuditableEntity, IHouseholdOwned
         "Discretionary spending",
     ];
 
+    /// <summary>The icon for a category that hasn't been given one (BUD-69).</summary>
+    public const string DefaultIcon = "label";
+
+    public const int IconMaxLength = 30;
+
+    /// <summary>The icon each default category starts with; other categories get <see cref="DefaultIcon"/>.</summary>
+    public static IReadOnlyDictionary<string, string> DefaultIcons { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Housing"] = "home",
+        ["Utilities"] = "bolt",
+        ["Phone & internet"] = "wifi",
+        ["Insurance"] = "shield",
+        ["Home maintenance"] = "build",
+        ["Car & travel"] = "car",
+        ["Pets"] = "pets",
+        ["Health & personal care"] = "health",
+        ["Food & household"] = "cart",
+        ["Children"] = "child",
+        ["Subscriptions & TV"] = "tv",
+        ["Leisure & memberships"] = "ticket",
+        ["Gifts & giving"] = "gift",
+        ["Banking & fees"] = "bank",
+        ["Savings & set-asides"] = "savings",
+        ["Discretionary spending"] = "wallet",
+    };
+
     private OutgoingCategory()
     {
     }
@@ -48,7 +74,11 @@ public sealed class OutgoingCategory : AuditableEntity, IHouseholdOwned
 
     public bool IsHidden { get; private set; }
 
-    public static OutgoingCategory Create(Guid householdId, string name, int sortOrder)
+    /// <summary>A key from the app's set of category icons, e.g. "home".</summary>
+    public string Icon { get; private set; } = DefaultIcon;
+
+    /// <param name="icon">Defaults to the default category's icon for that name, or <see cref="DefaultIcon"/>.</param>
+    public static OutgoingCategory Create(Guid householdId, string name, int sortOrder, string? icon = null)
     {
         if (householdId == Guid.Empty)
         {
@@ -61,6 +91,7 @@ public sealed class OutgoingCategory : AuditableEntity, IHouseholdOwned
             HouseholdId = householdId,
             Name = NormaliseName(name),
             SortOrder = sortOrder,
+            Icon = NormaliseIcon(icon ?? DefaultIcons.GetValueOrDefault(name?.Trim() ?? string.Empty, DefaultIcon)),
         };
     }
 
@@ -70,9 +101,22 @@ public sealed class OutgoingCategory : AuditableEntity, IHouseholdOwned
 
     public void Rename(string name) => Name = NormaliseName(name);
 
+    public void ChangeIcon(string icon) => Icon = NormaliseIcon(icon);
+
     public void Hide() => IsHidden = true;
 
     public void Show() => IsHidden = false;
+
+    private static string NormaliseIcon(string icon)
+    {
+        var trimmed = icon?.Trim();
+        if (string.IsNullOrEmpty(trimmed) || trimmed.Length > IconMaxLength)
+        {
+            throw new ArgumentException("An icon key is 1 to 30 characters.", nameof(icon));
+        }
+
+        return trimmed;
+    }
 
     public static string NormaliseName(string name)
     {

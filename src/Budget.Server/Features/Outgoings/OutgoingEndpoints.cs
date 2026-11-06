@@ -60,7 +60,7 @@ public static class OutgoingEndpoints
             .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync();
-        var categories = await db.OutgoingCategories.ToDictionaryAsync(c => c.Id, c => new { c.Name, c.SortOrder });
+        var categories = await db.OutgoingCategories.ToDictionaryAsync(c => c.Id, c => new { c.Name, c.SortOrder, c.Icon });
         var people = await db.People.ToDictionaryAsync(p => p.Id, p => p.DisplayName);
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
@@ -91,7 +91,8 @@ public static class OutgoingEndpoints
                     o.EndsOn,
                     o.NextRenewalOnOrAfter(today),
                     o.IsComingUp(today),
-                    o.AutoRenews);
+                    o.AutoRenews,
+                    category?.Icon ?? CategoryIcons.Default);
             })
             .OrderBy(i => i.CategorySortOrder)
             .ThenBy(i => i.CategoryName, StringComparer.CurrentCultureIgnoreCase)

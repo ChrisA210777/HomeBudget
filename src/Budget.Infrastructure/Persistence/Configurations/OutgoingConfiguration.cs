@@ -14,6 +14,8 @@ public sealed class OutgoingCategoryConfiguration : IEntityTypeConfiguration<Out
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).ValueGeneratedNever();
         builder.Property(c => c.Name).HasMaxLength(OutgoingCategory.NameMaxLength).IsRequired();
+        builder.Property(c => c.Icon).HasMaxLength(OutgoingCategory.IconMaxLength).IsUnicode(false).IsRequired()
+            .HasDefaultValue(OutgoingCategory.DefaultIcon);
 
         // Unique within a household; the collation is case-insensitive.
         builder.HasIndex(c => new { c.HouseholdId, c.Name }).IsUnique();

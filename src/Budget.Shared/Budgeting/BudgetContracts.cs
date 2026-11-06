@@ -36,4 +36,4 @@ public sealed record BudgetMonthResponse(
 public sealed record BudgetKindLine(OutgoingKindDto Kind, decimal Amount);
 
 /// <summary>A category's monthly total, in the household's category order; only categories with something in them.</summary>
-public sealed record BudgetCategoryLine(Guid CategoryId, string Name, decimal Amount);
+public sealed record BudgetCategoryLine(Guid CategoryId, string Name, decimal Amount, string Icon = CategoryIcons.Default);

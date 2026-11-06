@@ -351,7 +351,8 @@ public sealed record OutgoingMonthItem(
     DateOnly? EndsOn,
     DateOnly? NextRenewal,
     bool IsComingUp,
-    bool AutoRenews = false);
+    bool AutoRenews = false,
+    string CategoryIcon = CategoryIcons.Default);
 
 /// <summary>Totals for a set of outgoings, each rounded once from the exact amounts.</summary>
 public sealed record OutgoingTotals(decimal Total, decimal Essential, decimal Preferred, decimal Optional)
