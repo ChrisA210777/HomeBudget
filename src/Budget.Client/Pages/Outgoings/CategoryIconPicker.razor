@@ -1,0 +1,36 @@
+@* A grid of the category icons to choose from (BUD-69). Works like a set of radio buttons. *@
+@using Budget.Client.Outgoings
+@using Budget.Shared.Outgoings
+
+<div role="radiogroup" aria-label="@Label" class="category-icon-picker" data-testid="icon-picker">
+    @foreach (var icon in CategoryIcons.All)
+    {
+        var selected = icon.Key == Value;
+        <MudTooltip Text="@icon.Label" Delay="400">
+            <MudIconButton Icon="@CategoryIconSvg.For(icon.Key)"
+                           Variant="@(selected ? Variant.Filled : Variant.Text)"
+                           Color="@(selected ? Color.Primary : Color.Default)"
+                           role="radio"
+                           aria-checked="@(selected ? "true" : "false")"
+                           aria-label="@icon.Label"
+                           OnClick="() => ChooseAsync(icon.Key)"
+                           data-testid="icon-option"
+                           data-icon="@icon.Key" />
+        </MudTooltip>
+    }
+</div>
+
+@code {
+    /// <summary>The chosen icon's key.</summary>
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>Read out by screen readers for the whole group.</summary>
+    [Parameter]
+    public string Label { get; set; } = "Icon";
+
+    private Task ChooseAsync(string key) => ValueChanged.InvokeAsync(key);
+}

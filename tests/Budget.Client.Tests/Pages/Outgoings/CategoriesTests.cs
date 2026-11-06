@@ -140,6 +140,60 @@ public sealed class CategoriesTests : IDisposable
         Assert.Empty(cut.FindAll("[data-testid=delete]"));
     }
 
+    [Fact]
+    public void Each_category_shows_its_icon()
+    {
+        var cut = _context.RenderComponent<Categories>();
+
+        var icons = cut.FindAll("[data-testid=category-icon]").Select(i => i.GetAttribute("data-icon")).ToArray();
+        Assert.Equal(new[] { "home", "label", "label" }, icons);
+    }
+
+    [Fact]
+    public void An_icon_can_be_chosen_when_renaming()
+    {
+        var cut = _context.RenderComponent<Categories>();
+
+        cut.FindAll("[data-testid=rename]").ToList()[0].Click();
+        var picker = cut.Find("[data-testid=icon-picker]");
+        Assert.Equal("radiogroup", picker.GetAttribute("role"));
+        Assert.Equal("true", cut.Find("[data-testid=icon-option][data-icon=home]").GetAttribute("aria-checked"));
+
+        cut.Find("[data-testid=icon-option][data-icon=bank]").Click();
+        Assert.Equal("true", cut.Find("[data-testid=icon-option][data-icon=bank]").GetAttribute("aria-checked"));
+        Assert.Equal("false", cut.Find("[data-testid=icon-option][data-icon=home]").GetAttribute("aria-checked"));
+        cut.Find("[data-testid=rename-save]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(("Housing", "bank"), _api.Updated.Select(u => (u.Request.Name, u.Request.Icon)).Single()));
+    }
+
+    [Fact]
+    public void A_new_category_sends_the_chosen_icon_or_none_for_the_usual_one()
+    {
+        var cut = _context.RenderComponent<Categories>();
+
+        cut.Find("input[data-testid=add-name]").Change("Hobbies");
+        cut.Find("[data-testid=add-category]").Click();
+        cut.WaitForAssertion(() => Assert.Single(_api.AddedIcons));
+
+        cut.Find("input[data-testid=add-name]").Change("Coffee");
+        cut.Find("[data-testid=icon-option][data-icon=coffee]").Click();
+        cut.Find("[data-testid=add-category]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(new string?[] { null, "coffee" }, _api.AddedIcons));
+    }
+
+    [Fact]
+    public void Every_icon_on_offer_has_its_own_picture_and_a_name()
+    {
+        Assert.All(CategoryIcons.All, icon =>
+        {
+            Assert.True(CategoryIconSvg.Has(icon.Key), icon.Key);
+            Assert.False(string.IsNullOrWhiteSpace(icon.Label));
+        });
+        Assert.Equal(CategoryIcons.All.Count, CategoryIcons.All.Select(i => CategoryIconSvg.For(i.Key)).Distinct().Count());
+    }
+
     public void Dispose() => _context.Dispose();
 
     private void UseRole(string role, bool isOwner = true)
@@ -151,6 +205,8 @@ public sealed class CategoriesTests : IDisposable
     private sealed class FakeCategoryApi : ICategoryApi
     {
         public List<string> Added { get; } = [];
+
+        public List<string?> AddedIcons { get; } = [];
 
         public List<(Guid Id, UpdateCategoryRequest Request)> Updated { get; } = [];
 
@@ -165,7 +221,7 @@ public sealed class CategoriesTests : IDisposable
             ListCalls++;
             return Task.FromResult<IReadOnlyList<OutgoingCategorySummary>>(
             [
-                new(HousingId, "Housing", IsHidden: false, OutgoingCount: 2),
+                new(HousingId, "Housing", IsHidden: false, OutgoingCount: 2, Icon: "home"),
                 new(PetsId, "Pets", IsHidden: false, OutgoingCount: 0),
                 new(OldId, "Old stuff", IsHidden: true, OutgoingCount: 1),
             ]);
@@ -179,6 +235,7 @@ public sealed class CategoriesTests : IDisposable
             }
 
             Added.Add(request.Name);
+            AddedIcons.Add(request.Icon);
             return Task.FromResult(CategoryResult.Success);
         }
 

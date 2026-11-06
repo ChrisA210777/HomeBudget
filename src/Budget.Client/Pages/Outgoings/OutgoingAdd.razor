@@ -87,7 +87,12 @@
                            Variant="Variant.Outlined" data-testid="category">
                     @foreach (var category in _categories)
                     {
-                        <MudSelectItem T="Guid" Value="category.Id">@category.Name</MudSelectItem>
+                        <MudSelectItem T="Guid" Value="category.Id">
+                            <span class="d-flex align-center gap-2">
+                                <MudIcon Icon="@CategoryIconSvg.For(category.Icon)" Size="Size.Small" aria-hidden="true" />
+                                @category.Name
+                            </span>
+                        </MudSelectItem>
                     }
                 </MudSelect>
 
