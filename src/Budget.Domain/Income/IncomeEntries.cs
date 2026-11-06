@@ -1,5 +1,6 @@
 using System.Globalization;
 using Budget.Domain.Common;
+using Budget.Domain.Outgoings;
 
 namespace Budget.Domain.Income;
 
@@ -14,7 +15,11 @@ public enum IncomeStatusReason
     Other,
 }
 
-/// <summary>From <see cref="EffectiveFrom"/>, the income is <see cref="MonthlyNetAmount"/> a month.</summary>
+/// <summary>
+/// From <see cref="EffectiveFrom"/>, <see cref="Amount"/> is received every <see cref="Every"/>
+/// <see cref="Unit"/>s, e.g. Child Benefit every 4 weeks (BUD-57). The budget uses its
+/// <see cref="MonthlyEquivalent"/>.
+/// </summary>
 public sealed class IncomeAmountChange : AuditableEntity
 {
     private IncomeAmountChange()
@@ -27,29 +32,40 @@ public sealed class IncomeAmountChange : AuditableEntity
 
     public DateOnly EffectiveFrom { get; private set; }
 
-    public decimal MonthlyNetAmount { get; private set; }
+    /// <summary>What's received each time, after tax and other deductions.</summary>
+    public decimal Amount { get; private set; }
+
+    public int Every { get; private set; } = 1;
+
+    public PaymentUnit Unit { get; private set; } = PaymentUnit.Month;
 
     public string Comment { get; private set; } = string.Empty;
 
-    internal static IncomeAmountChange Create(Guid incomeStreamId, DateOnly effectiveFrom, decimal monthlyNetAmount, string comment) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        IncomeStreamId = incomeStreamId,
-        EffectiveFrom = effectiveFrom,
-        MonthlyNetAmount = IncomeTimeline.ValidAmount(monthlyNetAmount, nameof(monthlyNetAmount)),
-        Comment = IncomeTimeline.RequiredText(comment, nameof(comment)),
-    };
+    public PaymentSchedule Schedule => new(Every, Unit);
 
-    internal void Update(DateOnly effectiveFrom, decimal monthlyNetAmount, string comment)
+    /// <summary>The amount averaged into a month (weekly × 52 ÷ 12, yearly ÷ 12). Unrounded.</summary>
+    public decimal MonthlyEquivalent => Schedule.MonthlyEquivalent(Amount);
+
+    internal static IncomeAmountChange Create(Guid incomeStreamId, DateOnly effectiveFrom, decimal amount, PaymentSchedule schedule, string comment)
     {
+        var change = new IncomeAmountChange { Id = Guid.CreateVersion7(), IncomeStreamId = incomeStreamId };
+        change.Update(effectiveFrom, amount, schedule, comment);
+        return change;
+    }
+
+    internal void Update(DateOnly effectiveFrom, decimal amount, PaymentSchedule schedule, string comment)
+    {
+        var valid = schedule.Validated();
         EffectiveFrom = effectiveFrom;
-        MonthlyNetAmount = IncomeTimeline.ValidAmount(monthlyNetAmount, nameof(monthlyNetAmount));
+        Amount = IncomeTimeline.ValidAmount(amount, nameof(amount));
+        Every = valid.Every;
+        Unit = valid.Unit;
         Comment = IncomeTimeline.RequiredText(comment, nameof(comment));
     }
 
-    /// <summary>A plain description kept in the correction history, e.g. "£2,500.00 a month from 01/04/2026 (Starting amount)".</summary>
+    /// <summary>A plain description kept in the correction history, e.g. "102.20 every 4 weeks from 2026-04-06 (Child Benefit)".</summary>
     public string Describe() =>
-        string.Create(CultureInfo.InvariantCulture, $"{MonthlyNetAmount:N2} a month from {EffectiveFrom:yyyy-MM-dd} ({Comment})");
+        string.Create(CultureInfo.InvariantCulture, $"{Amount:N2} {Schedule.Describe()} from {EffectiveFrom:yyyy-MM-dd} ({Comment})");
 }
 
 /// <summary>

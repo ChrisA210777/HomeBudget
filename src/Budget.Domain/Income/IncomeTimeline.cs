@@ -3,7 +3,7 @@ namespace Budget.Domain.Income;
 /// <summary>
 /// Works out income from a stream's timeline (see ADR-009):
 /// <list type="bullet">
-/// <item>On a date: the latest amount change on or before it, replaced by the amount of any status period covering it.</item>
+/// <item>On a date: the monthly equivalent of the latest amount change on or before it (BUD-57), replaced by the amount of any status period covering it.</item>
 /// <item>For a month: pro-rata by calendar days, i.e. the average of the daily amounts in force.</item>
 /// </list>
 /// Results are unrounded; round once for display with <see cref="RoundForDisplay"/>.
@@ -27,7 +27,7 @@ public static class IncomeTimeline
         return amountChanges
             .Where(c => c.EffectiveFrom <= date)
             .OrderByDescending(c => c.EffectiveFrom)
-            .Select(c => c.MonthlyNetAmount)
+            .Select(c => c.MonthlyEquivalent)
             .FirstOrDefault();
     }
 

@@ -42,7 +42,7 @@ test('adds an income using only the keyboard', async ({ page }) => {
   await page.keyboard.press('Enter');
 
   await expect(page.getByTestId('income-name')).toHaveText('Keyboard salary');
-  await expect(page.getByTestId('amount-today')).toHaveText('£1,800.00');
+  await expect(page.getByTestId('amount-today')).toHaveText('£1,800.00 a month today');
 });
 
 test('records a pay rise using only the keyboard', async ({ page }) => {
@@ -58,7 +58,7 @@ test('records a pay rise using only the keyboard', async ({ page }) => {
   await tabTo(page, 'save');
   await page.keyboard.press('Enter');
 
-  await expect(page.getByTestId('amount-today')).toHaveText('£2,100.00');
+  await expect(page.getByTestId('amount-today')).toHaveText('£2,100.00 a month today');
 });
 
 test('renames the household using only the keyboard', async ({ page }) => {

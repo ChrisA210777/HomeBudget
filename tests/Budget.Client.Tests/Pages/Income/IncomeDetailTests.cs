@@ -18,10 +18,11 @@ public sealed class IncomeDetailTests : IncomeTestContext
         var cut = Render();
 
         Assert.Equal("Chris – salary", cut.Find("[data-testid=income-name]").TextContent.Trim());
-        Assert.Equal("£3,000.00", cut.Find("[data-testid=amount-today]").TextContent.Trim());
+        Assert.Equal("£3,000.00 a month", cut.Find("[data-testid=amount-received]").TextContent.Trim());
+        Assert.Equal("£3,000.00 a month today", cut.Find("[data-testid=amount-today]").TextContent.Trim());
         var changes = cut.FindAll("[data-testid=amount-change]").ToList();
         Assert.Equal(2, changes.Count);
-        Assert.Equal("£3,300.00", changes[0].QuerySelector("[data-testid=entry-amount]")!.TextContent.Trim());
+        Assert.Equal("£3,300.00 a month", changes[0].QuerySelector("[data-testid=entry-amount]")!.TextContent.Trim());
         Assert.NotNull(changes[0].QuerySelector("[data-testid=upcoming]"));
         Assert.Null(changes[1].QuerySelector("[data-testid=delete-entry]"));
         var period = Assert.Single(cut.FindAll("[data-testid=status-period]").ToList());
@@ -35,7 +36,7 @@ public sealed class IncomeDetailTests : IncomeTestContext
     {
         var cut = Render();
         cut.Find("[data-testid=change-amount]").Click();
-        cut.Find("input[data-testid=amount]").Change("3150");
+        cut.Find("input[data-testid=amount]").Input("3150");
         cut.Find("[data-testid=save]").Click();
 
         Assert.Empty(Api.Calls);
@@ -49,7 +50,7 @@ public sealed class IncomeDetailTests : IncomeTestContext
             var (operation, _, body) = Assert.Single(Api.Calls);
             Assert.Equal("AddAmount", operation);
             var request = Assert.IsType<SaveAmountChangeRequest>(body);
-            Assert.Equal(3150m, request.MonthlyNetAmount);
+            Assert.Equal(3150m, request.Amount);
             Assert.Equal(new DateOnly(2026, 11, 5), request.EffectiveFrom);
             Assert.Equal("5% pay rise", request.Comment);
             Assert.Null(request.CorrectionReason);
@@ -145,7 +146,7 @@ public sealed class IncomeDetailTests : IncomeTestContext
         Api.NextResult = new ApiResult<IncomeStreamDetails>(null, new Dictionary<string, string[]>(), Conflict: true);
         var cut = Render();
         cut.Find("[data-testid=change-amount]").Click();
-        cut.Find("input[data-testid=amount]").Change("3150");
+        cut.Find("input[data-testid=amount]").Input("3150");
         cut.Find("input[data-testid=comment]").Change("Pay rise");
         cut.Find("[data-testid=save]").Click();
 
@@ -165,7 +166,7 @@ public sealed class IncomeDetailTests : IncomeTestContext
         });
         var cut = Render();
         cut.Find("[data-testid=change-amount]").Click();
-        cut.Find("input[data-testid=amount]").Change("3150");
+        cut.Find("input[data-testid=amount]").Input("3150");
         cut.Find("input[data-testid=comment]").Change("Pay rise");
         cut.Find("[data-testid=save]").Click();
 

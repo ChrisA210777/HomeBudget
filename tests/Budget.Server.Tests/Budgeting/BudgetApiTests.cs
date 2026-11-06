@@ -125,7 +125,7 @@ public class BudgetApiTests(BudgetApiFactory factory) : IntegrationTestBase(fact
         {
             Name = "Salary",
             PersonId = personId,
-            MonthlyNetAmount = monthly,
+            Amount = monthly,
             StartsOn = new DateOnly(2026, 1, 1),
         });
         response.EnsureSuccessStatusCode();

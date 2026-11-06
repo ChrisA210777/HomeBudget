@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using Budget.Domain.Households;
 using Budget.Server.Tests.Infrastructure;
+using Budget.Shared.Budgeting;
 using Budget.Shared.Income;
+using Budget.Shared.Outgoings;
 using Budget.Shared.People;
 using Microsoft.AspNetCore.Http;
 
@@ -12,6 +14,51 @@ namespace Budget.Server.Tests.Income;
 public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestBase(factory)
 {
     private static readonly DateOnly January = new(2026, 1, 1);
+
+    [Fact]
+    public async Task Four_weekly_income_like_child_benefit_is_averaged_into_the_month()
+    {
+        var (client, householdId, personId) = await OwnerAsync("Chris");
+        using var response = await client.PostAsJsonAsync(Url(IncomeRoutes.IncomeStreams(householdId)), new CreateIncomeStreamRequest
+        {
+            Name = "Child Benefit", PersonId = personId, Amount = 102.20m, Every = 4, Unit = PaymentUnitDto.Week, StartsOn = new DateOnly(2026, 1, 5),
+        });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = (await response.Content.ReadFromJsonAsync<IncomeStreamDetails>())!;
+
+        var first = Assert.Single(created.AmountChanges);
+        Assert.Equal((102.20m, 4, PaymentUnitDto.Week, 110.72m), (first.Amount, first.Every, first.Unit, first.MonthlyAmount));
+        Assert.Equal((102.20m, 4, PaymentUnitDto.Week), (created.ReceivedAmount, created.Every, created.Unit));
+
+        var november = await MonthAsync(client, householdId, 2026, 11);
+        var item = Assert.Single(november.Items);
+        Assert.Equal((110.72m, 110.72m), (item.AmountForMonth, item.UsualAmount!.Value));
+        Assert.Equal((102.20m, 4, PaymentUnitDto.Week), (item.ReceivedAmount!.Value, item.Every, item.Unit));
+
+        var budget = (await client.GetFromJsonAsync<BudgetMonthResponse>(Url(BudgetRoutes.Month(householdId, 2026, 11))))!;
+        Assert.Equal(110.72m, budget.Income);
+    }
+
+    [Fact]
+    public async Task A_change_of_schedule_is_recorded_with_the_amount()
+    {
+        var (client, householdId, personId) = await OwnerAsync("Chris");
+        var created = await CreateAsync(client, householdId, personId, "Freelance", 1000m, January);
+
+        var updated = await SendAsync<IncomeStreamDetails>(client, HttpMethod.Post, IncomeRoutes.AmountChanges(householdId, created.Id), new SaveAmountChangeRequest
+        {
+            Amount = 300m, Every = 1, Unit = PaymentUnitDto.Week, EffectiveFrom = new DateOnly(2026, 6, 1), Comment = "Paid weekly now", Version = created.Version,
+        });
+        var june = await MonthAsync(client, householdId, 2026, 6);
+
+        Assert.Equal(1300m, june.Items.Single().AmountForMonth);
+        Assert.Contains(updated.AmountChanges, c => c.Unit == PaymentUnitDto.Week && c.MonthlyAmount == 1300m);
+        using var invalid = await client.PostAsJsonAsync(Url(IncomeRoutes.AmountChanges(householdId, created.Id)), new SaveAmountChangeRequest
+        {
+            Amount = 300m, Every = 0, EffectiveFrom = new DateOnly(2026, 7, 1), Comment = "Bad", Version = updated.Version,
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
 
     [Fact]
     public async Task New_income_shows_its_monthly_amount_from_when_it_starts()
@@ -46,7 +93,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
 
         var updated = await SendAsync<IncomeStreamDetails>(client, HttpMethod.Post, IncomeRoutes.AmountChanges(householdId, created.Id), new SaveAmountChangeRequest
         {
-            MonthlyNetAmount = 3300m,
+            Amount = 3300m,
             EffectiveFrom = new DateOnly(2026, 11, 16),
             Comment = "10% pay rise",
             Version = created.Version,
@@ -56,7 +103,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
         var november = Assert.Single((await MonthAsync(client, householdId, 2026, 11)).Items);
         Assert.Equal(3150m, november.AmountForMonth);
         Assert.Equal(3300m, november.UsualAmount);
-        Assert.Equal(new[] { "Changes to £3,300.00 from 16 Nov 2026" }, november.Notes);
+        Assert.Equal(new[] { "Changes to £3,300.00 a month from 16 Nov 2026" }, november.Notes);
         Assert.Equal(3300m, Assert.Single((await MonthAsync(client, householdId, 2026, 12)).Items).AmountForMonth);
     }
 
@@ -128,13 +175,13 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
         var created = await CreateAsync(client, householdId, personId, "Salary", 3000m, January);
         var withRise = await SendAsync<IncomeStreamDetails>(client, HttpMethod.Post, IncomeRoutes.AmountChanges(householdId, created.Id), new SaveAmountChangeRequest
         {
-            MonthlyNetAmount = 3200m, EffectiveFrom = new DateOnly(2026, 4, 1), Comment = "Pay rise", Version = created.Version,
+            Amount = 3200m, EffectiveFrom = new DateOnly(2026, 4, 1), Comment = "Pay rise", Version = created.Version,
         });
         var rise = withRise.AmountChanges.Single(c => !c.IsFirst);
 
         var corrected = await SendAsync<IncomeStreamDetails>(client, HttpMethod.Put, IncomeRoutes.AmountChange(householdId, created.Id, rise.Id), new SaveAmountChangeRequest
         {
-            MonthlyNetAmount = 3100m, EffectiveFrom = new DateOnly(2026, 4, 1), Comment = "Pay rise", CorrectionReason = "Typed the wrong figure", Version = withRise.Version,
+            Amount = 3100m, EffectiveFrom = new DateOnly(2026, 4, 1), Comment = "Pay rise", CorrectionReason = "Typed the wrong figure", Version = withRise.Version,
         });
         var deleted = await SendAsync<IncomeStreamDetails>(client, HttpMethod.Delete, IncomeRoutes.AmountChange(householdId, created.Id, rise.Id), new DeleteEntryRequest
         {
@@ -159,7 +206,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
 
         var duplicateDate = await ProblemAsync(client, HttpMethod.Post, IncomeRoutes.AmountChanges(householdId, created.Id), new SaveAmountChangeRequest
         {
-            MonthlyNetAmount = 3100m, EffectiveFrom = January, Comment = "Same day", Version = created.Version,
+            Amount = 3100m, EffectiveFrom = January, Comment = "Same day", Version = created.Version,
         });
         var deleteFirst = await ProblemAsync(client, HttpMethod.Delete, IncomeRoutes.AmountChange(householdId, created.Id, first.Id), new DeleteEntryRequest
         {
@@ -184,7 +231,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
     {
         var (client, householdId, personId) = await OwnerAsync("Chris");
         var created = await CreateAsync(client, householdId, personId, "Salary", 3000m, January);
-        var request = new SaveAmountChangeRequest { MonthlyNetAmount = 3100m, EffectiveFrom = new DateOnly(2026, 4, 1), Comment = "Rise", Version = created.Version };
+        var request = new SaveAmountChangeRequest { Amount = 3100m, EffectiveFrom = new DateOnly(2026, 4, 1), Comment = "Rise", Version = created.Version };
 
         using var first = await client.PostAsJsonAsync(Url(IncomeRoutes.AmountChanges(householdId, created.Id)), request);
         using var second = await client.PostAsJsonAsync(Url(IncomeRoutes.AmountChanges(householdId, created.Id)), request with { EffectiveFrom = new DateOnly(2026, 5, 1) });
@@ -223,7 +270,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
 
         var problem = await ProblemAsync(client, HttpMethod.Post, IncomeRoutes.IncomeStreams(householdId), new CreateIncomeStreamRequest
         {
-            Name = "Sneaky", PersonId = otherPerson, MonthlyNetAmount = 100m, StartsOn = January,
+            Name = "Sneaky", PersonId = otherPerson, Amount = 100m, StartsOn = January,
         });
 
         Assert.Contains("PersonId", problem.Errors.Keys);
@@ -252,7 +299,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
         using var get = await client.GetAsync(Url(IncomeRoutes.IncomeStream(householdId, theirs.Id)));
         using var change = await client.PostAsJsonAsync(Url(IncomeRoutes.AmountChanges(householdId, theirs.Id)), new SaveAmountChangeRequest
         {
-            MonthlyNetAmount = 1m, EffectiveFrom = new DateOnly(2026, 3, 1), Comment = "Hijack", Version = theirs.Version,
+            Amount = 1m, EffectiveFrom = new DateOnly(2026, 3, 1), Comment = "Hijack", Version = theirs.Version,
         });
         using var delete = await client.DeleteAsync(Url(IncomeRoutes.IncomeStream(householdId, theirs.Id)));
         var month = await MonthAsync(client, householdId, 2026, 3);
@@ -326,7 +373,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
     {
         var entry = entryId ?? Guid.NewGuid();
         var v = version ?? "AAAAAAAAAAA=";
-        var amount = new SaveAmountChangeRequest { MonthlyNetAmount = 1m, EffectiveFrom = new DateOnly(2026, 3, 1), Comment = "c", CorrectionReason = "r", Version = v };
+        var amount = new SaveAmountChangeRequest { Amount = 1m, EffectiveFrom = new DateOnly(2026, 3, 1), Comment = "c", CorrectionReason = "r", Version = v };
         var period = new SaveStatusPeriodRequest { Reason = IncomeStatusReasonDto.Holiday, StartDate = new DateOnly(2026, 3, 1), Comment = "c", CorrectionReason = "r", Version = v };
         var delete = new DeleteEntryRequest { Reason = "r", Version = v };
 
@@ -334,7 +381,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
         {
             "month" => (HttpMethod.Get, IncomeRoutes.ForMonth(householdId, 2026, 1), null),
             "create" => (HttpMethod.Post, IncomeRoutes.IncomeStreams(householdId),
-                new CreateIncomeStreamRequest { Name = "n", PersonId = personId ?? Guid.NewGuid(), MonthlyNetAmount = 1m, StartsOn = new DateOnly(2026, 1, 1) }),
+                new CreateIncomeStreamRequest { Name = "n", PersonId = personId ?? Guid.NewGuid(), Amount = 1m, StartsOn = new DateOnly(2026, 1, 1) }),
             "details" => (HttpMethod.Get, IncomeRoutes.IncomeStream(householdId, streamId), null),
             "update" => (HttpMethod.Put, IncomeRoutes.IncomeStream(householdId, streamId), new UpdateIncomeStreamRequest { Name = "n", PersonId = personId ?? Guid.NewGuid(), Version = v }),
             "delete" => (HttpMethod.Delete, IncomeRoutes.IncomeStream(householdId, streamId), null),
@@ -369,7 +416,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
     {
         using var response = await client.PostAsJsonAsync(Url(IncomeRoutes.IncomeStreams(householdId)), new CreateIncomeStreamRequest
         {
-            Name = name, PersonId = personId, MonthlyNetAmount = amount, StartsOn = startsOn,
+            Name = name, PersonId = personId, Amount = amount, StartsOn = startsOn,
         });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<IncomeStreamDetails>())!;

@@ -1,3 +1,5 @@
+using Budget.Shared.Outgoings;
+
 namespace Budget.Shared.Income;
 
 /// <summary>
@@ -11,6 +13,9 @@ public static class IncomeValidator
     public const decimal MaxAmount = 10_000_000m;
     public const string DefaultStartingComment = "Starting amount";
 
+    /// <summary>Shown under the amount: income is always what actually arrives.</summary>
+    public const string AmountHelp = "What actually reaches your account, after tax, National Insurance, pension and other deductions.";
+
     public static IReadOnlyDictionary<string, string[]> Validate(CreateIncomeStreamRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -18,8 +23,9 @@ public static class IncomeValidator
         var errors = new Errors();
         Name(errors, nameof(request.Name), request.Name);
         Person(errors, nameof(request.PersonId), request.PersonId);
-        Amount(errors, nameof(request.MonthlyNetAmount), request.MonthlyNetAmount, required: true);
-        Date(errors, nameof(request.StartsOn), request.StartsOn, "Choose when this income starts.");
+        Amount(errors, nameof(request.Amount), request.Amount, required: true);
+        Schedule(errors, nameof(request.Every), request.Every, request.Unit);
+        Date(errors, nameof(request.StartsOn), request.StartsOn, "Choose the date of the first payment.");
         if (request.Comment?.Trim().Length > CommentMaxLength)
         {
             errors.Add(nameof(request.Comment), $"The comment can be at most {CommentMaxLength} characters.");
@@ -43,7 +49,8 @@ public static class IncomeValidator
         ArgumentNullException.ThrowIfNull(request);
 
         var errors = new Errors();
-        Amount(errors, nameof(request.MonthlyNetAmount), request.MonthlyNetAmount, required: true);
+        Amount(errors, nameof(request.Amount), request.Amount, required: true);
+        Schedule(errors, nameof(request.Every), request.Every, request.Unit);
         Date(errors, nameof(request.EffectiveFrom), request.EffectiveFrom, "Choose the date the new amount applies from.");
         Text(errors, nameof(request.Comment), request.Comment, "Say why the amount is changing, e.g. \"3% pay rise\".");
         if (isCorrection)
@@ -132,7 +139,7 @@ public static class IncomeValidator
         {
             if (required)
             {
-                errors.Add(property, "Enter the monthly take-home amount.");
+                errors.Add(property, "Enter the amount received.");
             }
 
             return;
@@ -149,6 +156,19 @@ public static class IncomeValidator
         else if (decimal.Round(value, 2) != value)
         {
             errors.Add(property, "Use pounds and pence, with at most 2 decimal places.");
+        }
+    }
+
+    private static void Schedule(Errors errors, string property, int every, PaymentUnitDto unit)
+    {
+        if (every is < 1 or > OutgoingValidator.MaxEvery)
+        {
+            errors.Add(property, $"Enter a number from 1 to {OutgoingValidator.MaxEvery}.");
+        }
+
+        if (!Enum.IsDefined(unit))
+        {
+            errors.Add(nameof(SaveAmountChangeRequest.Unit), "Choose weeks, months or years.");
         }
     }
 

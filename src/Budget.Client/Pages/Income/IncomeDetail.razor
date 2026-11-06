@@ -3,6 +3,7 @@
 @using Budget.Client.Income
 @using Budget.Client.People
 @using Budget.Shared.Income
+@using Budget.Shared.Outgoings
 @using Budget.Shared.People
 @inject UserSession Session
 @inject IIncomeApi IncomeApi
@@ -33,8 +34,8 @@
                 <MudText Typo="Typo.body1" Color="Color.Secondary" data-testid="income-person">@d.PersonName</MudText>
             </div>
             <div class="text-right">
-                <MudText Typo="Typo.overline">Monthly today</MudText>
-                <MudText Typo="Typo.h5" data-testid="amount-today">@Money.Format(d.AmountToday, d.CurrencyCode)</MudText>
+                <MudText Typo="Typo.h5" data-testid="amount-received">@Money.Format(d.ReceivedAmount, d.CurrencyCode) @OutgoingValidator.DescribeSchedule(d.Every, d.Unit)</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="amount-today">@Money.Format(d.AmountToday, d.CurrencyCode) a month today</MudText>
             </div>
         </div>
         <MudText Typo="Typo.body2" Class="mb-3" data-testid="income-dates">
@@ -83,9 +84,31 @@
 
                         case Mode.ChangeAmount:
                         case Mode.CorrectAmount:
-                            <MudNumericField T="decimal?" @bind-Value="_amount" Label="Monthly take-home pay" Adornment="Adornment.Start" AdornmentText="£"
-                                             InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined"
-                                             Error="Has(nameof(SaveAmountChangeRequest.MonthlyNetAmount))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.MonthlyNetAmount))" data-testid="amount" />
+                            <div class="d-flex gap-2 flex-wrap align-start">
+                                <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount received" Immediate="true" Adornment="Adornment.Start" AdornmentText="£"
+                                                 HelperText="@IncomeValidator.AmountHelp" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined"
+                                                 Class="flex-grow-1" Style="min-width: 9rem"
+                                                 Error="Has(nameof(SaveAmountChangeRequest.Amount))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.Amount))" data-testid="amount" />
+                                <div class="d-flex gap-2">
+                                    <div style="width: 5.5rem">
+                                        <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                                         InputMode="InputMode.numeric" HideSpinButtons="true" Variant="Variant.Outlined"
+                                                         Error="Has(nameof(SaveAmountChangeRequest.Every))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.Every))" data-testid="every" />
+                                    </div>
+                                    <div style="width: 8rem">
+                                        <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Period" Variant="Variant.Outlined" data-testid="unit">
+                                            @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
+                                            {
+                                                <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </div>
+                                </div>
+                            </div>
+                            @if (OutgoingValidator.DescribeMonthlyEquivalent(_amount, _every, _unit) is { } equivalent)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Primary" aria-live="polite" data-testid="monthly-equivalent">@equivalent</MudText>
+                            }
                             <MudDatePicker @bind-Date="_date" Label="Applies from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
                                            HelperText="Can be in the future once you know about it."
                                            Error="Has(nameof(SaveAmountChangeRequest.EffectiveFrom))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.EffectiveFrom))" data-testid="date" />
@@ -163,7 +186,7 @@
                     <div class="d-flex align-start gap-2">
                         <div class="flex-grow-1" style="min-width: 0">
                             <MudText Typo="Typo.subtitle1">
-                                <b data-testid="entry-amount">@Money.Format(change.MonthlyNetAmount, d.CurrencyCode)</b> a month from @IncomeDates.Format(change.EffectiveFrom)
+                                <b data-testid="entry-amount">@Money.Format(change.Amount, d.CurrencyCode) @OutgoingValidator.DescribeSchedule(change.Every, change.Unit)</b> from @IncomeDates.Format(change.EffectiveFrom)
                                 @if (change.IsUpcoming)
                                 {
                                     <MudChip T="string" Size="Size.Small" Color="Color.Info" data-testid="upcoming">Upcoming</MudChip>
@@ -267,6 +290,8 @@
     private string? _name;
     private Guid _personId;
     private decimal? _amount;
+    private int _every = 1;
+    private PaymentUnitDto _unit = PaymentUnitDto.Month;
     private DateTime? _date;
     private DateTime? _endDate;
     private IncomeStatusReasonDto _reason = IncomeStatusReasonDto.UnpaidLeave;
@@ -317,6 +342,8 @@
         _errors = new Dictionary<string, string[]>();
         _conflict = false;
         _amount = null;
+        _every = _details?.Every ?? 1;
+        _unit = _details?.Unit ?? PaymentUnitDto.Month;
         _date = Today;
         _endDate = null;
         _comment = null;
@@ -348,7 +375,9 @@
     {
         Start(Mode.CorrectAmount);
         _entryId = change.Id;
-        _amount = change.MonthlyNetAmount;
+        _amount = change.Amount;
+        _every = change.Every;
+        _unit = change.Unit;
         _date = IncomeDates.ToDateTime(change.EffectiveFrom);
         _comment = change.Comment;
     }
@@ -357,7 +386,7 @@
     {
         Start(Mode.DeleteAmount);
         _entryId = change.Id;
-        _deleteSummary = $"{Money.Format(change.MonthlyNetAmount, _details!.CurrencyCode)} a month from {IncomeDates.Format(change.EffectiveFrom)} ({change.Comment})";
+        _deleteSummary = $"{Money.Format(change.Amount, _details!.CurrencyCode)} {OutgoingValidator.DescribeSchedule(change.Every, change.Unit)} from {IncomeDates.Format(change.EffectiveFrom)} ({change.Comment})";
     }
 
     private void StartCorrectPeriod(StatusPeriodEntry period)
@@ -376,6 +405,12 @@
         Start(Mode.DeletePeriod);
         _entryId = period.Id;
         _deleteSummary = $"{IncomeLabels.Reason(period.Reason)} {PeriodDates(period)} ({period.Comment})";
+    }
+
+    private string UnitName(PaymentUnitDto unit)
+    {
+        var word = unit.ToString().ToLowerInvariant();
+        return _every == 1 ? word : word + "s";
     }
 
     private void Cancel()
@@ -414,7 +449,9 @@
                 var isCorrection = _mode == Mode.CorrectAmount;
                 var request = new SaveAmountChangeRequest
                 {
-                    MonthlyNetAmount = _amount,
+                    Amount = _amount,
+                    Every = _every,
+                    Unit = _unit,
                     EffectiveFrom = IncomeDates.ToDateOnly(_date),
                     Comment = _comment ?? string.Empty,
                     CorrectionReason = isCorrection ? _correctionReason : null,

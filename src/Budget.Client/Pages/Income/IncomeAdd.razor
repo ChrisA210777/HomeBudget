@@ -3,6 +3,7 @@
 @using Budget.Client.Income
 @using Budget.Client.People
 @using Budget.Shared.Income
+@using Budget.Shared.Outgoings
 @using Budget.Shared.People
 @inject UserSession Session
 @inject IIncomeApi IncomeApi
@@ -42,12 +43,34 @@
                 </MudSelect>
                 <MudText Typo="Typo.caption">Someone missing? <MudLink Href="/people">Add them on the People page</MudLink>.</MudText>
 
-                <MudNumericField T="decimal?" @bind-Value="_amount" Label="Monthly take-home pay"
-                                 Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
-                                 Error="Has(nameof(CreateIncomeStreamRequest.MonthlyNetAmount))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.MonthlyNetAmount))"
-                                 Variant="Variant.Outlined" data-testid="amount" />
+                <div class="d-flex gap-2 flex-wrap align-start">
+                    <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount received" Immediate="true" HelperText="@IncomeValidator.AmountHelp"
+                                     Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
+                                     Error="Has(nameof(CreateIncomeStreamRequest.Amount))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.Amount))"
+                                     Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem" data-testid="amount" />
+                    <div class="d-flex gap-2">
+                        <div style="width: 5.5rem">
+                            <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                             InputMode="InputMode.numeric" HideSpinButtons="true"
+                                             Error="Has(nameof(CreateIncomeStreamRequest.Every))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.Every))"
+                                             Variant="Variant.Outlined" data-testid="every" />
+                        </div>
+                        <div style="width: 8rem">
+                            <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Period" Variant="Variant.Outlined" data-testid="unit">
+                                @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
+                                {
+                                    <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </div>
+                    </div>
+                </div>
+                @if (OutgoingValidator.DescribeMonthlyEquivalent(_amount, _every, _unit) is { } equivalent)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Primary" aria-live="polite" data-testid="monthly-equivalent">@equivalent</MudText>
+                }
 
-                <MudDatePicker @bind-Date="_startsOn" Label="Starts from" DateFormat="d MMM yyyy"
+                <MudDatePicker @bind-Date="_startsOn" Label="First payment" DateFormat="d MMM yyyy"
                                Error="Has(nameof(CreateIncomeStreamRequest.StartsOn))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.StartsOn))"
                                Variant="Variant.Outlined" data-testid="starts-on" />
 
@@ -80,6 +103,8 @@
     private string? _name;
     private Guid _personId;
     private decimal? _amount;
+    private int _every = 1;
+    private PaymentUnitDto _unit = PaymentUnitDto.Month;
     private DateTime? _startsOn;
     private string? _comment;
 
@@ -105,7 +130,9 @@
         {
             Name = _name ?? string.Empty,
             PersonId = _personId,
-            MonthlyNetAmount = _amount,
+            Amount = _amount,
+            Every = _every,
+            Unit = _unit,
             StartsOn = IncomeDates.ToDateOnly(_startsOn),
             Comment = _comment,
         };
@@ -132,6 +159,12 @@
         {
             _saving = false;
         }
+    }
+
+    private string UnitName(PaymentUnitDto unit)
+    {
+        var word = unit.ToString().ToLowerInvariant();
+        return _every == 1 ? word : word + "s";
     }
 
     private string PersonName(Guid id) => _people.FirstOrDefault(p => p.Id == id)?.DisplayName ?? string.Empty;

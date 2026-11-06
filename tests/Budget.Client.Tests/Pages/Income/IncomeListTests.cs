@@ -1,18 +1,33 @@
 using Budget.Client.Pages.Income;
 using Budget.Shared.Income;
+using Budget.Shared.Outgoings;
 
 namespace Budget.Client.Tests.Pages.Income;
 
 public sealed class IncomeListTests : IncomeTestContext
 {
     [Fact]
+    public void Income_not_paid_monthly_shows_what_is_received()
+    {
+        Api.Month = new IncomeMonthResponse(2026, 11,
+        [
+            new(Guid.NewGuid(), "Child Benefit", Guid.NewGuid(), "Chris Austin", 110.72m, 110.72m, 102.20m, 4, PaymentUnitDto.Week, [], new DateOnly(2026, 1, 5), null),
+        ], 110.72m, "GBP");
+
+        var cut = Context.RenderComponent<IncomeList>();
+
+        Assert.Equal("£110.72", cut.Find("[data-testid=income-amount]").TextContent.Trim());
+        Assert.Equal("£102.20 every 4 weeks", cut.Find("[data-testid=income-received]").TextContent.Trim());
+    }
+
+    [Fact]
     public void Shows_this_months_income_with_the_total_and_why_it_differs()
     {
         Api.Month = new IncomeMonthResponse(2026, 11,
         [
-            new(Guid.NewGuid(), "Chris – salary", Guid.NewGuid(), "Chris Austin", 1735m, 3000m,
+            new(Guid.NewGuid(), "Chris – salary", Guid.NewGuid(), "Chris Austin", 1735m, 3000m, 3000m, 1, PaymentUnitDto.Month,
                 ["Sick leave 16 Nov 2026 – until further notice (£470.00 a month)"], new DateOnly(2026, 1, 1), null),
-            new(Guid.NewGuid(), "Jane – cleaning", Guid.NewGuid(), "Jane", 850m, 850m, [], new DateOnly(2026, 1, 1), null),
+            new(Guid.NewGuid(), "Jane – cleaning", Guid.NewGuid(), "Jane", 850m, 850m, 850m, 1, PaymentUnitDto.Month, [], new DateOnly(2026, 1, 1), null),
         ], 2585m, "GBP");
 
         var cut = Context.RenderComponent<IncomeList>();
