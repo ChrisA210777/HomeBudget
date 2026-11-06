@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Budget.Shared;
+using Budget.Shared.Account;
 using Budget.Shared.Households;
 
 namespace Budget.Client.Households;
@@ -15,8 +17,21 @@ public sealed record RenameHouseholdResult(HouseholdResponse? Household, IReadOn
     public bool Conflict => CurrentName is not null;
 }
 
+/// <summary>The outcome of creating a household: the new household, or field errors.</summary>
+public sealed record CreateHouseholdResult(HouseholdResponse? Household, IReadOnlyDictionary<string, string[]> Errors)
+{
+    public bool Succeeded => Household is not null;
+}
+
 public interface IHouseholdApi
 {
+    /// <summary>Creates a household owned by the signed-in user. It becomes their active household.</summary>
+    Task<CreateHouseholdResult> CreateAsync(CreateHouseholdRequest request);
+
+    /// <summary>Switches the signed-in user to another of their households.</summary>
+    /// <returns>False if they're no longer a member of it.</returns>
+    Task<bool> SwitchToAsync(Guid householdId);
+
     Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request);
 
     /// <returns>The household's members, owner first, then by name.</returns>
@@ -35,6 +50,31 @@ public interface IHouseholdApi
 
 public sealed class HouseholdApi(HttpClient http) : IHouseholdApi
 {
+    public async Task<CreateHouseholdResult> CreateAsync(CreateHouseholdRequest request)
+    {
+        using var response = await http.PostAsJsonAsync(new Uri(HouseholdRoutes.Households, UriKind.Relative), request);
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>();
+            return new CreateHouseholdResult(null, problem?.Errors ?? []);
+        }
+
+        response.EnsureSuccessStatusCode();
+        return new CreateHouseholdResult(await response.Content.ReadFromJsonAsync<HouseholdResponse>(), new Dictionary<string, string[]>());
+    }
+
+    public async Task<bool> SwitchToAsync(Guid householdId)
+    {
+        using var response = await http.PutAsJsonAsync(new Uri(AccountRoutes.ActiveHousehold, UriKind.Relative), new SetActiveHouseholdRequest(householdId));
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
     public async Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId) =>
         await http.GetFromJsonAsync<List<HouseholdMemberSummary>>(new Uri(MemberRoutes.Members(householdId), UriKind.Relative)) ?? [];
 

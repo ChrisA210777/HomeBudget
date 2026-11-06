@@ -17,11 +17,36 @@ public static class AccountEndpoints
         app.MapGet(AccountRoutes.LoginTemplate, LoginAsync).AllowAnonymous();
         app.MapGet(AccountRoutes.ExternalCallback, ExternalCallbackAsync).AllowAnonymous();
         app.MapGet(AccountRoutes.CurrentUser, GetCurrentUserAsync).RequireAuthorization();
+        app.MapPut(AccountRoutes.ActiveHousehold, SetActiveHouseholdAsync).RequireAuthorization();
 
         // Anonymous so that signing out always succeeds, even if the session has already expired.
         app.MapPost(AccountRoutes.Logout, LogoutAsync).AllowAnonymous();
 
         return app;
+    }
+
+    /// <summary>Switches the user's active household (BUD-20). It's remembered for their next sign-in.</summary>
+    private static async Task<IResult> SetActiveHouseholdAsync(
+        SetActiveHouseholdRequest request,
+        ClaimsPrincipal principal,
+        UserManager<ApplicationUser> users,
+        BudgetDbContext db)
+    {
+        var user = await users.GetUserAsync(principal);
+        if (user is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // Not a member, or no such household: the same answer, so it doesn't reveal which exist.
+        if (!await db.HouseholdMembers.AnyAsync(m => m.UserId == user.Id && m.HouseholdId == request.HouseholdId))
+        {
+            return Results.NotFound();
+        }
+
+        user.LastActiveHouseholdId = request.HouseholdId;
+        var updated = await users.UpdateAsync(user);
+        return updated.Succeeded ? Results.NoContent() : Results.Problem("Couldn't switch household.");
     }
 
     private static async Task<IReadOnlyList<AuthProvider>> GetProvidersAsync(SignInManager<ApplicationUser> signInManager)

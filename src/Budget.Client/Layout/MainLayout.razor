@@ -22,14 +22,12 @@
                                OnClick="ToggleDrawer" data-testid="drawer-toggle" />
             </Authorized>
         </AuthorizeView>
-        <a href="/" class="app-title" data-testid="app-title">
-            <span class="@(_household is null ? "" : "d-none d-sm-inline")">Home Budget</span>
-            @if (_household is not null)
-            {
-                <span class="app-title-separator d-none d-sm-inline" aria-hidden="true">·</span>
-                <span class="app-household" data-testid="appbar-household">@_household.Name</span>
-            }
-        </a>
+        <a href="/" class="app-title @(_household is null ? "" : "d-none d-sm-inline-flex")" data-testid="app-title">Home Budget</a>
+        @if (_household is not null)
+        {
+            <span class="app-title-separator d-none d-sm-inline mx-1" aria-hidden="true">·</span>
+            <HouseholdSwitcher Active="_household" Households="_households" />
+        }
         <MudSpacer />
         <UserMenu />
     </MudAppBar>
@@ -94,6 +92,7 @@
     private MudThemeProvider? _themeProvider;
     private ErrorBoundary? _errorBoundary;
     private HouseholdMembershipSummary? _household;
+    private IReadOnlyList<HouseholdMembershipSummary> _households = [];
     private bool _drawerOpen = true;
     private bool _systemIsDark;
     private bool _isDarkMode;
@@ -134,10 +133,12 @@
         try
         {
             _household = await Session.GetActiveHouseholdAsync();
+            _households = (await Session.GetCurrentUserAsync())?.Households ?? [];
         }
         catch (HttpRequestException)
         {
             _household = null;
+            _households = [];
         }
     }
 

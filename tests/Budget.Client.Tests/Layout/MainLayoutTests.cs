@@ -18,6 +18,7 @@ public sealed class MainLayoutTests : IDisposable
     {
         _context.Services.AddMudServices();
         _context.Services.AddSingleton<IAccountApi>(new FakeAccountApi());
+        _context.Services.AddSingleton<Budget.Client.Households.IHouseholdApi>(new RecordingHouseholdApi());
         _context.Services.AddScoped<UserSession>();
         _context.Services.AddScoped<ThemePreference>();
         _context.Services.AddScoped<Connectivity>();

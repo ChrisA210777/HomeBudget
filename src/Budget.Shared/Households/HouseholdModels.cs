@@ -5,6 +5,9 @@ public static class HouseholdRoutes
     /// <summary>All household-scoped API routes start with this (see Roles &amp; Permissions).</summary>
     public const string Base = "/api/households/{householdId:guid}";
 
+    /// <summary>POST (any signed-in user): create another household, owned by the caller (BUD-21).</summary>
+    public const string Households = "/api/households";
+
     /// <summary>GET: the household's details and the caller's role in it. PUT (Admins): rename it.</summary>
     public static string Household(Guid householdId) => $"/api/households/{householdId}";
 }
@@ -31,6 +34,14 @@ public sealed record RenameHouseholdRequest
     public string? PreviousName { get; init; }
 }
 
+/// <summary>Create another household. The caller becomes its owner and it becomes their active household.</summary>
+public sealed record CreateHouseholdRequest
+{
+    public const string DefaultName = "My Household";
+
+    public string Name { get; init; } = DefaultName;
+}
+
 /// <summary>Shared by the form and the API.</summary>
 public static class HouseholdValidator
 {
@@ -40,8 +51,19 @@ public static class HouseholdValidator
     public static IReadOnlyDictionary<string, string[]> Validate(RenameHouseholdRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        return ValidateName(request.Name);
+    }
 
-        var name = request.Name?.Trim() ?? string.Empty;
+    /// <returns>Error messages keyed by property name; empty when valid.</returns>
+    public static IReadOnlyDictionary<string, string[]> Validate(CreateHouseholdRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return ValidateName(request.Name);
+    }
+
+    private static IReadOnlyDictionary<string, string[]> ValidateName(string? requested)
+    {
+        var name = requested?.Trim() ?? string.Empty;
         string? error = name.Length switch
         {
             0 => "Enter a name for the household.",
@@ -51,6 +73,6 @@ public static class HouseholdValidator
 
         return error is null
             ? new Dictionary<string, string[]>()
-            : new Dictionary<string, string[]> { [nameof(RenameHouseholdRequest.Name)] = [error] };
+            : new Dictionary<string, string[]> { ["Name"] = [error] };
     }
 }

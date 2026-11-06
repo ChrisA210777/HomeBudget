@@ -82,12 +82,13 @@ body {
     font-weight: 500;
 }
 
-.app-household {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 50vw;
+/* The household switcher (BUD-20): the household's name, shortened in code if it's long. */
+.household-switcher .mud-button-root {
+    text-transform: none;
+    font-size: 1.25rem;
     font-weight: 400;
+    min-height: 44px;
+    white-space: nowrap;
 }
 
 .app-title-separator {

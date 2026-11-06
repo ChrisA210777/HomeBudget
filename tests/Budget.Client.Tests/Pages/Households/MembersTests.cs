@@ -183,6 +183,10 @@ public sealed class MembersTests : IDisposable
 
         public bool YouOwn { get; set; }
 
+        public Task<CreateHouseholdResult> CreateAsync(CreateHouseholdRequest request) => throw new NotSupportedException();
+
+        public Task<bool> SwitchToAsync(Guid householdId) => throw new NotSupportedException();
+
         public Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request) =>
             throw new NotSupportedException();
 
