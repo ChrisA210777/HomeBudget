@@ -32,6 +32,9 @@ public static class AccountRoutes
     /// <summary>GET: the signed-in user, or 401 if nobody is signed in.</summary>
     public const string CurrentUser = "/bff/user";
 
+    /// <summary>PUT: switch the signed-in user's active household (BUD-20). 404 if they aren't a member.</summary>
+    public const string ActiveHousehold = "/bff/user/active-household";
+
     /// <summary>POST: signs out by clearing the session cookie. Returns 204.</summary>
     public const string Logout = "/bff/logout";
 

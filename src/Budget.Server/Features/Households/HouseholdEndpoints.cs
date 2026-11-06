@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Budget.Domain.Households;
+using Budget.Domain.Outgoings;
+using Budget.Domain.People;
 using Budget.Infrastructure.Persistence;
 using Budget.Shared.Households;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,8 @@ public static class HouseholdEndpoints
 {
     public static IEndpointRouteBuilder MapHouseholdEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapPost(HouseholdRoutes.Households, CreateAsync).RequireAuthorization();
+
         // Every endpoint in this group is household-scoped: give each one a household policy.
         var household = app.MapGroup(HouseholdRoutes.Base);
 
@@ -38,6 +42,37 @@ public static class HouseholdEndpoints
         return members
             .Select(m => new HouseholdMemberSummary(m.UserId, m.DisplayName, m.Email, m.Role.ToString(), m.IsOwner, m.JoinedAt))
             .ToList();
+    }
+
+    /// <summary>
+    /// Creates another household (BUD-21), set up as on sign-up: the caller is its owner and an Admin, with a
+    /// person linked to their login and the default outgoing categories. It becomes their active household.
+    /// </summary>
+    private static async Task<IResult> CreateAsync(
+        CreateHouseholdRequest request,
+        ClaimsPrincipal principal,
+        BudgetDbContext db,
+        TimeProvider time)
+    {
+        var errors = HouseholdValidator.Validate(request);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var user = await db.Users.SingleAsync(u => u.Id == userId);
+
+        var household = Household.Create(userId, time.GetUtcNow(), request.Name);
+        db.Households.Add(household);
+        db.People.Add(Person.CreateForUser(household.Id, userId, user.DisplayName));
+        db.OutgoingCategories.AddRange(OutgoingCategory.CreateDefaults(household.Id));
+        user.LastActiveHouseholdId = household.Id;
+        await db.SaveChangesAsync();
+
+        return Results.Created(
+            HouseholdRoutes.Household(household.Id),
+            new HouseholdResponse(household.Id, household.Name, household.CurrencyCode, nameof(HouseholdRole.Admin), IsOwner: true, MemberCount: 1));
     }
 
     private static async Task<IResult> ChangeRoleAsync(Guid householdId, Guid userId, ChangeRoleRequest request, BudgetDbContext db)

@@ -247,6 +247,10 @@ public sealed class HomeTests : IDisposable
 
         public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
 
+        public Task<CreateHouseholdResult> CreateAsync(CreateHouseholdRequest request) => throw new NotSupportedException();
+
+        public Task<bool> SwitchToAsync(Guid householdId) => throw new NotSupportedException();
+
         public Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request)
         {
             Renames.Add((householdId, request));

@@ -1,0 +1,63 @@
+@page "/households/new"
+@attribute [Authorize]
+@using Budget.Client.Households
+@using Budget.Shared.Households
+@inject IHouseholdApi HouseholdApi
+@inject NavigationManager Navigation
+
+<PageTitle>Create household · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/" Class="mb-2">Home</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-2">Create household</h1>
+    <MudText Typo="Typo.body2" Class="mb-4">
+        Keep a separate budget, for example for a parent you help. You'll be its owner, and you can switch between your households from the app bar.
+    </MudText>
+
+    <MudPaper Class="pa-4" Elevation="1">
+        <MudTextField @bind-Value="_name" Label="Household name" MaxLength="HouseholdValidator.NameMaxLength" Variant="Variant.Outlined"
+                      Error="_error is not null" ErrorText="@_error" Immediate="true" data-testid="household-name" />
+        <div class="d-flex gap-2 mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddHome" OnClick="CreateAsync" Disabled="@(_saving || !Online)" data-testid="create">Create</MudButton>
+            <MudButton Variant="Variant.Text" Href="/">Cancel</MudButton>
+        </div>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    private string? _name = CreateHouseholdRequest.DefaultName;
+    private string? _error;
+    private bool _saving;
+
+    private async Task CreateAsync()
+    {
+        var request = new CreateHouseholdRequest { Name = _name ?? string.Empty };
+        _error = HouseholdValidator.Validate(request).Values.SelectMany(v => v).FirstOrDefault();
+        if (_error is not null)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await HouseholdApi.CreateAsync(request);
+            if (!result.Succeeded)
+            {
+                _error = result.Errors.Values.SelectMany(v => v).FirstOrDefault();
+                return;
+            }
+
+            // It's now the active household: reload so every part of the app uses it.
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

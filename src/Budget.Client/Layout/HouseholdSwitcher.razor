@@ -1,0 +1,60 @@
+@* The active household's name in the app bar, as a menu to switch household (BUD-20) or create one (BUD-21). *@
+@using Budget.Client.Households
+@inject IHouseholdApi HouseholdApi
+@inject NavigationManager Navigation
+
+<MudMenu Label="@Shorten(Active.Name)"
+         EndIcon="@Icons.Material.Filled.ArrowDropDown"
+         Variant="Variant.Text"
+         Color="Color.Inherit"
+         AnchorOrigin="Origin.BottomLeft"
+         TransformOrigin="Origin.TopLeft"
+         AriaLabel="@($"Household: {Active.Name}. Switch or create a household")"
+         Class="household-switcher"
+         data-testid="appbar-household">
+    <ChildContent>
+        <MudText Typo="Typo.overline" Class="px-4 pt-2">Your households</MudText>
+        @foreach (var household in Households)
+        {
+            var isActive = household.HouseholdId == Active.HouseholdId;
+            <MudMenuItem Icon="@(isActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Home)"
+                         OnClick="() => SwitchAsync(household)"
+                         data-active="@(isActive ? "true" : "false")"
+                         data-testid="switch-household">
+                <span data-testid="switch-household-name">@household.Name</span>
+                <span class="mud-text-secondary ml-1">· @(household.IsOwner ? "Owner" : household.Role)</span>
+                @if (isActive)
+                {
+                    <span class="visually-hidden"> (current)</span>
+                }
+            </MudMenuItem>
+        }
+        <MudDivider Class="my-1" />
+        <MudMenuItem Icon="@Icons.Material.Filled.AddHome" Href="/households/new" data-testid="create-household">Create household</MudMenuItem>
+    </ChildContent>
+</MudMenu>
+
+@code {
+    [Parameter, EditorRequired]
+    public HouseholdMembershipSummary Active { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<HouseholdMembershipSummary> Households { get; set; } = [];
+
+    /// <summary>Long names are shortened so the app bar fits on a phone; the full name is in the menu and its label.</summary>
+    private static string Shorten(string name) => name.Length <= 24 ? name : $"{name[..23].TrimEnd()}…";
+
+    private async Task SwitchAsync(HouseholdMembershipSummary household)
+    {
+        if (household.HouseholdId == Active.HouseholdId)
+        {
+            return;
+        }
+
+        // If they've lost access to it meanwhile, the reload opens another of their households.
+        await HouseholdApi.SwitchToAsync(household.HouseholdId);
+
+        // Every page's data belongs to a household, so start again from Home with the new one.
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

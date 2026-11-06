@@ -196,3 +196,41 @@ public sealed class FakeRenewalApi : IRenewalApi
 
     public Task<IReadOnlyList<RenewalComingUp>> ComingUpAsync(Guid householdId) => Task.FromResult(ComingUp);
 }
+
+/// <summary>Records household switches and creations; the rest isn't used by the tests that need this.</summary>
+public sealed class RecordingHouseholdApi : Budget.Client.Households.IHouseholdApi
+{
+    public List<Guid> SwitchedTo { get; } = [];
+
+    public List<Budget.Shared.Households.CreateHouseholdRequest> Created { get; } = [];
+
+    public Dictionary<string, string[]>? CreateErrors { get; set; }
+
+    public Task<Budget.Client.Households.CreateHouseholdResult> CreateAsync(Budget.Shared.Households.CreateHouseholdRequest request)
+    {
+        Created.Add(request);
+        return Task.FromResult(CreateErrors is { } errors
+            ? new Budget.Client.Households.CreateHouseholdResult(null, errors)
+            : new Budget.Client.Households.CreateHouseholdResult(
+                new Budget.Shared.Households.HouseholdResponse(Guid.NewGuid(), request.Name.Trim(), "GBP", "Admin", true, 1),
+                new Dictionary<string, string[]>()));
+    }
+
+    public Task<bool> SwitchToAsync(Guid householdId)
+    {
+        SwitchedTo.Add(householdId);
+        return Task.FromResult(true);
+    }
+
+    public Task<Budget.Client.Households.RenameHouseholdResult> RenameAsync(Guid householdId, Budget.Shared.Households.RenameHouseholdRequest request) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<Budget.Shared.Households.HouseholdMemberSummary>> GetMembersAsync(Guid householdId) =>
+        throw new NotSupportedException();
+
+    public Task<string?> ChangeRoleAsync(Guid householdId, Guid userId, string role) => throw new NotSupportedException();
+
+    public Task<string?> RemoveMemberAsync(Guid householdId, Guid userId) => throw new NotSupportedException();
+
+    public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
+}
