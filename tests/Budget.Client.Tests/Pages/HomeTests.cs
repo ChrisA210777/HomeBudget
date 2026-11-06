@@ -241,6 +241,12 @@ public sealed class HomeTests : IDisposable
         public Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId) =>
             Task.FromResult<IReadOnlyList<HouseholdMemberSummary>>([]);
 
+        public Task<string?> ChangeRoleAsync(Guid householdId, Guid userId, string role) => throw new NotSupportedException();
+
+        public Task<string?> RemoveMemberAsync(Guid householdId, Guid userId) => throw new NotSupportedException();
+
+        public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
+
         public Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request)
         {
             Renames.Add((householdId, request));

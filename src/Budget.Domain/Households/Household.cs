@@ -75,6 +75,67 @@ public sealed class Household : AuditableEntity
         return member;
     }
 
+    /// <summary>
+    /// Changes a member's role. The owner's role can't change, and the household must keep at least one Admin.
+    /// </summary>
+    /// <remarks>The household's members must be loaded.</remarks>
+    /// <exception cref="HouseholdMembershipException">The change isn't allowed; the message explains why.</exception>
+    public void ChangeRole(Guid userId, HouseholdRole role)
+    {
+        if (!Enum.IsDefined(role))
+        {
+            throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown household role.");
+        }
+
+        var member = FindMember(userId);
+        if (member.Role == role)
+        {
+            return;
+        }
+
+        if (member.IsOwner)
+        {
+            throw new HouseholdMembershipException("The owner's role can't be changed. The owner is always an Admin.");
+        }
+
+        if (member.Role == HouseholdRole.Admin && IsLastAdmin(member))
+        {
+            throw new HouseholdMembershipException("The household needs at least one Admin. Make someone else an Admin first.");
+        }
+
+        member.ChangeRole(role);
+    }
+
+    /// <summary>
+    /// Removes a member, whether an Admin removes them or they leave. The owner can't be removed,
+    /// and the household must keep at least one Admin.
+    /// </summary>
+    /// <remarks>The household's members must be loaded.</remarks>
+    /// <exception cref="HouseholdMembershipException">The removal isn't allowed; the message explains why.</exception>
+    public void RemoveMember(Guid userId)
+    {
+        var member = FindMember(userId);
+        if (member.IsOwner)
+        {
+            throw new HouseholdMembershipException(
+                "The owner can't leave or be removed. Handing ownership to someone else is coming later; until then the owner can delete the household instead.");
+        }
+
+        if (member.Role == HouseholdRole.Admin && IsLastAdmin(member))
+        {
+            throw new HouseholdMembershipException("The household needs at least one Admin. Make someone else an Admin first.");
+        }
+
+        _members.Remove(member);
+    }
+
+    private HouseholdMember FindMember(Guid userId) =>
+        _members.SingleOrDefault(m => m.UserId == userId)
+        ?? throw new KeyNotFoundException("That user isn't a member of this household.");
+
+    private bool IsLastAdmin(HouseholdMember member) =>
+        !_members.Any(m => m != member && m.Role == HouseholdRole.Admin);
+
     /// <summary>Trims the name and checks it is between 1 and <see cref="NameMaxLength"/> characters.</summary>
     public static string NormaliseName(string name)
     {

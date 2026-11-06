@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { settled, signIn } from './helpers';
+import { choose, settled, signIn, signInAsMemberOf } from './helpers';
 
 test('members are listed with their role, owner badge and join date', async ({ page }) => {
   const name = await signIn(page);
@@ -16,4 +16,41 @@ test('members are listed with their role, owner badge and join date', async ({ p
   await expect(me.getByTestId('member-role')).toHaveText('Admin');
   await expect(me.getByTestId('member-owner')).toHaveText('Owner');
   await expect(me.getByTestId('member-joined')).toHaveText(/^Joined \d{1,2} \w{3} \d{4}$/);
+  await expect(page.getByTestId('owner-cant-leave')).toBeVisible();
+});
+
+test("an admin can change a member's role and remove them", async ({ page }) => {
+  const owner = await signIn(page);
+  const member = await signInAsMemberOf(page, owner, 'Viewer');
+  await signIn(page, owner);
+
+  await page.goto('/members');
+  await settled(page);
+  const row = page.getByTestId('member').filter({ hasText: member });
+  await expect(row.getByTestId('member-role')).toHaveText('Viewer');
+
+  await choose(page, 'role-select', 'User');
+  await expect(page.getByText(`${member} is now a User.`)).toBeVisible();
+  await expect(row.getByTestId('member-role')).toHaveText('User');
+
+  await row.getByTestId('remove-member').click();
+  await expect(row.getByTestId('remove-confirm')).toContainText(`Remove ${member} from this household?`);
+  await row.getByTestId('remove-yes').click();
+  await expect(page.getByText(`${member} was removed.`)).toBeVisible();
+  await expect(page.getByTestId('member')).toHaveCount(1);
+});
+
+test('a member can leave and goes back to their own household', async ({ page }) => {
+  const owner = await signIn(page);
+  await signInAsMemberOf(page, owner, 'Viewer');
+  await expect(page.getByTestId('household-role')).toHaveText('Your role in this household: Viewer.');
+
+  await page.goto('/members');
+  await settled(page);
+  await expect(page.getByTestId('member')).toHaveCount(2);
+  await page.getByTestId('leave').click();
+  await page.getByTestId('leave-yes').click();
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId('household-role')).toHaveText("You're the owner of this household.");
 });

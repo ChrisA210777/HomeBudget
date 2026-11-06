@@ -40,6 +40,9 @@ public sealed class Person : AuditableEntity, IHouseholdOwned
         };
     }
 
+    /// <summary>Unlinks the person from their login, e.g. when that member leaves. The person and their income stay.</summary>
+    public void Unlink() => LinkedUserId = null;
+
     /// <summary>A person for a login, using their name from the sign-in provider (shortened if needed).</summary>
     public static Person CreateForUser(Guid householdId, Guid userId, string? userDisplayName)
     {
