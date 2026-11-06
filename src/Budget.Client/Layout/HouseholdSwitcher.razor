@@ -30,6 +30,10 @@
             </MudMenuItem>
         }
         <MudDivider Class="my-1" />
+        @if (Active.Role == "Admin")
+        {
+            <MudMenuItem Icon="@Icons.Material.Filled.ImportExport" Href="/household/data" data-testid="household-data">Download or import data</MudMenuItem>
+        }
         <MudMenuItem Icon="@Icons.Material.Filled.AddHome" Href="/households/new" data-testid="create-household">Create household</MudMenuItem>
     </ChildContent>
 </MudMenu>

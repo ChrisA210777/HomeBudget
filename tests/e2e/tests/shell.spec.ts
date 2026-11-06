@@ -42,7 +42,7 @@ test('nothing scrolls sideways', async ({ page }) => {
   await signIn(page);
   const incomePage = await addIncome(page, 'Salary', '2500');
 
-  for (const path of ['/', '/budget', '/income', '/income/new', '/people', '/members', '/households/new', '/outgoings', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname]) {
+  for (const path of ['/', '/budget', '/income', '/income/new', '/people', '/members', '/households/new', '/household/data', '/outgoings', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname]) {
     await page.goto(path);
     await settled(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

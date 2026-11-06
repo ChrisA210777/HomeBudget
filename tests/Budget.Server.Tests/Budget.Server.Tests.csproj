@@ -19,6 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Golden export files and the format's schema snapshot (BUD-64). -->
+    <None Include="..\ImportCompatibility\**\*.json" LinkBase="ImportCompatibility" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Budget.Server\Budget.Server.csproj" />
   </ItemGroup>
 
