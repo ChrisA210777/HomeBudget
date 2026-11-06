@@ -51,6 +51,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.HasKey("Id");
 
                     b.ToTable("Households", (string)null);
@@ -81,6 +88,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -128,6 +142,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -184,6 +205,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -223,6 +251,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Reason")
                         .IsRequired()
@@ -267,6 +302,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<Guid>("PersonId")
                         .HasColumnType("uniqueidentifier");
@@ -336,6 +378,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("PaidFrom")
                         .HasMaxLength(100)
@@ -423,6 +472,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<Guid>("OutgoingId")
                         .HasColumnType("uniqueidentifier");
 
@@ -475,6 +531,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
@@ -525,6 +588,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<Guid>("OutgoingId")
                         .HasColumnType("uniqueidentifier");
 
@@ -561,6 +631,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<Guid>("OutgoingId")
                         .HasColumnType("uniqueidentifier");
@@ -610,6 +687,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
 
