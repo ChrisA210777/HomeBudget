@@ -64,7 +64,7 @@ public sealed class HouseholdSwitcherTests : IDisposable
         Navigation.NavigateTo("/outgoings");
 
         cut.Find("[data-testid=appbar-household] button").Click();
-        popovers.WaitForElements("[data-testid=switch-household]")[1].Click();
+        popovers.WaitForElements("[data-testid=switch-household]").ToList()[1].Click();
 
         cut.WaitForAssertion(() =>
         {
@@ -81,7 +81,7 @@ public sealed class HouseholdSwitcherTests : IDisposable
         var cut = Render(Ours);
 
         cut.Find("[data-testid=appbar-household] button").Click();
-        popovers.WaitForElements("[data-testid=switch-household]")[0].Click();
+        popovers.WaitForElements("[data-testid=switch-household]").ToList()[0].Click();
 
         Assert.Empty(_api.SwitchedTo);
     }
