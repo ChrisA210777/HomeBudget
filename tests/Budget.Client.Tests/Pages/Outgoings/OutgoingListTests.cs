@@ -59,7 +59,7 @@ public sealed class OutgoingListTests : IDisposable
         Assert.Contains("Essential", insurance.QuerySelector("[data-testid=outgoing-priority]")!.TextContent, StringComparison.Ordinal);
 
         var mortgage = Item(cut, "Mortgage");
-        Assert.Equal("Paused 1 Nov 2026 – 30 Nov 2026", mortgage.QuerySelector("[data-testid=outgoing-note]")!.TextContent.Trim());
+        Assert.Equal("Paused from 1 Nov 2026 until 1 Dec 2026", mortgage.QuerySelector("[data-testid=outgoing-note]")!.TextContent.Trim());
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public sealed class OutgoingListTests : IDisposable
             IReadOnlyList<OutgoingMonthItem> items = Empty ? [] :
             [
                 Outgoing("Council tax", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 180m, PaymentUnitDto.Month, 150m, notes: ["Rises to £180.00 a month from 16 Nov 2026"]),
-                Outgoing("Mortgage", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 900m, PaymentUnitDto.Month, 0m, notes: ["Paused 1 Nov 2026 – 30 Nov 2026"]),
+                Outgoing("Mortgage", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 900m, PaymentUnitDto.Month, 0m, notes: ["Paused from 1 Nov 2026 until 1 Dec 2026"]),
                 Outgoing("Car insurance", InsuranceId, "Insurance", 40, OutgoingPriorityDto.Essential, 480m, PaymentUnitDto.Year, 40m,
                     personId: StaticPeopleApi.ChrisId, personName: "Chris Austin", comingUp: true),
                 Outgoing("Food shopping", FoodId, "Food & household", 90, OutgoingPriorityDto.Preferred, 120m, PaymentUnitDto.Week, 520m, kind: OutgoingKindDto.Allowance),
@@ -179,5 +179,22 @@ public sealed class OutgoingListTests : IDisposable
         public Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request) => throw new NotSupportedException();
 
         public Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId) => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task<OutgoingDetailsResponse?> GetAsync(Guid householdId, Guid outgoingId) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> UpdateAsync(Guid householdId, Guid outgoingId, UpdateOutgoingRequest request) => throw new NotSupportedException();
+
+        public Task DeleteAsync(Guid householdId, Guid outgoingId) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> AddAmountChangeAsync(Guid householdId, Guid outgoingId, SaveOutgoingAmountRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> CorrectAmountChangeAsync(Guid householdId, Guid outgoingId, Guid entryId, SaveOutgoingAmountRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> DeleteAmountChangeAsync(Guid householdId, Guid outgoingId, Guid entryId, DeleteOutgoingEntryRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> AddStatusPeriodAsync(Guid householdId, Guid outgoingId, SaveOutgoingStatusRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> CorrectStatusPeriodAsync(Guid householdId, Guid outgoingId, Guid entryId, SaveOutgoingStatusRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> DeleteStatusPeriodAsync(Guid householdId, Guid outgoingId, Guid entryId, DeleteOutgoingEntryRequest request) => throw new NotSupportedException();
     }
 }

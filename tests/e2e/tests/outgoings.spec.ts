@@ -1,33 +1,6 @@
 import { expect, test } from './fixtures';
-import type { Page } from '@playwright/test';
-import { settled, signIn } from './helpers';
+import { addOutgoing, choose, settled, signIn } from './helpers';
 
-/** Opens a MudSelect (found by the data-testid on its input) and picks the option containing the text. */
-async function choose(page: Page, testId: string, option: string): Promise<void> {
-  const select = page.locator('.mud-select').filter({ has: page.getByTestId(testId) }).first();
-  const item = page.locator('.mud-popover-open .mud-list-item').filter({ hasText: option }).first();
-  await select.scrollIntoViewIfNeeded();
-  try {
-    await expect(async () => {
-      if (!(await item.isVisible())) {
-        await select.click();
-      }
-      await expect(item, `the ${testId} list didn't open`).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
-  } catch (error) {
-    // Diagnostics for CI, where traces can't be downloaded.
-    const box = await select.boundingBox();
-    const report = await page.evaluate(({ x, y }) => {
-      const hit = document.elementFromPoint(x, y);
-      const popovers = [...document.querySelectorAll('.mud-popover')].map(p => `${p.className} :: ${(p.textContent ?? '').slice(0, 80)}`);
-      return { hit: hit ? `${hit.tagName}.${hit.className} :: ${(hit.textContent ?? '').slice(0, 60)}` : 'none', popovers, scrollY: window.scrollY, height: window.innerHeight };
-    }, { x: (box?.x ?? 0) + (box?.width ?? 0) / 2, y: (box?.y ?? 0) + (box?.height ?? 0) / 2 });
-    console.log(`choose(${testId}) failed. Select box: ${JSON.stringify(box)}\n${JSON.stringify(report, null, 2)}`);
-    throw error;
-  }
-  await item.click();
-  await expect(page.locator('.mud-popover-open .mud-list-item')).toHaveCount(0);
-}
 
 test("an outgoing added from the home page shows in this month's list", async ({ page }) => {
   await signIn(page);
@@ -62,4 +35,28 @@ test('the add form warns about card numbers', async ({ page }) => {
   await page.getByTestId('reference-value').fill('4111 1111 1111 1111');
 
   await expect(page.getByTestId('sensitive-warning')).toBeVisible();
+});
+
+test('an outgoing can be paused for whole payments and its price changed', async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Gym membership', 'Leisure', '30');
+
+  await page.getByTestId('pause').click();
+  await page.getByTestId('skip-payments').fill('2');
+  await expect(page.getByTestId('resumes-preview')).toContainText('Payments resume on');
+  await page.getByTestId('comment').fill('Injured');
+  await page.getByTestId('save').click();
+  await expect(page.getByTestId('period-description')).toContainText('skips 2 payments');
+
+  await page.getByTestId('change-amount').click();
+  await page.getByTestId('amount').fill('35');
+  await page.getByTestId('comment').fill('Price rise');
+  await page.getByTestId('save').click();
+  await expect(page.getByTestId('amount-change')).toHaveCount(2);
+
+  await page.getByTestId('edit-details').click();
+  await settled(page);
+  await page.getByTestId('name').fill('Gym');
+  await page.getByTestId('save').click();
+  await expect(page.getByTestId('outgoing-name')).toHaveText('Gym');
 });

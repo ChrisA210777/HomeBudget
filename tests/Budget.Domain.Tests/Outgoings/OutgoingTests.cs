@@ -132,6 +132,57 @@ public class OutgoingTests
     }
 
     [Fact]
+    public void A_pause_knows_how_many_payments_it_skips()
+    {
+        var outgoing = Create(15, PaymentSchedule.Weekly, new DateOnly(2026, 1, 5));
+        var skipping = outgoing.PauseFor(new DateOnly(2026, 11, 9), payments: 3, "Away");
+        var open = outgoing.Pause(new DateOnly(2027, 1, 4), null, "Stopped for now");
+
+        Assert.Equal(new DateOnly(2026, 11, 30), skipping.ResumesOn);
+        Assert.Equal(3, outgoing.PaymentsSkippedBy(skipping));
+        Assert.Null(outgoing.PaymentsSkippedBy(open));
+    }
+
+    [Fact]
+    public void Upcoming_payment_dates_follow_the_schedule()
+    {
+        var outgoing = Create(10, PaymentSchedule.Monthly, new DateOnly(2026, 1, 31));
+
+        Assert.Equal(
+            new[] { new DateOnly(2026, 11, 30), new DateOnly(2026, 12, 31), new DateOnly(2027, 1, 31), new DateOnly(2027, 2, 28) },
+            outgoing.PaymentDatesFrom(new DateOnly(2026, 11, 5), 4));
+        Assert.Equal(new DateOnly(2026, 1, 31), outgoing.PaymentDatesFrom(new DateOnly(2025, 6, 1), 1)[0]);
+    }
+
+    [Fact]
+    public void Correcting_the_first_amount_moves_the_first_payment_date()
+    {
+        var outgoing = Create(10, PaymentSchedule.Monthly, new DateOnly(2026, 1, 1));
+        var first = outgoing.AmountChanges.Single();
+        outgoing.ChangeAmount(new DateOnly(2026, 6, 1), 12, PaymentSchedule.Monthly, "Rise");
+
+        outgoing.CorrectAmountChange(first.Id, new DateOnly(2026, 1, 15), 10, PaymentSchedule.Monthly, "Starting amount", "Wrong day");
+
+        Assert.Equal(new DateOnly(2026, 1, 15), outgoing.FirstPaymentDate);
+        Assert.Throws<InvalidOperationException>(() =>
+            outgoing.CorrectAmountChange(first.Id, new DateOnly(2026, 7, 1), 10, PaymentSchedule.Monthly, "Starting amount", "Too late"));
+        var rise = outgoing.AmountChanges.Single(c => c.Amount == 12);
+        Assert.Throws<InvalidOperationException>(() =>
+            outgoing.CorrectAmountChange(rise.Id, new DateOnly(2026, 1, 1), 12, PaymentSchedule.Monthly, "Rise", "Too early"));
+    }
+
+    [Fact]
+    public void Editing_details_doesnt_move_the_first_payment()
+    {
+        var outgoing = Create(10, PaymentSchedule.Monthly, new DateOnly(2026, 1, 1));
+
+        outgoing.UpdateDetails(Details(new DateOnly(2026, 3, 1)) with { Name = "Renamed" });
+
+        Assert.Equal("Renamed", outgoing.Name);
+        Assert.Equal(new DateOnly(2026, 1, 1), outgoing.FirstPaymentDate);
+    }
+
+    [Fact]
     public void Pauses_start_and_resume_on_payment_dates()
     {
         var outgoing = Create(900, PaymentSchedule.Monthly);

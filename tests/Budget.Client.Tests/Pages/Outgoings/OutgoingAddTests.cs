@@ -181,6 +181,56 @@ public sealed class OutgoingAddTests : IDisposable
         Assert.Empty(cut.FindAll("[data-testid=save]"));
     }
 
+    [Fact]
+    public void Editing_fills_in_the_details_and_hides_the_amount()
+    {
+        _api.Existing = OutgoingDetailTests.Details(hiddenCategory: HiddenId);
+        var id = _api.Existing.Id;
+
+        var cut = _context.RenderComponent<OutgoingAdd>(p => p.Add(c => c.OutgoingId, id));
+
+        Assert.Equal("Car insurance", cut.Find("input[data-testid=name]").GetAttribute("value"));
+        Assert.Empty(cut.FindAll("[data-testid=amount]"));
+        Assert.Empty(cut.FindAll("[data-testid=first-payment]"));
+        Assert.Contains("Save changes", cut.Find("[data-testid=save]").TextContent, StringComparison.Ordinal);
+        Assert.NotEmpty(cut.FindAll("[data-testid=website]"));
+    }
+
+    [Fact]
+    public async Task Saving_an_edit_sends_the_version_and_returns_to_the_outgoing()
+    {
+        _api.Existing = OutgoingDetailTests.Details();
+        var id = _api.Existing.Id;
+        var cut = _context.RenderComponent<OutgoingAdd>(p => p.Add(c => c.OutgoingId, id));
+
+        cut.Find("input[data-testid=name]").Change("Car insurance (Ford)");
+        await ChooseAsync(cut, Selects<OutgoingPriorityDto?>(cut)[0], OutgoingPriorityDto.Preferred);
+        cut.Find("[data-testid=save]").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var update = Assert.Single(_api.Updates);
+            Assert.Equal(("Car insurance (Ford)", OutgoingPriorityDto.Preferred, "v1"), (update.Name, update.Priority, update.Version));
+            Assert.Equal("https://example.com/", update.Website);
+        });
+        Assert.EndsWith($"/outgoings/{id}", _context.Services.GetRequiredService<FakeNavigationManager>().Uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_conflict_while_editing_reloads_and_says_so()
+    {
+        _api.Existing = OutgoingDetailTests.Details();
+        _api.ConflictNext = true;
+        var cut = _context.RenderComponent<OutgoingAdd>(p => p.Add(c => c.OutgoingId, _api.Existing.Id));
+
+        cut.Find("input[data-testid=name]").Change("Mine");
+        cut.Find("[data-testid=save]").Click();
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=conflict]")));
+        Assert.Equal("Car insurance", cut.Find("input[data-testid=name]").GetAttribute("value"));
+        Assert.Empty(_api.Updates);
+    }
+
     public void Dispose() => _context.Dispose();
 
     private async Task<IRenderedComponent<OutgoingAdd>> FilledInAsync()
@@ -239,5 +289,39 @@ public sealed class OutgoingAddTests : IDisposable
             Task.FromResult<IReadOnlyList<string>>(["Joint account"]);
 
         public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) => throw new NotSupportedException();
+
+        public OutgoingDetailsResponse? Existing { get; set; }
+
+        public List<UpdateOutgoingRequest> Updates { get; } = [];
+
+        public bool ConflictNext { get; set; }
+
+        public Task<OutgoingDetailsResponse?> GetAsync(Guid householdId, Guid outgoingId) => Task.FromResult(Existing);
+
+        public Task<ApiResult<OutgoingDetailsResponse>> UpdateAsync(Guid householdId, Guid outgoingId, UpdateOutgoingRequest request)
+        {
+            if (ConflictNext)
+            {
+                ConflictNext = false;
+                return Task.FromResult(new ApiResult<OutgoingDetailsResponse>(null, new Dictionary<string, string[]>(), Conflict: true));
+            }
+
+            Updates.Add(request);
+            return Task.FromResult(ApiResult<OutgoingDetailsResponse>.Success(Existing!));
+        }
+
+        public Task DeleteAsync(Guid householdId, Guid outgoingId) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> AddAmountChangeAsync(Guid householdId, Guid outgoingId, SaveOutgoingAmountRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> CorrectAmountChangeAsync(Guid householdId, Guid outgoingId, Guid entryId, SaveOutgoingAmountRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> DeleteAmountChangeAsync(Guid householdId, Guid outgoingId, Guid entryId, DeleteOutgoingEntryRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> AddStatusPeriodAsync(Guid householdId, Guid outgoingId, SaveOutgoingStatusRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> CorrectStatusPeriodAsync(Guid householdId, Guid outgoingId, Guid entryId, SaveOutgoingStatusRequest request) => throw new NotSupportedException();
+
+        public Task<ApiResult<OutgoingDetailsResponse>> DeleteStatusPeriodAsync(Guid householdId, Guid outgoingId, Guid entryId, DeleteOutgoingEntryRequest request) => throw new NotSupportedException();
     }
 }

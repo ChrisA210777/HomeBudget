@@ -218,7 +218,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
 
         var mortgageItem = month.Items[1];
         Assert.Equal(0m, mortgageItem.MonthlyAmount);
-        Assert.Equal(new[] { "Paused 1 Nov 2026 – 30 Nov 2026" }, mortgageItem.Notes);
+        Assert.Equal(new[] { "Paused from 1 Nov 2026 until 1 Dec 2026" }, mortgageItem.Notes);
 
         var insuranceItem = month.Items[2];
         Assert.Equal((40m, 480m, PaymentUnitDto.Year), (insuranceItem.MonthlyAmount, insuranceItem.Amount, insuranceItem.Unit));

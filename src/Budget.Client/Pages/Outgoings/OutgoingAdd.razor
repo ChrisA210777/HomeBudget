@@ -1,4 +1,5 @@
 @page "/outgoings/new"
+@page "/outgoings/{OutgoingId:guid}/edit"
 @attribute [Authorize]
 @using Budget.Client.Income
 @using Budget.Client.Outgoings
@@ -13,11 +14,18 @@
 @inject ISnackbar Snackbar
 @inject TimeProvider Clock
 
-<PageTitle>Add an outgoing · Home Budget</PageTitle>
+<PageTitle>@Title · Home Budget</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings" Class="mb-2">Outgoings</MudButton>
-    <h1 class="mud-typography mud-typography-h4 mb-4">Add an outgoing</h1>
+    @if (IsEdit)
+    {
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2">@(_existing?.Name ?? "Outgoing")</MudButton>
+    }
+    else
+    {
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings" Class="mb-2">Outgoings</MudButton>
+    }
+    <h1 class="mud-typography mud-typography-h4 mb-4">@Title</h1>
 
     @if (!_loaded)
     {
@@ -25,10 +33,20 @@
     }
     else if (!_canEdit)
     {
-        <MudAlert Severity="Severity.Info" data-testid="read-only">Viewers can see outgoings but not add them.</MudAlert>
+        <MudAlert Severity="Severity.Info" data-testid="read-only">@(IsEdit ? "Viewers can see outgoings but not change them." : "Viewers can see outgoings but not add them.")</MudAlert>
+    }
+    else if (IsEdit && _existing is null)
+    {
+        <MudAlert Severity="Severity.Warning" data-testid="not-found">This outgoing doesn't exist any more.</MudAlert>
     }
     else
     {
+        @if (_conflict)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="conflict">
+                Someone else changed this outgoing while you were editing. We've loaded their changes – please check and save again.
+            </MudAlert>
+        }
         <MudPaper Class="pa-4" Elevation="1">
             <MudStack Spacing="3">
                 <MudSelect T="OutgoingKindDto" Value="_kind" ValueChanged="KindChanged" ToStringFunc="KindName" Label="What is it?"
@@ -71,41 +89,44 @@
                     }
                 </MudSelect>
 
-                <div class="d-flex gap-2 flex-wrap align-start">
-                    <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount" Immediate="true"
-                                     Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
-                                     Error="Has(nameof(CreateOutgoingRequest.Amount))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Amount))"
-                                     Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem" data-testid="amount" />
-                    <div class="d-flex gap-2">
-                        <div style="width: 5.5rem">
-                            <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
-                                             InputMode="InputMode.numeric" HideSpinButtons="true"
-                                             Error="Has(nameof(CreateOutgoingRequest.Every))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Every))"
-                                             Variant="Variant.Outlined" data-testid="every" />
-                        </div>
-                        <div style="width: 8rem">
-                            <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Unit"
-                                       Variant="Variant.Outlined" data-testid="unit">
-                                @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
-                                {
-                                    <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
-                                }
-                            </MudSelect>
+                @if (!IsEdit)
+                {
+                    <div class="d-flex gap-2 flex-wrap align-start">
+                        <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount" Immediate="true"
+                                         Adornment="Adornment.Start" AdornmentText="£" InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0"
+                                         Error="Has(nameof(CreateOutgoingRequest.Amount))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Amount))"
+                                         Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem" data-testid="amount" />
+                        <div class="d-flex gap-2">
+                            <div style="width: 5.5rem">
+                                <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                                 InputMode="InputMode.numeric" HideSpinButtons="true"
+                                                 Error="Has(nameof(CreateOutgoingRequest.Every))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Every))"
+                                                 Variant="Variant.Outlined" data-testid="every" />
+                            </div>
+                            <div style="width: 8rem">
+                                <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Unit"
+                                           Variant="Variant.Outlined" data-testid="unit">
+                                    @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
+                                    {
+                                        <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </div>
                         </div>
                     </div>
-                </div>
-                @if (OutgoingValidator.DescribeMonthlyEquivalent(_amount, _every, _unit) is { } equivalent)
-                {
-                    <MudText Typo="Typo.body2" Color="Color.Primary" aria-live="polite" data-testid="monthly-equivalent">@equivalent</MudText>
+                    @if (OutgoingValidator.DescribeMonthlyEquivalent(_amount, _every, _unit) is { } equivalent)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Primary" aria-live="polite" data-testid="monthly-equivalent">@equivalent</MudText>
+                    }
+
+                    <MudDatePicker @bind-Date="_firstPaymentDate" Label="First payment" DateFormat="d MMM yyyy"
+                                   HelperText="Later payments follow on from this date"
+                                   Error="Has(nameof(CreateOutgoingRequest.FirstPaymentDate))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.FirstPaymentDate))"
+                                   Variant="Variant.Outlined" data-testid="first-payment" />
+
+                    <MudTextField @bind-Value="_comment" Label="Comment (optional)" Placeholder="@OutgoingValidator.DefaultStartingComment"
+                                  MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined" data-testid="comment" />
                 }
-
-                <MudDatePicker @bind-Date="_firstPaymentDate" Label="First payment" DateFormat="d MMM yyyy"
-                               HelperText="Later payments follow on from this date"
-                               Error="Has(nameof(CreateOutgoingRequest.FirstPaymentDate))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.FirstPaymentDate))"
-                               Variant="Variant.Outlined" data-testid="first-payment" />
-
-                <MudTextField @bind-Value="_comment" Label="Comment (optional)" Placeholder="@OutgoingValidator.DefaultStartingComment"
-                              MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined" data-testid="comment" />
 
                 @if (_kind != OutgoingKindDto.Allowance)
                 {
@@ -180,8 +201,8 @@
                 }
 
                 <div class="d-flex justify-end gap-2 mt-2">
-                    <MudButton Variant="Variant.Text" Href="/outgoings">Cancel</MudButton>
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">Add outgoing</MudButton>
+                    <MudButton Variant="Variant.Text" Href="@BackHref">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">@(IsEdit ? "Save changes" : "Add outgoing")</MudButton>
                 </div>
             </MudStack>
         </MudPaper>
@@ -192,6 +213,19 @@
     /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
     [CascadingParameter(Name = "Online")]
     public bool Online { get; set; } = true;
+
+    /// <summary>Set when editing an existing outgoing's details (BUD-51) rather than adding one.</summary>
+    [Parameter]
+    public Guid? OutgoingId { get; set; }
+
+    private bool IsEdit => OutgoingId is not null;
+
+    private string Title => IsEdit ? "Edit details" : "Add an outgoing";
+
+    private string BackHref => IsEdit ? $"/outgoings/{OutgoingId}" : "/outgoings";
+
+    private OutgoingDetailsResponse? _existing;
+    private bool _conflict;
 
     private const string WholeHousehold = "The whole household";
 
@@ -242,12 +276,48 @@
             var categories = CategoryApi.ListAsync(_household.HouseholdId);
             var people = PeopleApi.ListAsync(_household.HouseholdId);
             var paidFrom = OutgoingApi.PaidFromNamesAsync(_household.HouseholdId);
-            _categories = (await categories).Where(c => !c.IsHidden).ToList();
+            var allCategories = await categories;
             _people = await people;
             _paidFromNames = await paidFrom;
+
+            if (OutgoingId is { } id)
+            {
+                _existing = await OutgoingApi.GetAsync(_household.HouseholdId, id);
+                if (_existing is not null)
+                {
+                    Fill(_existing);
+                }
+            }
+
+            // A hidden category stays available to an outgoing that already uses it.
+            _categories = allCategories.Where(c => !c.IsHidden || c.Id == _existing?.CategoryId).ToList();
         }
 
         _loaded = true;
+    }
+
+    private void Fill(OutgoingDetailsResponse existing)
+    {
+        _kind = existing.Kind;
+        _name = existing.Name;
+        _categoryId = existing.CategoryId;
+        _priority = existing.Priority;
+        _personId = existing.PersonId ?? Guid.Empty;
+        _renews = existing.RenewalDate is not null;
+        _renewalDate = IncomeDates.ToDateTime(existing.RenewalDate);
+        _renewalEveryMonths = existing.RenewalEveryMonths;
+        _autoRenews = existing.AutoRenews;
+        _alertPeriod = existing.AlertPeriod;
+        _recipient = existing.Recipient;
+        _paymentMethod = existing.PaymentMethod;
+        _paidFrom = existing.PaidFrom;
+        _referenceLabel = existing.ReferenceLabel;
+        _referenceValue = existing.ReferenceValue;
+        _website = existing.Website;
+        _contactPhone = existing.ContactPhone;
+        _notes = existing.Notes;
+        _showDetails = new[] { _recipient, _paidFrom, _referenceLabel, _referenceValue, _website, _contactPhone, _notes }.Any(v => !string.IsNullOrEmpty(v))
+            || _paymentMethod is not null;
     }
 
     private void KindChanged(OutgoingKindDto kind)
@@ -299,6 +369,12 @@
 
     private async Task SaveAsync()
     {
+        if (IsEdit)
+        {
+            await SaveChangesAsync();
+            return;
+        }
+
         var request = BuildRequest();
         var errors = OutgoingValidator.Validate(request).ToDictionary(e => e.Key, e => e.Value);
         if (_renews && _kind != OutgoingKindDto.Allowance && request.RenewalDate is null)
@@ -321,6 +397,77 @@
             {
                 Snackbar.Add($"{result.Value!.Name} was added.", Severity.Success);
                 Navigation.NavigateTo("/outgoings");
+                return;
+            }
+
+            _errors = result.Errors;
+            ShowDetailsIfTheyHaveErrors();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SaveChangesAsync()
+    {
+        var created = BuildRequest();
+        var request = new UpdateOutgoingRequest
+        {
+            Kind = created.Kind,
+            Name = created.Name,
+            CategoryId = created.CategoryId,
+            Priority = created.Priority,
+            PersonId = created.PersonId,
+            Recipient = created.Recipient,
+            PaymentMethod = created.PaymentMethod,
+            PaidFrom = created.PaidFrom,
+            ReferenceLabel = created.ReferenceLabel,
+            ReferenceValue = created.ReferenceValue,
+            Website = created.Website,
+            ContactPhone = created.ContactPhone,
+            Notes = created.Notes,
+            RenewalDate = created.RenewalDate,
+            RenewalEveryMonths = created.RenewalEveryMonths,
+            AutoRenews = created.AutoRenews,
+            AlertPeriod = created.AlertPeriod,
+            Version = _existing!.Version,
+        };
+
+        var errors = OutgoingValidator.Validate(request).ToDictionary(e => e.Key, e => e.Value);
+        if (_renews && _kind != OutgoingKindDto.Allowance && request.RenewalDate is null)
+        {
+            errors[nameof(CreateOutgoingRequest.RenewalDate)] = ["Choose the next renewal date, or turn off renewal."];
+        }
+
+        _errors = errors;
+        _conflict = false;
+        if (_errors.Count > 0)
+        {
+            ShowDetailsIfTheyHaveErrors();
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await OutgoingApi.UpdateAsync(_household!.HouseholdId, OutgoingId!.Value, request);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("Changes saved.", Severity.Success);
+                Navigation.NavigateTo(BackHref);
+                return;
+            }
+
+            if (result.Conflict)
+            {
+                _existing = await OutgoingApi.GetAsync(_household!.HouseholdId, OutgoingId!.Value);
+                if (_existing is not null)
+                {
+                    Fill(_existing);
+                }
+
+                _conflict = true;
                 return;
             }
 
