@@ -123,3 +123,19 @@ test('common outgoings are suggested and fill in their usual settings', async ({
   await page.getByTestId('amount').fill('480');
   await expect(page.getByTestId('monthly-equivalent')).toHaveText('£480.00 a year = £40.00 a month');
 });
+
+test('amounts, their period and the category subtotal line up on the right', async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Council tax', 'Housing', '150');
+  await page.goto('/outgoings');
+  await settled(page);
+
+  const item = page.getByTestId('outgoing-item').first();
+  const right = async (locator: import('@playwright/test').Locator) => {
+    const box = (await locator.boundingBox())!;
+    return box.x + box.width;
+  };
+  const amount = await right(item.getByTestId('outgoing-monthly'));
+  expect(Math.abs((await right(item.getByTestId('outgoing-period'))) - amount)).toBeLessThanOrEqual(1);
+  expect(Math.abs((await right(page.getByTestId('category-subtotal').first())) - amount)).toBeLessThanOrEqual(1);
+});
