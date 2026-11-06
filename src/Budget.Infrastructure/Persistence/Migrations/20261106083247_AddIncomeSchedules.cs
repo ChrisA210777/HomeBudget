@@ -20,7 +20,7 @@ namespace Budget.Infrastructure.Persistence.Migrations
                 table: "IncomeAmountChanges",
                 type: "int",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 1); // Existing income was always monthly (BUD-57).
 
             migrationBuilder.AddColumn<string>(
                 name: "Unit",
@@ -28,7 +28,7 @@ namespace Budget.Infrastructure.Persistence.Migrations
                 type: "nvarchar(10)",
                 maxLength: 10,
                 nullable: false,
-                defaultValue: "");
+                defaultValue: "Month");
         }
 
         /// <inheritdoc />
