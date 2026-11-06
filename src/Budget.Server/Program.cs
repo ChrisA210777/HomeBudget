@@ -4,6 +4,7 @@ using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Account;
 using Budget.Server.Features.Budgeting;
+using Budget.Server.Features.DataExport;
 using Budget.Server.Features.Households;
 using Budget.Server.Features.Income;
 using Budget.Server.Features.Outgoings;
@@ -16,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+builder.Services.AddScoped<ExportBuilder>();
 builder.Services.AddInfrastructure();
 builder.Services.AddBudgetAuthentication(builder.Configuration);
 builder.Services.AddHouseholdAuthorization();
@@ -79,6 +81,7 @@ app.MapPeopleEndpoints();
 app.MapOutgoingCategoryEndpoints();
 app.MapOutgoingEndpoints();
 app.MapBudgetEndpoints();
+app.MapDataExportEndpoints();
 
 // Unknown server routes are 404s, not the client app's page.
 app.MapFallback("/api/{**path}", () => Results.NotFound());
