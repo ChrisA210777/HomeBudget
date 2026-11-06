@@ -102,8 +102,13 @@ public class ImportNewHouseholdApiTests(BudgetApiFactory factory) : IntegrationT
     public async Task The_person_with_your_email_is_linked_to_you()
     {
         var (userId, ownHouseholdId) = await CreateHouseholdOwnerAsync();
-        string? email = null;
-        await ExecuteDbContextAsync(async db => email = await db.Users.Where(u => u.Id == userId).Select(u => u.Email).SingleAsync());
+        const string email = "jane.austin@example.com";
+        await ExecuteDbContextAsync(async db =>
+        {
+            var user = await db.Users.SingleAsync(u => u.Id == userId);
+            user.Email = email;
+            await db.SaveChangesAsync();
+        });
         using var client = CreateClient(signedInAs: userId);
         var file = Encoding.UTF8.GetString(GoldenFile).Replace("jane@example.com", email, StringComparison.Ordinal);
 
