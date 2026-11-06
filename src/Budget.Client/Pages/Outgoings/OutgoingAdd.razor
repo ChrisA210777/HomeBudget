@@ -57,9 +57,30 @@
                     }
                 </MudSelect>
 
-                <MudTextField @bind-Value="_name" Label="Name" HelperText="@OutgoingValidator.NameHelp(_kind)" MaxLength="OutgoingValidator.NameMaxLength"
-                              Error="Has(nameof(CreateOutgoingRequest.Name))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Name))"
-                              Variant="Variant.Outlined" data-testid="name" />
+                @if (IsEdit)
+                {
+                    <MudTextField @bind-Value="_name" Label="Name" HelperText="@OutgoingValidator.NameHelp(_kind)" MaxLength="OutgoingValidator.NameMaxLength"
+                                  Error="Has(nameof(CreateOutgoingRequest.Name))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Name))"
+                                  Variant="Variant.Outlined" data-testid="name" />
+                }
+                else
+                {
+                    @* Free text, with common outgoings suggested as you type (BUD-54). Picking one fills in its usual settings. *@
+                    <MudAutocomplete T="string" Value="_name" ValueChanged="NameChanged" SearchFunc="SearchCommonAsync" CoerceValue="true" CoerceText="false"
+                                     Label="Name" HelperText="@NameHelpText" MaxLength="OutgoingValidator.NameMaxLength" MaxItems="10"
+                                     ShowProgressIndicator="false" Variant="Variant.Outlined"
+                                     Error="Has(nameof(CreateOutgoingRequest.Name))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Name))" data-testid="name">
+                        <ItemTemplate Context="suggestion">
+                            <div class="d-flex align-center gap-2" style="width: 100%" data-testid="name-suggestion">
+                                <span class="flex-grow-1">@suggestion</span>
+                                @if (_existingNames.Contains(suggestion))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0" data-testid="already-added">Already added</MudChip>
+                                }
+                            </div>
+                        </ItemTemplate>
+                    </MudAutocomplete>
+                }
 
                 <MudSelect T="Guid" @bind-Value="_categoryId" ToStringFunc="CategoryName" Label="Category"
                            Error="Has(nameof(CreateOutgoingRequest.CategoryId))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.CategoryId))"
@@ -98,13 +119,13 @@
                                          Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem" data-testid="amount" />
                         <div class="d-flex gap-2">
                             <div style="width: 5.5rem">
-                                <MudNumericField T="int" @bind-Value="_every" Class="every-field" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                <MudNumericField T="int" Value="_every" ValueChanged="EveryChanged" Class="every-field" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
                                                  InputMode="InputMode.numeric" HideSpinButtons="true"
                                                  Error="Has(nameof(CreateOutgoingRequest.Every))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Every))"
                                                  Variant="Variant.Outlined" data-testid="every" />
                             </div>
                             <div style="width: 8rem">
-                                <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Period"
+                                <MudSelect T="PaymentUnitDto" Value="_unit" ValueChanged="UnitChanged" ToStringFunc="UnitName" Label="Period"
                                            Variant="Variant.Outlined" data-testid="unit">
                                     @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
                                     {
@@ -235,6 +256,10 @@
     private IReadOnlyList<PersonSummary> _people = [];
     private IReadOnlyList<string> _paidFromNames = [];
     private IReadOnlyList<string> _referenceLabels = [];
+    private HashSet<string> _existingNames = new(StringComparer.OrdinalIgnoreCase);
+    private string? _appliedSuggestion;
+    private bool _kindChosen;
+    private bool _scheduleChosen;
     private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
     private bool _loaded;
     private bool _canEdit;
@@ -283,6 +308,12 @@
             _people = await people;
             _paidFromNames = await paidFrom;
             _referenceLabels = await referenceLabels;
+            if (OutgoingId is null)
+            {
+                var today = Clock.GetLocalNow();
+                var all = await OutgoingApi.GetMonthAsync(_household.HouseholdId, today.Year, today.Month, all: true);
+                _existingNames = all.Items.Select(i => i.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            }
 
             if (OutgoingId is { } id)
             {
@@ -324,8 +355,84 @@
             || _paymentMethod is not null;
     }
 
+    private string NameHelpText => CommonOutgoings.Find(_name) is { } common && _appliedSuggestion == common.Name
+        ? "Usual settings filled in – change anything that's different for you."
+        : OutgoingValidator.NameHelp(_kind);
+
+    private Task<IEnumerable<string>> SearchCommonAsync(string? text, CancellationToken cancellationToken) =>
+        Task.FromResult(CommonOutgoings.Search(text).Select(c => c.Name));
+
+    private void NameChanged(string? name)
+    {
+        _name = name;
+        if (CommonOutgoings.Find(name) is { } common && common.Name != _appliedSuggestion)
+        {
+            ApplySuggestion(common);
+        }
+    }
+
+    /// <summary>Fills in a common outgoing's usual settings, leaving anything already chosen alone (BUD-54).</summary>
+    private void ApplySuggestion(CommonOutgoing common)
+    {
+        _appliedSuggestion = common.Name;
+        _name = common.Name;
+
+        if (!_kindChosen)
+        {
+            _kind = common.Kind;
+        }
+
+        if (_categoryId == Guid.Empty && _categories.FirstOrDefault(c => string.Equals(c.Name, common.Category, StringComparison.OrdinalIgnoreCase)) is { } category)
+        {
+            _categoryId = category.Id;
+        }
+
+        _priority ??= common.Priority;
+
+        if (!_scheduleChosen)
+        {
+            _every = common.Every;
+            _unit = common.Unit;
+        }
+
+        _paymentMethod ??= common.PaymentMethod;
+        if (string.IsNullOrWhiteSpace(_referenceLabel))
+        {
+            _referenceLabel = common.ReferenceLabel;
+        }
+
+        if (string.IsNullOrWhiteSpace(_website))
+        {
+            _website = common.Website;
+        }
+
+        if (common.Renews && _kind != OutgoingKindDto.Allowance && !_renews)
+        {
+            _renews = true;
+            _renewalEveryMonths = common.RenewalEveryMonths;
+            _renewalDate ??= (_firstPaymentDate ?? Clock.GetLocalNow().Date).AddMonths(common.RenewalEveryMonths);
+            _autoRenews = common.AutoRenews;
+            _alertPeriod = common.AlertPeriod;
+        }
+
+        _showDetails |= common.ReferenceLabel is not null || common.Website is not null || common.PaymentMethod is not null;
+    }
+
+    private void EveryChanged(int every)
+    {
+        _scheduleChosen = true;
+        _every = every;
+    }
+
+    private void UnitChanged(PaymentUnitDto unit)
+    {
+        _scheduleChosen = true;
+        _unit = unit;
+    }
+
     private void KindChanged(OutgoingKindDto kind)
     {
+        _kindChosen = true;
         _kind = kind;
         if (kind == OutgoingKindDto.Allowance)
         {

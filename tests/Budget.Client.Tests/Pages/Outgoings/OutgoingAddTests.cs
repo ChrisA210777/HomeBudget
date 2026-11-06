@@ -38,7 +38,7 @@ public sealed class OutgoingAddTests : IDisposable
     {
         var cut = _context.RenderComponent<OutgoingAdd>();
 
-        cut.Find("input[data-testid=name]").Change("Car insurance");
+        await SetNameAsync(cut, "Insurance for the car");
         await ChooseAsync(cut, Selects<Guid>(cut)[0], InsuranceId);
         await ChooseAsync(cut, Selects<OutgoingPriorityDto?>(cut)[0], OutgoingPriorityDto.Essential);
         cut.Find("input[data-testid=amount]").Input("480");
@@ -49,7 +49,7 @@ public sealed class OutgoingAddTests : IDisposable
         {
             var request = Assert.Single(_api.Created);
             Assert.Equal(OutgoingKindDto.Bill, request.Kind);
-            Assert.Equal("Car insurance", request.Name);
+            Assert.Equal("Insurance for the car", request.Name);
             Assert.Equal(InsuranceId, request.CategoryId);
             Assert.Equal(OutgoingPriorityDto.Essential, request.Priority);
             Assert.Null(request.PersonId);
@@ -79,6 +79,60 @@ public sealed class OutgoingAddTests : IDisposable
         cut.Find("input[data-testid=amount]").Input("15");
         await ChooseAsync(cut, Selects<PaymentUnitDto>(cut)[0], PaymentUnitDto.Week);
         cut.WaitForAssertion(() => Assert.Equal("£15.00 a week = £65.00 a month", cut.Find("[data-testid=monthly-equivalent]").TextContent.Trim()));
+    }
+
+    [Fact]
+    public async Task Picking_a_common_outgoing_fills_in_its_usual_settings()
+    {
+        var cut = _context.RenderComponent<OutgoingAdd>();
+
+        await SetNameAsync(cut, "car INSURANCE");
+        cut.Find("input[data-testid=amount]").Input("480");
+        cut.Find("[data-testid=save]").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var request = Assert.Single(_api.Created);
+            Assert.Equal("Car insurance", request.Name);
+            Assert.Equal((OutgoingKindDto.Bill, InsuranceId, OutgoingPriorityDto.Essential), (request.Kind, request.CategoryId, request.Priority));
+            Assert.Equal((1, PaymentUnitDto.Year), (request.Every, request.Unit));
+            Assert.Equal((PaymentMethodDto.DirectDebit, "Policy number"), (request.PaymentMethod, request.ReferenceLabel));
+            Assert.Equal(new DateOnly(2027, 11, 5), request.RenewalDate);
+            Assert.Equal((12, true, AlertPeriodDto.OneMonth), (request.RenewalEveryMonths, request.AutoRenews, request.AlertPeriod));
+        });
+    }
+
+    [Fact]
+    public async Task A_suggestion_doesnt_overwrite_what_youve_already_chosen()
+    {
+        var cut = _context.RenderComponent<OutgoingAdd>();
+        await ChooseAsync(cut, Selects<OutgoingPriorityDto?>(cut)[0], OutgoingPriorityDto.Optional);
+        await ChooseAsync(cut, Selects<PaymentUnitDto>(cut)[0], PaymentUnitDto.Month);
+        cut.Find("[data-testid=toggle-details]").Click();
+        cut.Find("input[data-testid=website]").Change("my-insurer.co.uk");
+
+        await SetNameAsync(cut, "Car insurance");
+        cut.Find("input[data-testid=amount]").Input("40");
+        cut.Find("[data-testid=save]").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var request = Assert.Single(_api.Created);
+            Assert.Equal((OutgoingPriorityDto.Optional, PaymentUnitDto.Month), (request.Priority!.Value, request.Unit));
+            Assert.Equal("my-insurer.co.uk", request.Website);
+            Assert.Equal(InsuranceId, request.CategoryId);
+        });
+    }
+
+    [Fact]
+    public async Task Typing_your_own_name_fills_in_nothing()
+    {
+        var cut = _context.RenderComponent<OutgoingAdd>();
+
+        await SetNameAsync(cut, "Insurance for the car");
+
+        Assert.Null(Selects<OutgoingPriorityDto?>(cut)[0].Instance.Value);
+        Assert.Equal(Guid.Empty, Selects<Guid>(cut)[0].Instance.Value);
     }
 
     [Fact]
@@ -237,12 +291,15 @@ public sealed class OutgoingAddTests : IDisposable
     {
         _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo("/outgoings/new");
         var cut = _context.RenderComponent<OutgoingAdd>();
-        cut.Find("input[data-testid=name]").Change("Car insurance");
+        await SetNameAsync(cut, "Insurance for the car");
         await ChooseAsync(cut, Selects<Guid>(cut)[0], InsuranceId);
         await ChooseAsync(cut, Selects<OutgoingPriorityDto?>(cut)[0], OutgoingPriorityDto.Preferred);
         cut.Find("input[data-testid=amount]").Input("40");
         return cut;
     }
+
+    private static Task SetNameAsync(IRenderedComponent<OutgoingAdd> cut, string name) =>
+        cut.InvokeAsync(() => cut.FindComponent<MudAutocomplete<string>>().Instance.ValueChanged.InvokeAsync(name));
 
     private static IReadOnlyList<IRenderedComponent<MudSelect<T>>> Selects<T>(IRenderedComponent<OutgoingAdd> cut) =>
         cut.FindComponents<MudSelect<T>>();
@@ -290,7 +347,8 @@ public sealed class OutgoingAddTests : IDisposable
         public Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId) =>
             Task.FromResult<IReadOnlyList<string>>(["Joint account"]);
 
-        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) => throw new NotSupportedException();
+        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) =>
+            Task.FromResult(new OutgoingMonthResponse(year, month, [], "GBP"));
 
         public OutgoingDetailsResponse? Existing { get; set; }
 
