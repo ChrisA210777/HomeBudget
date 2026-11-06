@@ -132,7 +132,7 @@ public sealed class HomeTests : IDisposable
     }
 
     [Fact]
-    public void A_new_household_is_prompted_to_add_income_outgoings_and_people_in_that_order()
+    public void A_new_household_is_prompted_to_add_people_income_and_outgoings_in_that_order()
     {
         UseHousehold("Admin");
         _householdApi.Setup = new HouseholdSetupResponse(0, 0, 1);
@@ -141,7 +141,7 @@ public sealed class HomeTests : IDisposable
 
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=getting-started]")));
         var steps = cut.FindAll("[data-testid=getting-started] li").Select(li => li.GetAttribute("data-testid")).ToArray();
-        Assert.Equal(new[] { "setup-add-income", "setup-add-outgoing", "setup-add-people" }, steps);
+        Assert.Equal(new[] { "setup-add-people", "setup-add-income", "setup-add-outgoing" }, steps);
         Assert.Equal("/income/new", cut.Find("[data-testid=setup-add-income-go]").GetAttribute("href"));
         Assert.Equal("/outgoings/new", cut.Find("[data-testid=setup-add-outgoing-go]").GetAttribute("href"));
         Assert.Equal("/people", cut.Find("[data-testid=setup-add-people-go]").GetAttribute("href"));
