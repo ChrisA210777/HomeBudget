@@ -141,8 +141,10 @@ body {
     outline-offset: -4px;
 }
 
-/* Touch targets of at least 44×44px (BUD-36). */
-.mud-icon-button {
+/* Touch targets of at least 44×44px (BUD-36). The calendar's days are left at MudBlazor's own size:
+   at 44px wide, seven of them don't fit in a row, so the weeks wrap and dates sit under the wrong
+   weekday. */
+.mud-icon-button:not(.mud-picker-calendar-day) {
     min-width: 44px;
     min-height: 44px;
 }
