@@ -67,7 +67,7 @@ export async function choose(page: Page, testId: string, option: string): Promis
 export async function addOutgoing(page: Page, name: string, category: string, amount: string): Promise<string> {
   await page.goto('/outgoings/new');
   await settled(page);
-  await page.getByTestId('name').fill(name);
+  await typeOutgoingName(page, name);
   await choose(page, 'category', category);
   await choose(page, 'priority', 'Optional');
   await page.getByTestId('amount').fill(amount);
@@ -75,4 +75,10 @@ export async function addOutgoing(page: Page, name: string, category: string, am
   await page.getByTestId('outgoing-name').filter({ hasText: name }).first().click();
   await expect(page.getByTestId('outgoing-name')).toHaveText(name);
   return page.url();
+}
+
+/** Types an outgoing's name and closes the suggestions so they don't cover the rest of the form. */
+export async function typeOutgoingName(page: Page, name: string): Promise<void> {
+  await page.getByTestId('name').fill(name);
+  await page.getByTestId('name').press('Escape');
 }

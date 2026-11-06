@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { addOutgoing, choose, settled, signIn } from './helpers';
+import { addOutgoing, choose, settled, signIn, typeOutgoingName } from './helpers';
 
 
 test("an outgoing added from the home page shows in this month's list", async ({ page }) => {
@@ -7,7 +7,7 @@ test("an outgoing added from the home page shows in this month's list", async ({
   await page.getByTestId('add-outgoing').click();
   await settled(page);
 
-  await page.getByTestId('name').fill('Car insurance');
+  await typeOutgoingName(page, 'Insurance for the car');
   await choose(page, 'category', 'Insurance');
   await choose(page, 'priority', 'Essential');
   await page.getByTestId('amount').fill('480');
@@ -17,8 +17,8 @@ test("an outgoing added from the home page shows in this month's list", async ({
   await page.getByTestId('save').click();
 
   await expect(page.getByRole('heading', { level: 1, name: 'Outgoings' })).toBeVisible();
-  await expect(page.getByText('Car insurance was added.')).toBeVisible();
-  const item = page.getByTestId('outgoing-item').filter({ hasText: 'Car insurance' });
+  await expect(page.getByText('Insurance for the car was added.')).toBeVisible();
+  const item = page.getByTestId('outgoing-item').filter({ hasText: 'Insurance for the car' });
   // It starts this month, so this month counts in full (ADR-011).
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£40.00');
   await expect(item.getByTestId('outgoing-paid')).toContainText('£480.00 a year');
@@ -102,4 +102,24 @@ test('reference names are suggested as you type', async ({ page }) => {
   await page.getByTestId('reference-label').fill('memb');
   await page.locator('.mud-popover-open .mud-list-item').filter({ hasText: 'Membership number' }).first().click();
   await expect(page.getByTestId('reference-label')).toHaveValue('Membership number');
+});
+
+test('common outgoings are suggested and fill in their usual settings', async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Netflix', 'Subscriptions', '10.99');
+
+  await page.goto('/outgoings/new');
+  await settled(page);
+  await page.getByTestId('name').fill('netf');
+  const netflix = page.locator('.mud-popover-open [data-testid=name-suggestion]').filter({ hasText: 'Netflix' });
+  await expect(netflix.getByTestId('already-added')).toBeVisible();
+
+  await page.getByTestId('name').fill('car ins');
+  await page.locator('.mud-popover-open [data-testid=name-suggestion]').filter({ hasText: 'Car insurance' }).first().click();
+  await expect(page.getByTestId('name')).toHaveValue('Car insurance');
+  await expect(page.getByTestId('reference-label')).toHaveValue('Policy number');
+  await expect(page.getByTestId('renewal-date')).toBeVisible();
+
+  await page.getByTestId('amount').fill('480');
+  await expect(page.getByTestId('monthly-equivalent')).toHaveText('£480.00 a year = £40.00 a month');
 });
