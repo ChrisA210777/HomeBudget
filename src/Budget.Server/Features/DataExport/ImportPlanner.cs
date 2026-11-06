@@ -1,3 +1,4 @@
+using Budget.Domain.Common;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Domain.People;
@@ -18,6 +19,9 @@ public sealed class ImportPlan
 
     /// <summary>Each person's <c>linkedMemberEmail</c> in the file, for linking logins when importing.</summary>
     public Dictionary<Person, string> LinkedEmails { get; } = [];
+
+    /// <summary>The new person for each person's id in the file.</summary>
+    public Dictionary<Guid, Person> PeopleByFileId { get; } = [];
 }
 
 /// <summary>
@@ -48,14 +52,27 @@ public static class ImportPlanner
             }
         }
 
+        // Who first recorded each item, and when, are kept for information (BUD-63).
+        T? Keep<T>(T? entity, ExportedAudited source)
+            where T : AuditableEntity
+        {
+            if (entity is not null && (source.RecordedBy is not null || source.RecordedAt is not null))
+            {
+                entity.RestoreOriginalRecord(source.RecordedBy, source.RecordedAt);
+            }
+
+            return entity;
+        }
+
         var people = new Dictionary<Guid, Guid>();
         for (var i = 0; i < export.People.Count; i++)
         {
             var source = export.People[i];
-            var person = Try($"people[{i}]", () => Person.Create(householdId, source.DisplayName));
+            var person = Keep(Try($"people[{i}]", () => Person.Create(householdId, source.DisplayName)), source);
             if (person is not null)
             {
                 people[source.Id] = person.Id;
+                plan.PeopleByFileId[source.Id] = person;
                 plan.People.Add(person);
                 if (!string.IsNullOrWhiteSpace(source.LinkedMemberEmail))
                 {
@@ -78,6 +95,7 @@ public static class ImportPlanner
 
                 return created;
             });
+            Keep(category, source);
             if (category is not null)
             {
                 categories[source.Id] = category.Id;
@@ -97,17 +115,17 @@ public static class ImportPlanner
             var entryIds = new Dictionary<Guid, Guid>();
             var changes = source.AmountChanges.OrderBy(c => c.EffectiveFrom).ToList();
             var first = changes[0];
-            var income = Try(path, () => IncomeStream.Create(householdId, personId, source.Name, first.Amount, first.EffectiveFrom, first.Comment, Schedule(first)));
+            var income = Keep(Try(path, () => IncomeStream.Create(householdId, personId, source.Name, first.Amount, first.EffectiveFrom, first.Comment, Schedule(first))), source);
             if (income is null)
             {
                 continue;
             }
 
-            entryIds[first.Id] = income.AmountChanges.Single().Id;
+            entryIds[first.Id] = Keep(income.AmountChanges.Single(), first)!.Id;
             foreach (var change in changes.Skip(1))
             {
                 var index = Index(source.AmountChanges, change);
-                var added = Try($"{path}.amountChanges[{index}]", () => income.ChangeAmount(change.EffectiveFrom, change.Amount, change.Comment, Schedule(change)));
+                var added = Keep(Try($"{path}.amountChanges[{index}]", () => income.ChangeAmount(change.EffectiveFrom, change.Amount, change.Comment, Schedule(change))), change);
                 if (added is not null)
                 {
                     entryIds[change.Id] = added.Id;
@@ -117,8 +135,8 @@ public static class ImportPlanner
             for (var p = 0; p < source.StatusPeriods.Count; p++)
             {
                 var period = source.StatusPeriods[p];
-                var added = Try($"{path}.statusPeriods[{p}]", () =>
-                    income.AddStatusPeriod(Enum.Parse<IncomeStatusReason>(period.Reason), period.StartDate, period.EndDate, period.ReducedMonthlyAmount, period.Comment));
+                var added = Keep(Try($"{path}.statusPeriods[{p}]", () =>
+                    income.AddStatusPeriod(Enum.Parse<IncomeStatusReason>(period.Reason), period.StartDate, period.EndDate, period.ReducedMonthlyAmount, period.Comment)), period);
                 if (added is not null)
                 {
                     entryIds[period.Id] = added.Id;
@@ -128,13 +146,13 @@ public static class ImportPlanner
             for (var c = 0; c < source.Corrections.Count; c++)
             {
                 var correction = source.Corrections[c];
-                Try($"{path}.corrections[{c}]", () => income.RestoreCorrection(
+                Keep(Try($"{path}.corrections[{c}]", () => income.RestoreCorrection(
                     Enum.Parse<IncomeEntryType>(correction.EntryType),
                     EntryId(entryIds, correction.EntryId),
                     Enum.Parse<IncomeCorrectionAction>(correction.Action),
                     correction.Before,
                     correction.After,
-                    correction.Reason));
+                    correction.Reason)), correction);
             }
 
             plan.Incomes.Add(income);
@@ -189,7 +207,7 @@ public static class ImportPlanner
                 continue;
             }
 
-            var outgoing = Try(path, () => Outgoing.Create(householdId, outgoingDetails, first.Amount, Schedule(first), first.Comment));
+            var outgoing = Keep(Try(path, () => Outgoing.Create(householdId, outgoingDetails, first.Amount, Schedule(first), first.Comment)), source);
             if (outgoing is null)
             {
                 continue;
@@ -199,12 +217,12 @@ public static class ImportPlanner
             {
                 if (change.EffectiveFrom == source.FirstPaymentDate)
                 {
-                    entryIds[change.Id] = outgoing.AmountChanges.Single(c => c.EffectiveFrom == source.FirstPaymentDate).Id;
+                    entryIds[change.Id] = Keep(outgoing.AmountChanges.Single(c => c.EffectiveFrom == source.FirstPaymentDate), change)!.Id;
                     continue;
                 }
 
-                var added = Try($"{path}.amountChanges[{Index(source.AmountChanges, change)}]", () =>
-                    outgoing.ChangeAmount(change.EffectiveFrom, change.Amount, Schedule(change), change.Comment));
+                var added = Keep(Try($"{path}.amountChanges[{Index(source.AmountChanges, change)}]", () =>
+                    outgoing.ChangeAmount(change.EffectiveFrom, change.Amount, Schedule(change), change.Comment)), change);
                 if (added is not null)
                 {
                     entryIds[change.Id] = added.Id;
@@ -214,9 +232,9 @@ public static class ImportPlanner
             for (var p = 0; p < source.StatusPeriods.Count; p++)
             {
                 var period = source.StatusPeriods[p];
-                var added = Try($"{path}.statusPeriods[{p}]", () => period.Reason == nameof(OutgoingStatusReason.Ended)
+                var added = Keep(Try($"{path}.statusPeriods[{p}]", () => period.Reason == nameof(OutgoingStatusReason.Ended)
                     ? outgoing.End(period.StartDate, period.Comment)
-                    : outgoing.Pause(period.StartDate, period.ResumesOn, period.Comment));
+                    : outgoing.Pause(period.StartDate, period.ResumesOn, period.Comment)), period);
                 if (added is not null)
                 {
                     entryIds[period.Id] = added.Id;
@@ -226,13 +244,13 @@ public static class ImportPlanner
             for (var c = 0; c < source.Corrections.Count; c++)
             {
                 var correction = source.Corrections[c];
-                Try($"{path}.corrections[{c}]", () => outgoing.RestoreCorrection(
+                Keep(Try($"{path}.corrections[{c}]", () => outgoing.RestoreCorrection(
                     Enum.Parse<OutgoingEntryType>(correction.EntryType),
                     EntryId(entryIds, correction.EntryId),
                     Enum.Parse<OutgoingCorrectionAction>(correction.Action),
                     correction.Before,
                     correction.After,
-                    correction.Reason));
+                    correction.Reason)), correction);
             }
 
             plan.Outgoings.Add(outgoing);

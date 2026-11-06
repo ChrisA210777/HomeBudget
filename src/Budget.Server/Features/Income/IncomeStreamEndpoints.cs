@@ -291,16 +291,16 @@ public static class IncomeStreamEndpoints
                 .OrderByDescending(c => c.EffectiveFrom)
                 .Select(c => new AmountChangeEntry(
                     c.Id, c.EffectiveFrom, c.Amount, c.Every, (PaymentUnitDto)c.Unit, IncomeTimeline.RoundForDisplay(c.MonthlyEquivalent), c.Comment,
-                    NameOf(c.CreatedBy), c.CreatedAt, c.EffectiveFrom > today, c.EffectiveFrom == stream.StartsOn))
+                    c.RecordedByName ?? NameOf(c.CreatedBy), c.RecordedAt, c.EffectiveFrom > today, c.EffectiveFrom == stream.StartsOn))
                 .ToList(),
             stream.StatusPeriods
                 .OrderByDescending(p => p.StartDate)
                 .Select(p => new StatusPeriodEntry(
-                    p.Id, ToDto(p.Reason), p.StartDate, p.EndDate, p.ReducedMonthlyAmount, p.Comment, NameOf(p.CreatedBy), p.CreatedAt, p.StartDate > today))
+                    p.Id, ToDto(p.Reason), p.StartDate, p.EndDate, p.ReducedMonthlyAmount, p.Comment, p.RecordedByName ?? NameOf(p.CreatedBy), p.RecordedAt, p.StartDate > today))
                 .ToList(),
             stream.Corrections
                 .OrderByDescending(c => c.CreatedAt)
-                .Select(c => new CorrectionEntry(c.EntryType.ToString(), c.Action.ToString(), c.Before, c.After, c.Reason, NameOf(c.CreatedBy), c.CreatedAt))
+                .Select(c => new CorrectionEntry(c.EntryType.ToString(), c.Action.ToString(), c.Before, c.After, c.Reason, c.RecordedByName ?? NameOf(c.CreatedBy), c.RecordedAt))
                 .ToList(),
             currency,
             version is null ? string.Empty : Convert.ToBase64String(version));

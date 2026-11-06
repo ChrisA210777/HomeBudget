@@ -2,8 +2,10 @@
 @attribute [Authorize]
 @using Budget.Client.DataExport
 @using Budget.Shared.DataExport
+@using Budget.Shared.Households
 @inject UserSession Session
 @inject IImportApi ImportApi
+@inject NavigationManager Navigation
 
 <PageTitle>Your data · Home Budget</PageTitle>
 
@@ -119,9 +121,36 @@
 
                     @if (_preview.CanImport)
                     {
-                        <MudAlert Severity="Severity.Success" Dense="true" Class="mt-3" data-testid="import-ok">
-                            This file passed every check. Importing it as a new household, or in place of this household's data, is coming next.
-                        </MudAlert>
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mt-3" data-testid="import-ok">This file passed every check and can be imported.</MudAlert>
+
+                        <MudText Typo="Typo.subtitle1" Class="mt-4 mb-1"><strong>Import as a new household</strong></MudText>
+                        <MudText Typo="Typo.body2" Class="mb-2">
+                            Creates a separate household from the file, with you as its owner. Nothing in @_household.Name changes.
+                        </MudText>
+                        <MudTextField @bind-Value="_newName" Label="New household's name" MaxLength="HouseholdValidator.NameMaxLength" Variant="Variant.Outlined"
+                                      Immediate="true" Class="mb-2" data-testid="import-name" />
+                        @if (_preview.People.Count > 0)
+                        {
+                            <MudSelect T="Guid?" @bind-Value="_me" Label="Which person in the file is you?" Variant="Variant.Outlined" Class="mb-2"
+                                       ToStringFunc="PersonName" data-testid="import-me">
+                                <MudSelectItem T="Guid?" Value="null">None of them</MudSelectItem>
+                                @foreach (var person in _preview.People)
+                                {
+                                    <MudSelectItem T="Guid?" Value="person.Id">@person.DisplayName</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                        @if (_importErrors is { Count: > 0 })
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2" data-testid="import-failed">
+                                @foreach (var error in _importErrors)
+                                {
+                                    <div>@Describe(error)</div>
+                                }
+                            </MudAlert>
+                        }
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddHome" OnClick="ImportAsNewHouseholdAsync"
+                                   Disabled="@(_importing || !Online)" data-testid="import-new-household">Import as a new household</MudButton>
                     }
                 </div>
             }
@@ -143,6 +172,11 @@
     private bool _checking;
     private string? _fileName;
     private ImportPreviewResponse? _preview;
+    private byte[]? _file;
+    private string? _newName;
+    private Guid? _me;
+    private bool _importing;
+    private IReadOnlyList<ImportProblem>? _importErrors;
 
     private string ExportUrl => DataRoutes.Export(_household!.HouseholdId, _includeHistory, _includeAudit);
 
@@ -163,7 +197,11 @@
             using var stream = e.File.OpenReadStream(ExportFormat.MaxFileBytes);
             using var memory = new MemoryStream();
             await stream.CopyToAsync(memory);
-            _preview = await ImportApi.PreviewAsync(_household!.HouseholdId, memory.ToArray());
+            _file = memory.ToArray();
+            _preview = await ImportApi.PreviewAsync(_household!.HouseholdId, _file);
+            _newName = _preview.HouseholdName;
+            _me = _preview.People.FirstOrDefault(p => p.IsYou)?.Id;
+            _importErrors = null;
         }
         catch (HttpRequestException)
         {
@@ -174,6 +212,35 @@
             _checking = false;
         }
     }
+
+    /// <summary>Imports the checked file as a new household, then opens it (BUD-63).</summary>
+    private async Task ImportAsNewHouseholdAsync()
+    {
+        _importing = true;
+        try
+        {
+            var result = await ImportApi.ImportAsNewHouseholdAsync(_household!.HouseholdId, _file!, _newName, _me);
+            if (!result.Succeeded)
+            {
+                _importErrors = result.Errors;
+                return;
+            }
+
+            // It's now the active household: reload so every part of the app uses it.
+            Navigation.NavigateTo("/?imported=true", forceLoad: true);
+        }
+        catch (HttpRequestException)
+        {
+            _importErrors = [new ImportProblem(string.Empty, "The file couldn't be imported. Check your connection and try again.")];
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    private string PersonName(Guid? id) =>
+        id is { } personId ? _preview?.People.FirstOrDefault(p => p.Id == personId)?.DisplayName ?? string.Empty : "None of them";
 
     private static ImportPreviewResponse Refused(string message) => new() { Errors = [new ImportProblem(string.Empty, message)] };
 

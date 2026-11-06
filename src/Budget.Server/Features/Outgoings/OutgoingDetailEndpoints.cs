@@ -312,17 +312,17 @@ internal static class OutgoingDetailEndpoints
                 .OrderByDescending(c => c.EffectiveFrom)
                 .Select(c => new OutgoingAmountEntry(
                     c.Id, c.EffectiveFrom, c.Amount, c.Every, (PaymentUnitDto)c.Unit, Values.RoundForDisplay(c.MonthlyEquivalent), c.Comment,
-                    NameOf(c.CreatedBy), c.CreatedAt, c.EffectiveFrom > today, c.EffectiveFrom == outgoing.StartsOn))
+                    c.RecordedByName ?? NameOf(c.CreatedBy), c.RecordedAt, c.EffectiveFrom > today, c.EffectiveFrom == outgoing.StartsOn))
                 .ToList(),
             outgoing.StatusPeriods
                 .OrderByDescending(p => p.StartDate)
                 .Select(p => new OutgoingStatusEntry(
                     p.Id, (OutgoingStatusReasonDto)p.Reason, p.StartDate, p.ResumesOn, outgoing.PaymentsSkippedBy(p), p.Comment,
-                    NameOf(p.CreatedBy), p.CreatedAt, p.StartDate > today))
+                    p.RecordedByName ?? NameOf(p.CreatedBy), p.RecordedAt, p.StartDate > today))
                 .ToList(),
             outgoing.Corrections
                 .OrderByDescending(c => c.CreatedAt)
-                .Select(c => new OutgoingCorrectionEntry(c.EntryType.ToString(), c.Action.ToString(), c.Before, c.After, c.Reason, NameOf(c.CreatedBy), c.CreatedAt))
+                .Select(c => new OutgoingCorrectionEntry(c.EntryType.ToString(), c.Action.ToString(), c.Before, c.After, c.Reason, c.RecordedByName ?? NameOf(c.CreatedBy), c.RecordedAt))
                 .ToList(),
             currency,
             Convert.ToBase64String(version));

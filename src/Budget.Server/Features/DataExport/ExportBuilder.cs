@@ -68,8 +68,9 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
             options.IncludeAudit
                 ? exported with
                 {
-                    RecordedBy = source.CreatedBy is { } c ? users.GetValueOrDefault(c)?.DisplayName : null,
-                    RecordedAt = source.CreatedAt,
+                    RecordedBy = (source as AuditableEntity)?.OriginallyRecordedBy
+                        ?? (source.CreatedBy is { } c ? users.GetValueOrDefault(c)?.DisplayName : null),
+                    RecordedAt = (source as AuditableEntity)?.OriginallyRecordedAt ?? source.CreatedAt,
                     ChangedBy = source.ModifiedBy is { } m ? users.GetValueOrDefault(m)?.DisplayName : null,
                     ChangedAt = source.ModifiedAt,
                 }

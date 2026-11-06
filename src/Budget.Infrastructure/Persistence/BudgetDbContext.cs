@@ -1,3 +1,4 @@
+using Budget.Domain.Common;
 using Budget.Domain.Households;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
@@ -56,6 +57,14 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
 
         builder.ApplyConfigurationsFromAssembly(typeof(BudgetDbContext).Assembly);
         builder.ApplyHouseholdQueryFilters(() => CurrentHouseholdId);
+
+        // Original audit details kept from an import (BUD-63), on every auditable table.
+        foreach (var entity in builder.Model.GetEntityTypes().Where(e => typeof(AuditableEntity).IsAssignableFrom(e.ClrType)))
+        {
+            builder.Entity(entity.ClrType).Property(nameof(AuditableEntity.OriginallyRecordedBy)).HasMaxLength(AuditableEntity.OriginallyRecordedByMaxLength);
+            builder.Entity(entity.ClrType).Ignore(nameof(AuditableEntity.RecordedByName));
+            builder.Entity(entity.ClrType).Ignore(nameof(AuditableEntity.RecordedAt));
+        }
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
