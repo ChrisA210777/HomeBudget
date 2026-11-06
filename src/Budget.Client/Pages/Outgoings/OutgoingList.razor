@@ -139,7 +139,7 @@
         {
             var items = group.ToList();
             <section class="mt-4" data-testid="category-group" aria-label="@items[0].CategoryName">
-                <div class="d-flex align-baseline justify-space-between px-1 mb-1">
+                <div class="d-flex align-baseline justify-space-between mb-1 category-heading">
                     <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2" style="font-weight: 600">
                         <MudIcon Icon="@CategoryIconSvg.For(items[0].CategoryIcon)" Size="Size.Small" Color="Color.Primary" aria-hidden="true" data-testid="category-icon" data-icon="@items[0].CategoryIcon" />
                         <span data-testid="category-name">@items[0].CategoryName</span>
@@ -171,9 +171,9 @@
                                             </MudChip>
                                         }
                                     </div>
-                                    <div class="text-right">
+                                    <div class="d-flex flex-column align-end text-right">
                                         <MudText Typo="Typo.subtitle1" data-testid="outgoing-monthly">@Format(item.MonthlyAmount)</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">a month</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="outgoing-period">a month</MudText>
                                     </div>
                                 </div>
                             </li>
