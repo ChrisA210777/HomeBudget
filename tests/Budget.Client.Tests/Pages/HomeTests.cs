@@ -134,6 +134,9 @@ public sealed class HomeTests : IDisposable
     [Fact]
     public void Links_to_income_and_people()
     {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", "Viewer", IsOwner: false));
+
         var cut = _context.RenderComponent<Home>();
 
         Assert.Equal("/income", cut.Find("[data-testid=go-to-income]").GetAttribute("href"));
