@@ -172,6 +172,8 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
     clientAffinityEnabled: false
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
+      // Say which assembly to run, rather than relying on App Service to guess it from the package.
+      appCommandLine: 'dotnet Budget.Server.dll'
       alwaysOn: !isFree
       minTlsVersion: '1.2'
       scmMinTlsVersion: '1.2'
@@ -213,6 +215,26 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
           value: 'false'
         }
       ], microsoftSettings)
+    }
+  }
+}
+
+// Keep the app's console output (and HTTP logs) for a day, so a failed start can be diagnosed.
+resource siteLogs 'Microsoft.Web/sites/config@2023-12-01' = {
+  parent: site
+  name: 'logs'
+  properties: {
+    applicationLogs: {
+      fileSystem: {
+        level: 'Information'
+      }
+    }
+    httpLogs: {
+      fileSystem: {
+        enabled: true
+        retentionInDays: 1
+        retentionInMb: 35
+      }
     }
   }
 }

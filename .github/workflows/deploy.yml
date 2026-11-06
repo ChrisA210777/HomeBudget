@@ -26,7 +26,8 @@ jobs:
       vars.AZURE_CLIENT_ID != '' && (
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
-    runs-on: ubuntu-latest
+    # Pinned: Microsoft's apt repository doesn't have sqlcmd for Ubuntu 26.04 yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment:
       name: dev
@@ -101,7 +102,12 @@ jobs:
 
       - name: Give the app access to the database
         run: |
-          command -v sqlcmd >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q sqlcmd; }
+          # From Microsoft's apt repository, or straight from the go-sqlcmd release if apt doesn't have it.
+          command -v sqlcmd >/dev/null \
+            || { sudo apt-get update -q && sudo apt-get install -y -q sqlcmd; } \
+            || curl -fsSL https://github.com/microsoft/go-sqlcmd/releases/latest/download/sqlcmd-linux-amd64.tar.bz2 \
+                 | sudo tar -xj -C /usr/local/bin sqlcmd
+          sqlcmd --version
           # The user is created from the identity's client id, so the server doesn't need directory access.
           sid=$(python3 -c "import uuid,sys; print('0x' + uuid.UUID(sys.argv[1]).bytes_le.hex().upper())" "${{ steps.infra.outputs.identityClientId }}")
           name="${{ steps.infra.outputs.identityName }}"
@@ -137,3 +143,19 @@ jobs:
             sleep 10
           done
           echo "::error::$url/health didn't respond"; exit 1
+
+      - name: Show why the app didn't start
+        if: failure() && steps.infra.outputs.app != ''
+        # Passed through the environment, not pasted into the script (CodeQL: code injection).
+        env:
+          APP: ${{ steps.infra.outputs.app }}
+        run: |
+          app="$APP"
+          az webapp show --resource-group "$RESOURCE_GROUP" --name "$app" \
+            --query "{state: state, runtime: siteConfig.linuxFxVersion, startup: siteConfig.appCommandLine}" --output json || true
+          echo "== .NET runtimes App Service offers on Linux"
+          az webapp list-runtimes --os linux --output tsv | grep -i dotnet || true
+          echo "== The app's most recent logs"
+          az webapp log download --resource-group "$RESOURCE_GROUP" --name "$app" --log-file logs.zip \
+            && unzip -o -q logs.zip -d logs \
+            && find logs -type f -name '*.log' -newermt '-30 minutes' -print -exec tail -n 80 {} \; || true
