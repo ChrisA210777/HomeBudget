@@ -209,6 +209,12 @@
                 return steps;
             }
 
+            if (_setup.People <= 1 && !_peopleStepDismissed)
+            {
+                steps.Add(new(PeopleStep, Icons.Material.Filled.People, "Add the people in your household",
+                    "Partners or children, so income and outgoings can be theirs. They don't need to sign in.", "Add people", "/people"));
+            }
+
             if (_setup.Incomes == 0)
             {
                 steps.Add(new("add-income", Icons.Material.Filled.Payments, "Add your income",
@@ -219,12 +225,6 @@
             {
                 steps.Add(new("add-outgoing", Icons.Material.Filled.ReceiptLong, "Add your outgoings",
                     "Bills, savings and spending allowances, so you can see what's left.", "Add an outgoing", "/outgoings/new"));
-            }
-
-            if (_setup.People <= 1 && !_peopleStepDismissed)
-            {
-                steps.Add(new(PeopleStep, Icons.Material.Filled.People, "Add the people in your household",
-                    "Partners or children whose income or bills you track. They don't need to sign in.", "Add people", "/people"));
             }
 
             return steps;

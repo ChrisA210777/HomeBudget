@@ -1,0 +1,57 @@
+@page "/household/data"
+@attribute [Authorize]
+@using Budget.Shared.DataExport
+@inject UserSession Session
+
+<PageTitle>Your data · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <h1 class="mud-typography mud-typography-h4 mb-2">Your data</h1>
+
+    @if (_household is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_household.Role != "Admin")
+    {
+        <MudAlert Severity="Severity.Info" data-testid="admins-only">Only the household's Admins can download or import its data.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Class="pa-4" Elevation="1" data-testid="export-section">
+            <MudText Typo="Typo.h6" Class="mb-1">Download your data</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">
+                A backup of @_household.Name you can import again later: its people, categories, and the income and outgoings
+                that are current or start in the future. Budgets and other totals aren't included, because they're worked out from these.
+            </MudText>
+
+            <MudCheckBox T="bool" @bind-Value="_includeHistory" Label="Include full history" Color="Color.Primary" data-testid="include-history" />
+            <MudText Typo="Typo.caption" Class="d-block ml-10 mb-2" Color="Color.Secondary">Ended items, past price changes and pauses, and corrections.</MudText>
+            <MudCheckBox T="bool" @bind-Value="_includeAudit" Label="Include who recorded what" Color="Color.Primary" data-testid="include-audit" />
+            <MudText Typo="Typo.caption" Class="d-block ml-10 mb-3" Color="Color.Secondary">The name of whoever added or last changed each item, and when.</MudText>
+
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" data-testid="export-warning">
+                The file contains your household's personal and financial details. Keep it somewhere safe, and don't share it.
+            </MudAlert>
+
+            @* A plain link, so the browser downloads the file with the name the server gives it. *@
+            <MudButton Href="@ExportUrl" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download"
+                       Disabled="!Online" download data-testid="download-json">Download (JSON)</MudButton>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    /// <summary>False while the device is offline, when the file can't be fetched (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    private HouseholdMembershipSummary? _household;
+    private bool _includeHistory;
+    private bool _includeAudit;
+
+    private string ExportUrl => DataRoutes.Export(_household!.HouseholdId, _includeHistory, _includeAudit);
+
+    protected override async Task OnInitializedAsync() =>
+        _household = await Session.GetActiveHouseholdAsync() ?? new HouseholdMembershipSummary(Guid.Empty, string.Empty, "Viewer", false);
+}
