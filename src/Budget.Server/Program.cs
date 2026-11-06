@@ -3,6 +3,7 @@ using Budget.Infrastructure;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Account;
+using Budget.Server.Features.Budgeting;
 using Budget.Server.Features.Households;
 using Budget.Server.Features.Income;
 using Budget.Server.Features.Outgoings;
@@ -77,6 +78,7 @@ app.MapIncomeStreamEndpoints();
 app.MapPeopleEndpoints();
 app.MapOutgoingCategoryEndpoints();
 app.MapOutgoingEndpoints();
+app.MapBudgetEndpoints();
 
 // Unknown server routes are 404s, not the client app's page.
 app.MapFallback("/api/{**path}", () => Results.NotFound());

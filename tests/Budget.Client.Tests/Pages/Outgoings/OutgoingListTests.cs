@@ -115,6 +115,23 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
+    public void A_month_and_category_can_come_from_the_link()
+    {
+        _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo($"/outgoings?month=2027-01&category={HousingId}");
+
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        Assert.Equal((2027, 1, false), _api.Requests.Single());
+        Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "outgoing-name"));
+        Assert.Contains("Housing", cut.Find("[data-testid=category-filter]").TextContent, StringComparison.Ordinal);
+        Assert.Equal("£150.00", Text(cut, "month-total"));
+
+        cut.Find("[data-testid=clear-category]").Click();
+
+        Assert.Equal(4, cut.FindAll("[data-testid=outgoing-item]").Count);
+    }
+
+    [Fact]
     public void An_empty_month_explains_how_to_add_one()
     {
         _api.Empty = true;

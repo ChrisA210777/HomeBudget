@@ -9,6 +9,7 @@ public static class NavItems
     public static IReadOnlyList<NavItem> All { get; } =
     [
         new("Home", "/", Icons.Material.Filled.Home, NavLinkMatch.All),
+        new("Budget", "/budget", Icons.Material.Filled.AccountBalanceWallet, NavLinkMatch.Prefix),
         new("Income", "/income", Icons.Material.Filled.Payments, NavLinkMatch.Prefix),
         new("Outgoings", "/outgoings", Icons.Material.Filled.ReceiptLong, NavLinkMatch.Prefix),
         new("People", "/people", Icons.Material.Filled.People, NavLinkMatch.Prefix),

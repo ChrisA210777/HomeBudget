@@ -46,10 +46,10 @@ public sealed class MainLayoutTests : IDisposable
     {
         var cut = Render();
 
-        var expected = new[] { "/", "/income", "/outgoings", "/people" };
+        var expected = new[] { "/", "/budget", "/income", "/outgoings", "/people" };
         Assert.Equal(expected, cut.FindAll("[data-testid=side-nav] a").Select(a => a.GetAttribute("href")).ToArray());
         Assert.Equal(expected, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.GetAttribute("href")).ToArray());
-        Assert.Equal(new[] { "Home", "Income", "Outgoings", "People" }, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.TextContent.Trim()).ToArray());
+        Assert.Equal(new[] { "Home", "Budget", "Income", "Outgoings", "People" }, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.TextContent.Trim()).ToArray());
     }
 
     [Fact]

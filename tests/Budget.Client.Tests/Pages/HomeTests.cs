@@ -1,6 +1,8 @@
 using Budget.Client.Account;
+using Budget.Client.Budgeting;
 using Budget.Client.Households;
 using Budget.Client.Pages;
+using Budget.Client.Tests.TestDoubles;
 using Budget.Shared.Account;
 using Budget.Shared.Households;
 using Bunit.TestDoubles;
@@ -15,15 +17,42 @@ public sealed class HomeTests : IDisposable
     private readonly TestContext _context = new();
     private readonly StubAccountApi _accountApi = new();
     private readonly FakeHouseholdApi _householdApi = new();
+    private readonly FakeBudgetApi _budgetApi = new();
 
     public HomeTests()
     {
         _context.Services.AddMudServices();
         _context.Services.AddSingleton<IAccountApi>(_accountApi);
         _context.Services.AddSingleton<IHouseholdApi>(_householdApi);
+        _context.Services.AddSingleton<IBudgetApi>(_budgetApi);
         _context.Services.AddScoped<UserSession>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
+    }
+
+    [Fact]
+    public void The_budget_card_shows_whats_left_this_month()
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", "Admin", IsOwner: true));
+
+        var cut = _context.RenderComponent<Home>();
+
+        Assert.Equal("£1,290.00", cut.Find("[data-testid=home-left]").TextContent.Trim());
+        Assert.Contains("£3,000.00 in, £1,710.00 out", cut.Find("[data-testid=budget-card]").TextContent, StringComparison.Ordinal);
+        Assert.Equal((null, null), _budgetApi.Requests.Single());
+    }
+
+    [Fact]
+    public void A_shortfall_on_the_budget_card_says_so_in_words()
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", "Admin", IsOwner: true));
+        _budgetApi.Month = FakeBudgetApi.Sample(2026, 11, income: 1000m, essential: 1200m, preferred: 0m, optional: 0m);
+
+        var cut = _context.RenderComponent<Home>();
+
+        Assert.Equal("Short by £200.00", cut.Find("[data-testid=home-left]").TextContent.Trim());
     }
 
     [Fact]
