@@ -122,6 +122,33 @@
                     <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Logout" OnClick="() => _confirmLeave = true" Disabled="!Online" data-testid="leave">Leave household</MudButton>
                 }
             </MudPaper>
+
+            @if (_household.IsOwner)
+            {
+                <MudPaper Outlined="true" Class="pa-4 mt-4 confirm-panel" data-testid="delete-section">
+                    <MudText Typo="Typo.subtitle1" Class="mb-1">Delete this household</MudText>
+                    @if (_confirmDelete)
+                    {
+                        <MudText Typo="Typo.body2" Class="mb-2">
+                            This permanently deletes @_household.Name and everything in it: its people, income, outgoings and categories.
+                            Everyone else in it loses access. It can't be undone.
+                        </MudText>
+                        <MudTextField @bind-Value="_deleteName" Label="@($"Type {_household.Name} to confirm")" Variant="Variant.Outlined" Immediate="true"
+                                      autocomplete="off" data-testid="delete-name" />
+                        <div class="d-flex gap-2 flex-wrap mt-3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteForever" OnClick="DeleteAsync"
+                                       Disabled="@(_saving || !Online || !NameConfirmed)" data-testid="delete-yes">Delete household</MudButton>
+                            <MudButton Variant="Variant.Text" OnClick="CancelDelete" data-testid="delete-cancel">Cancel</MudButton>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="mb-2">Only you, as the owner, can do this.</MudText>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteForever" OnClick="() => _confirmDelete = true"
+                                   Disabled="!Online" data-testid="delete-household">Delete household</MudButton>
+                    }
+                </MudPaper>
+            }
         }
 
         <MudText Typo="Typo.subtitle2" Class="mt-6 mb-1">What each role can do</MudText>
@@ -147,6 +174,11 @@
     private string? _error;
     private Guid? _removingId;
     private bool _confirmLeave;
+    private bool _confirmDelete;
+    private string? _deleteName;
+
+    /// <summary>The owner has typed the household's name (ignoring case and spaces at either end).</summary>
+    private bool NameConfirmed => string.Equals(_deleteName?.Trim(), _household?.Name, StringComparison.OrdinalIgnoreCase);
 
     protected override async Task OnInitializedAsync()
     {
@@ -182,6 +214,33 @@
     // Back to the home page, which opens another of your households.
     private Task LeaveAsync() =>
         SaveAsync(() => HouseholdApi.LeaveAsync(_household!.HouseholdId), $"You've left {_household!.Name}.", reloadAppAt: "/");
+
+    private void CancelDelete()
+    {
+        _confirmDelete = false;
+        _deleteName = null;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!NameConfirmed)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            await HouseholdApi.DeleteAsync(_household!.HouseholdId);
+
+            // Home opens another of your households, or offers to create one.
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
 
     /// <summary>Saves a change, then reloads the list, or the whole app when your own access has changed.</summary>
     private async Task SaveAsync(Func<Task<string?>> save, string done, string? reloadAppAt)

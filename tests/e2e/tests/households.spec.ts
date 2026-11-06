@@ -28,3 +28,23 @@ test('you can create another household and switch between them from the app bar'
   await page.reload();
   await expect(page.getByTestId('appbar-household')).toHaveText('My Household');
 });
+
+test('the owner can delete a household, and is offered a new one when they have none left', async ({ page }) => {
+  await signIn(page);
+
+  await page.goto('/members');
+  await settled(page);
+  await page.getByTestId('delete-household').click();
+  await expect(page.getByTestId('delete-yes')).toBeDisabled();
+  await page.getByTestId('delete-name').fill('My Household');
+  await page.getByTestId('delete-yes').click();
+
+  await expect(page.getByTestId('no-household')).toBeVisible();
+  await expect(page.getByTestId('appbar-household')).toHaveCount(0);
+
+  await page.getByTestId('no-household-create').click();
+  await settled(page);
+  await page.getByTestId('household-name').fill('Fresh start');
+  await page.getByTestId('create').click();
+  await expect(page.getByTestId('appbar-household')).toHaveText('Fresh start');
+});

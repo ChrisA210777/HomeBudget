@@ -54,102 +54,117 @@
         </MudText>
     }
 
-    <MudGrid Spacing="2">
-        <MudItem xs="12">
-            <MudCard Outlined="true" data-testid="budget-card">
-                <MudCardContent>
-                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Small" Class="mr-1" />Budget this month</MudText>
-                    @if (_budget is null)
-                    {
-                        <MudText Typo="Typo.body2">What's left after all your outgoings.</MudText>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.caption" Class="d-block">Left after everything</MudText>
-                        @if (_budget.LeftAfterEverything < 0)
+    @if (_loaded && _household is null)
+    {
+        <MudCard Outlined="true" data-testid="no-household">
+            <MudCardContent>
+                <MudText Typo="Typo.h6">You're not in a household</MudText>
+                <MudText Typo="Typo.body2">Create one to start budgeting, or ask someone to invite you to theirs.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Href="/households/new" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddHome" data-testid="no-household-create">Create household</MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+    else
+    {
+        <MudGrid Spacing="2">
+            <MudItem xs="12">
+                <MudCard Outlined="true" data-testid="budget-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Small" Class="mr-1" />Budget this month</MudText>
+                        @if (_budget is null)
                         {
-                            <MudText Typo="Typo.h5" Class="budget-shortfall" data-testid="home-left">
-                                <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" aria-hidden="true" />Short by @Money.Format(-_budget.LeftAfterEverything, _budget.CurrencyCode)
-                            </MudText>
+                            <MudText Typo="Typo.body2">What's left after all your outgoings.</MudText>
                         }
                         else
                         {
-                            <MudText Typo="Typo.h5" data-testid="home-left">@Money.Format(_budget.LeftAfterEverything, _budget.CurrencyCode)</MudText>
-                        }
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                            @Money.Format(_budget.Income, _budget.CurrencyCode) in, @Money.Format(_budget.Outgoings, _budget.CurrencyCode) out
-                        </MudText>
-                    }
-                </MudCardContent>
-                <MudCardActions>
-                    <MudButton Href="/budget" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-budget">Go to budget</MudButton>
-                </MudCardActions>
-            </MudCard>
-        </MudItem>
-        @if (_renewals is { Count: > 0 })
-        {
-            <MudItem xs="12">
-                <MudCard Outlined="true" data-testid="coming-up-card">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.EventRepeat" Size="Size.Small" Class="mr-1" />Coming up</MudText>
-                        <ul class="plain-list" aria-label="Renewals coming up">
-                            @foreach (var renewal in _renewals)
+                            <MudText Typo="Typo.caption" Class="d-block">Left after everything</MudText>
+                            @if (_budget.LeftAfterEverything < 0)
                             {
-                                <li class="py-2" data-testid="coming-up">
-                                    <div class="d-flex align-start gap-2">
-                                        <div class="flex-grow-1" style="min-width: 0">
-                                            <MudLink Href="@($"/outgoings/{renewal.Id}")" Typo="Typo.body1" data-testid="coming-up-name">@renewal.Name</MudLink>
-                                            <MudText Typo="Typo.body2" data-testid="coming-up-text">@OutgoingValidator.DescribeRenewal(renewal.Name, renewal.RenewalDate, renewal.AutoRenews)</MudText>
-                                        </div>
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ma-0" data-testid="coming-up-days">@OutgoingValidator.RenewsIn(renewal.DaysUntil)</MudChip>
-                                    </div>
-                                </li>
+                                <MudText Typo="Typo.h5" Class="budget-shortfall" data-testid="home-left">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" aria-hidden="true" />Short by @Money.Format(-_budget.LeftAfterEverything, _budget.CurrencyCode)
+                                </MudText>
                             }
-                        </ul>
+                            else
+                            {
+                                <MudText Typo="Typo.h5" data-testid="home-left">@Money.Format(_budget.LeftAfterEverything, _budget.CurrencyCode)</MudText>
+                            }
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @Money.Format(_budget.Income, _budget.CurrencyCode) in, @Money.Format(_budget.Outgoings, _budget.CurrencyCode) out
+                            </MudText>
+                        }
                     </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Href="/budget" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-budget">Go to budget</MudButton>
+                    </MudCardActions>
                 </MudCard>
             </MudItem>
-        }
-        <MudItem xs="12" sm="6">
-            <MudCard Outlined="true" Style="height: 100%" data-testid="income-card">
-                <MudCardContent>
-                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />Income</MudText>
-                    <MudText Typo="Typo.body2">See what comes in each month, and record pay changes and leave.</MudText>
-                </MudCardContent>
-                <MudCardActions>
-                    <MudButton Href="/income" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-income">Go to income</MudButton>
-                </MudCardActions>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6">
-            <MudCard Outlined="true" Style="height: 100%" data-testid="people-card">
-                <MudCardContent>
-                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Class="mr-1" />People</MudText>
-                    <MudText Typo="Typo.body2">Everyone in the household, including those who don't sign in.</MudText>
-                </MudCardContent>
-                <MudCardActions>
-                    <MudButton Href="/people" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-people">Go to people</MudButton>
-                    <MudButton Href="/members" Color="Color.Primary" Variant="Variant.Text" data-testid="go-to-members">Members</MudButton>
-                </MudCardActions>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6">
-            <MudCard Outlined="true" Style="height: 100%" data-testid="outgoings-card">
-                <MudCardContent>
-                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" Class="mr-1" />Outgoings</MudText>
-                    <MudText Typo="Typo.body2">Bills, savings and spending allowances, and the categories they go in.</MudText>
-                </MudCardContent>
-                <MudCardActions Class="flex-wrap">
-                    @if (_household?.Role is not null and not "Viewer")
-                    {
-                        <MudButton Href="/outgoings/new" Color="Color.Primary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Add" data-testid="add-outgoing">Add an outgoing</MudButton>
-                    }
-                    <MudButton Href="/outgoings/categories" Color="Color.Primary" Variant="Variant.Text" data-testid="go-to-categories">Categories</MudButton>
-                    <MudButton Href="/outgoings" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-outgoings">Go to outgoings</MudButton>
-                </MudCardActions>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
+            @if (_renewals is { Count: > 0 })
+            {
+                <MudItem xs="12">
+                    <MudCard Outlined="true" data-testid="coming-up-card">
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.EventRepeat" Size="Size.Small" Class="mr-1" />Coming up</MudText>
+                            <ul class="plain-list" aria-label="Renewals coming up">
+                                @foreach (var renewal in _renewals)
+                                {
+                                    <li class="py-2" data-testid="coming-up">
+                                        <div class="d-flex align-start gap-2">
+                                            <div class="flex-grow-1" style="min-width: 0">
+                                                <MudLink Href="@($"/outgoings/{renewal.Id}")" Typo="Typo.body1" data-testid="coming-up-name">@renewal.Name</MudLink>
+                                                <MudText Typo="Typo.body2" data-testid="coming-up-text">@OutgoingValidator.DescribeRenewal(renewal.Name, renewal.RenewalDate, renewal.AutoRenews)</MudText>
+                                            </div>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ma-0" data-testid="coming-up-days">@OutgoingValidator.RenewsIn(renewal.DaysUntil)</MudChip>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+            <MudItem xs="12" sm="6">
+                <MudCard Outlined="true" Style="height: 100%" data-testid="income-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />Income</MudText>
+                        <MudText Typo="Typo.body2">See what comes in each month, and record pay changes and leave.</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Href="/income" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-income">Go to income</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudCard Outlined="true" Style="height: 100%" data-testid="people-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Class="mr-1" />People</MudText>
+                        <MudText Typo="Typo.body2">Everyone in the household, including those who don't sign in.</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Href="/people" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-people">Go to people</MudButton>
+                        <MudButton Href="/members" Color="Color.Primary" Variant="Variant.Text" data-testid="go-to-members">Members</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudCard Outlined="true" Style="height: 100%" data-testid="outgoings-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" Class="mr-1" />Outgoings</MudText>
+                        <MudText Typo="Typo.body2">Bills, savings and spending allowances, and the categories they go in.</MudText>
+                    </MudCardContent>
+                    <MudCardActions Class="flex-wrap">
+                        @if (_household?.Role is not null and not "Viewer")
+                        {
+                            <MudButton Href="/outgoings/new" Color="Color.Primary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Add" data-testid="add-outgoing">Add an outgoing</MudButton>
+                        }
+                        <MudButton Href="/outgoings/categories" Color="Color.Primary" Variant="Variant.Text" data-testid="go-to-categories">Categories</MudButton>
+                        <MudButton Href="/outgoings" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-outgoings">Go to outgoings</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
 </MudContainer>
 
 @code {
@@ -158,6 +173,7 @@
     public bool Online { get; set; } = true;
 
     private HouseholdMembershipSummary? _household;
+    private bool _loaded;
     private bool _renaming;
     private bool _saving;
     private string? _newName;
@@ -177,6 +193,8 @@
             _budget = await budget;
             _renewals = await renewals;
         }
+
+        _loaded = true;
     }
 
     private void StartRename()
