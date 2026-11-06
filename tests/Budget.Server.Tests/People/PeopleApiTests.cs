@@ -23,7 +23,7 @@ public class PeopleApiTests(BudgetApiFactory factory) : IntegrationTestBase(fact
         var people = await client.GetFromJsonAsync<List<PersonSummary>>(Url(PeopleRoutes.People(householdId)));
 
         var me = Assert.Single(people!);
-        Assert.Equal("Chris Austin", me.DisplayName);
+        Assert.Equal("Chris", me.DisplayName);
         Assert.Equal(ownerId, me.LinkedUserId);
         Assert.Equal("Chris Austin", me.LinkedUserName);
         Assert.True(me.IsYou);

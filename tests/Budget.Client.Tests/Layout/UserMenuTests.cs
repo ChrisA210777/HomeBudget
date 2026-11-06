@@ -17,6 +17,7 @@ public sealed class UserMenuTests : IDisposable
     {
         _context.Services.AddMudServices();
         _context.Services.AddSingleton<IAccountApi>(_accountApi);
+        _context.Services.AddScoped<UserSession>();
         _context.Services.AddScoped<ThemePreference>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
@@ -32,6 +33,33 @@ public sealed class UserMenuTests : IDisposable
         var button = cut.Find("[data-testid=user-menu] button");
         Assert.Equal("Chris Austin", button.TextContent.Trim());
         Assert.Equal("Account menu for Chris Austin", button.GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void Shows_your_person_name_in_this_household_rather_than_the_logins_full_name()
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = new CurrentUserResponse(Guid.NewGuid(), "Chris Austin", "chris@example.com",
+            [new HouseholdMembershipSummary(householdId, "My Household", "Admin", true, Guid.NewGuid(), "Chris")], householdId);
+
+        var cut = _context.RenderComponent<UserMenu>();
+
+        var button = cut.Find("[data-testid=user-menu] button");
+        Assert.Equal("Chris", button.TextContent.Trim());
+        Assert.Equal("Account menu for Chris", button.GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void Renaming_your_person_updates_the_name_shown()
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = new CurrentUserResponse(Guid.NewGuid(), "Chris Austin", "chris@example.com",
+            [new HouseholdMembershipSummary(householdId, "My Household", "Admin", true, Guid.NewGuid(), "Chris")], householdId);
+        var cut = _context.RenderComponent<UserMenu>();
+
+        cut.InvokeAsync(() => _context.Services.GetRequiredService<UserSession>().SetPersonNameAsync(householdId, "Christopher"));
+
+        cut.WaitForAssertion(() => Assert.Equal("Christopher", cut.Find("[data-testid=user-menu] button").TextContent.Trim()));
     }
 
     [Fact]
@@ -97,8 +125,10 @@ public sealed class UserMenuTests : IDisposable
         public Task<IReadOnlyList<AuthProvider>> GetProvidersAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AuthProvider>>([]);
 
+        public CurrentUserResponse? User { get; set; }
+
         public Task<CurrentUserResponse?> GetCurrentUserAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<CurrentUserResponse?>(null);
+            Task.FromResult(User);
 
         public Task SignOutAsync(CancellationToken cancellationToken = default)
         {

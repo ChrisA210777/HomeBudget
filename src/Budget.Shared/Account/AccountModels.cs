@@ -15,7 +15,8 @@ public sealed record CurrentUserResponse(
 
 /// <summary>A household the user belongs to and their role in it.</summary>
 /// <param name="PersonId">The person in that household linked to the user's login, if any.</param>
-public sealed record HouseholdMembershipSummary(Guid HouseholdId, string Name, string Role, bool IsOwner, Guid? PersonId = null);
+/// <param name="PersonName">That person's name, e.g. "Chris"; shown instead of the login's full name.</param>
+public sealed record HouseholdMembershipSummary(Guid HouseholdId, string Name, string Role, bool IsOwner, Guid? PersonId = null, string? PersonName = null);
 
 /// <summary>Switch to another of the user's households.</summary>
 public sealed record SetActiveHouseholdRequest(Guid HouseholdId);
