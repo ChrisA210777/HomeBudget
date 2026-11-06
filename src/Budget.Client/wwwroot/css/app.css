@@ -193,3 +193,42 @@ body {
     margin: 0;
     overflow-wrap: anywhere;
 }
+
+/* The monthly budget (BUD-53). */
+.budget-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.budget-table th {
+    text-align: left;
+    font-weight: 400;
+    padding: 0.35rem 0;
+}
+
+.budget-table td {
+    text-align: right;
+    white-space: nowrap;
+    padding: 0.35rem 0 0.35rem 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.budget-table .budget-left th,
+.budget-table .budget-left td {
+    font-weight: 600;
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+.budget-table .budget-final th,
+.budget-table .budget-final td {
+    font-size: 1.15rem;
+    border-top: 2px solid var(--mud-palette-text-primary);
+}
+
+.budget-shortfall {
+    color: var(--mud-palette-error);
+}
+
+.budget-lines li + li {
+    border-top: 1px solid var(--mud-palette-lines-default);
+}

@@ -96,6 +96,16 @@
             </div>
         </div>
 
+        @if (_category is { } categoryId)
+        {
+            <div class="d-flex align-center flex-wrap gap-2 mb-1" data-testid="category-filter">
+                <MudText Typo="Typo.body2">
+                    Showing <b>@(_data.Items.FirstOrDefault(i => i.CategoryId == categoryId)?.CategoryName ?? "one category")</b> only.
+                </MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="() => _category = null" data-testid="clear-category">Show all categories</MudButton>
+            </div>
+        }
+
         <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show all, including ones not started or ended" data-testid="show-all" />
 
         @if (_data.Items.Count == 0)
@@ -169,6 +179,14 @@
 </MudContainer>
 
 @code {
+    /// <summary>Optional <c>?month=2026-11</c>, e.g. from the Budget page.</summary>
+    [SupplyParameterFromQuery(Name = "month")]
+    public string? MonthQuery { get; set; }
+
+    /// <summary>Optional <c>?category={id}</c> to show one category, e.g. from the Budget page.</summary>
+    [SupplyParameterFromQuery(Name = "category")]
+    public Guid? CategoryQuery { get; set; }
+
     private const string EveryoneKey = "";
     private const string HouseholdKey = "household";
 
@@ -181,16 +199,23 @@
     private int _year;
     private int _month;
 
+    private Guid? _category;
     private OutgoingKindDto? _kind;
     private OutgoingPriorityDto? _priority;
     private string _person = EveryoneKey;
 
-    private bool IsFiltered => _kind is not null || _priority is not null || _person != EveryoneKey;
+    private bool IsFiltered => _category is not null || _kind is not null || _priority is not null || _person != EveryoneKey;
 
     protected override async Task OnInitializedAsync()
     {
         var today = Clock.GetLocalNow();
         (_year, _month) = (today.Year, today.Month);
+        if (MonthQuery is { Length: 7 } && DateOnly.TryParseExact(MonthQuery + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var month))
+        {
+            (_year, _month) = (month.Year, month.Month);
+        }
+
+        _category = CategoryQuery;
 
         _household = await Session.GetActiveHouseholdAsync();
         _canEdit = _household is not null && _household.Role != "Viewer";
@@ -213,7 +238,8 @@
 
     private IEnumerable<OutgoingMonthItem> Filtered() =>
         _data!.Items.Where(i =>
-            (_kind is null || i.Kind == _kind)
+            (_category is null || i.CategoryId == _category)
+            && (_kind is null || i.Kind == _kind)
             && (_priority is null || i.Priority == _priority)
             && (_person == EveryoneKey
                 || (_person == HouseholdKey ? i.PersonId is null : i.PersonId?.ToString() == _person)));
@@ -233,6 +259,7 @@
 
     private void ClearFilters()
     {
+        _category = null;
         _kind = null;
         _priority = null;
         _person = EveryoneKey;

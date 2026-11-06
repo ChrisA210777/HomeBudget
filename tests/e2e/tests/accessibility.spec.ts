@@ -24,7 +24,7 @@ for (const theme of ['Light', 'Dark']) {
       const incomePage = await addIncome(page, 'Salary', '3000');
       const outgoingPage = await addOutgoing(page, 'Council tax', 'Housing', '150');
 
-      for (const path of ['/', '/income', '/income/new', '/people', '/outgoings', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname, new URL(outgoingPage).pathname, `${new URL(outgoingPage).pathname}/edit`]) {
+      for (const path of ['/', '/budget', '/income', '/income/new', '/people', '/outgoings', '/outgoings/categories', '/outgoings/new', new URL(incomePage).pathname, new URL(outgoingPage).pathname, `${new URL(outgoingPage).pathname}/edit`]) {
         await page.goto(path);
         await settled(page);
         await expectNoSeriousViolations(page, `${path} (${theme})`);

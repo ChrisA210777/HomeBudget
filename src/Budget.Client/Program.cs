@@ -1,5 +1,6 @@
 using Budget.Client;
 using Budget.Client.Account;
+using Budget.Client.Budgeting;
 using Budget.Client.Households;
 using Budget.Client.Income;
 using Budget.Client.Layout;
@@ -27,6 +28,7 @@ builder.Services.AddScoped<IIncomeApi, IncomeApi>();
 builder.Services.AddScoped<IPeopleApi, PeopleApi>();
 builder.Services.AddScoped<ICategoryApi, CategoryApi>();
 builder.Services.AddScoped<IOutgoingApi, OutgoingApi>();
+builder.Services.AddScoped<IBudgetApi, BudgetApi>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ThemePreference>();
 builder.Services.AddScoped<Connectivity>();

@@ -1,0 +1,178 @@
+@page "/budget"
+@attribute [Authorize]
+@using Budget.Client.Budgeting
+@using Budget.Client.Income
+@using Budget.Shared.Budgeting
+@using Budget.Shared.Income
+@using Budget.Shared.Outgoings
+@inject UserSession Session
+@inject IBudgetApi BudgetApi
+@inject TimeProvider Clock
+
+<PageTitle>Budget · Home Budget</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
+    <h1 class="mud-typography mud-typography-h4 mb-2">Budget</h1>
+    <MudText Typo="Typo.body2" Class="mb-3">
+        What comes in against what goes out each month. Annual and weekly payments are averaged into the month.
+    </MudText>
+
+    <div class="d-flex align-center justify-space-between mb-3">
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
+        <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
+    </div>
+
+    @if (_loaded && _household is null)
+    {
+        <MudAlert Severity="Severity.Info">You're not in a household yet.</MudAlert>
+    }
+    else if (_budget is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        var b = _budget;
+
+        <MudPaper Class="pa-4 mb-3" Elevation="1">
+            <table class="budget-table" aria-label="Budget for @IncomeDates.MonthName(_year, _month)">
+                <tbody>
+                    <tr class="budget-income">
+                        <th scope="row"><MudLink Href="/income">Income</MudLink></th>
+                        <td data-testid="budget-income">@Format(b.Income)</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Essential outgoings</th>
+                        <td data-testid="budget-essential">− @Format(b.Essential)</td>
+                    </tr>
+                    <tr class="budget-left">
+                        <th scope="row">Left after essentials</th>
+                        <td data-testid="left-essential">@Left(b.LeftAfterEssential)</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Preferred outgoings</th>
+                        <td data-testid="budget-preferred">− @Format(b.Preferred)</td>
+                    </tr>
+                    <tr class="budget-left">
+                        <th scope="row">Left after essential and preferred</th>
+                        <td data-testid="left-preferred">@Left(b.LeftAfterPreferred)</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Optional outgoings</th>
+                        <td data-testid="budget-optional">− @Format(b.Optional)</td>
+                    </tr>
+                    <tr class="budget-left budget-final">
+                        <th scope="row">Left after everything</th>
+                        <td data-testid="left-everything">@Left(b.LeftAfterEverything)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </MudPaper>
+
+        @if (b.LeftAfterEverything < 0)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="shortfall-warning">
+                Outgoings are @Format(-b.LeftAfterEverything) more than income this month.
+                @(b.LeftAfterEssential < 0 ? "Even the essentials aren't covered." : b.LeftAfterPreferred < 0 ? "The essentials are covered, but not everything preferred." : "Cutting optional outgoings would close the gap.")
+            </MudAlert>
+        }
+
+        @if (b.Outgoings == 0 && b.Income == 0)
+        {
+            <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="budget-empty">
+                <MudText Typo="Typo.body1">Nothing recorded for this month yet.</MudText>
+                <MudText Typo="Typo.body2">Add your <MudLink Href="/income">income</MudLink> and <MudLink Href="/outgoings">outgoings</MudLink> to see what's left.</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="5">
+                    <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
+                        <h2 class="mud-typography mud-typography-subtitle1 mb-2" style="font-weight: 600">By kind</h2>
+                        <ul class="plain-list budget-lines" aria-label="Outgoings by kind">
+                            @foreach (var line in b.ByKind)
+                            {
+                                <li class="d-flex justify-space-between py-1" data-testid="kind-line">
+                                    <span>@KindName(line.Kind)</span>
+                                    <span data-testid="kind-amount">@Format(line.Amount)</span>
+                                </li>
+                            }
+                        </ul>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="7">
+                    <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
+                        <h2 class="mud-typography mud-typography-subtitle1 mb-2" style="font-weight: 600">By category</h2>
+                        @if (b.ByCategory.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">No outgoings this month.</MudText>
+                        }
+                        <ul class="plain-list budget-lines" aria-label="Outgoings by category">
+                            @foreach (var line in b.ByCategory)
+                            {
+                                <li class="d-flex justify-space-between py-1" data-testid="category-line">
+                                    <MudLink Href="@($"/outgoings?month={_year:D4}-{_month:D2}&category={line.CategoryId}")" data-testid="category-link">@line.Name</MudLink>
+                                    <span data-testid="category-amount">@Format(line.Amount)</span>
+                                </li>
+                            }
+                        </ul>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    }
+</MudContainer>
+
+@code {
+    private HouseholdMembershipSummary? _household;
+    private BudgetMonthResponse? _budget;
+    private bool _loaded;
+    private int _year;
+    private int _month;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = Clock.GetLocalNow();
+        (_year, _month) = (today.Year, today.Month);
+        _household = await Session.GetActiveHouseholdAsync();
+        _loaded = true;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_household is not null)
+        {
+            _budget = await BudgetApi.GetMonthAsync(_household.HouseholdId, _year, _month);
+        }
+    }
+
+    private async Task MoveAsync(int months)
+    {
+        var next = new DateOnly(_year, _month, 1).AddMonths(months);
+        (_year, _month) = (next.Year, next.Month);
+        await LoadAsync();
+    }
+
+    private string Format(decimal amount) => Money.Format(amount, _budget?.CurrencyCode ?? "GBP");
+
+    /// <summary>A shortfall says so in words, not just in colour.</summary>
+    private RenderFragment Left(decimal amount)
+    {
+        if (amount < 0)
+        {
+            return @<span class="budget-shortfall"><MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" Style="vertical-align: text-bottom" aria-hidden="true" />Short by @Format(-amount)</span>;
+        }
+
+        return @<span>@Format(amount)</span>;
+    }
+
+    private static string KindName(OutgoingKindDto kind) => kind switch
+    {
+        OutgoingKindDto.Bill => "Bills",
+        OutgoingKindDto.Savings => "Savings",
+        _ => "Allowances",
+    };
+}

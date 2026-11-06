@@ -1,9 +1,13 @@
 @page "/"
 @attribute [Authorize]
+@using Budget.Client.Budgeting
 @using Budget.Client.Households
+@using Budget.Shared.Budgeting
 @using Budget.Shared.Households
+@using Budget.Shared.Income
 @inject UserSession Session
 @inject IHouseholdApi HouseholdApi
+@inject IBudgetApi BudgetApi
 
 <PageTitle>Home Budget</PageTitle>
 
@@ -48,6 +52,37 @@
     }
 
     <MudGrid Spacing="2">
+        <MudItem xs="12">
+            <MudCard Outlined="true" data-testid="budget-card">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Small" Class="mr-1" />Budget this month</MudText>
+                    @if (_budget is null)
+                    {
+                        <MudText Typo="Typo.body2">What's left after all your outgoings.</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Class="d-block">Left after everything</MudText>
+                        @if (_budget.LeftAfterEverything < 0)
+                        {
+                            <MudText Typo="Typo.h5" Class="budget-shortfall" data-testid="home-left">
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" aria-hidden="true" />Short by @Money.Format(-_budget.LeftAfterEverything, _budget.CurrencyCode)
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.h5" data-testid="home-left">@Money.Format(_budget.LeftAfterEverything, _budget.CurrencyCode)</MudText>
+                        }
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @Money.Format(_budget.Income, _budget.CurrencyCode) in, @Money.Format(_budget.Outgoings, _budget.CurrencyCode) out
+                        </MudText>
+                    }
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Href="/budget" Color="Color.Primary" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="go-to-budget">Go to budget</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
         <MudItem xs="12" sm="6">
             <MudCard Outlined="true" Style="height: 100%" data-testid="income-card">
                 <MudCardContent>
@@ -101,7 +136,16 @@
     private string? _error;
     private string? _notice;
 
-    protected override async Task OnInitializedAsync() => _household = await Session.GetActiveHouseholdAsync();
+    private BudgetMonthResponse? _budget;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        if (_household is not null)
+        {
+            _budget = await BudgetApi.GetMonthAsync(_household.HouseholdId);
+        }
+    }
 
     private void StartRename()
     {

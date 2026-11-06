@@ -60,3 +60,17 @@ test('an outgoing can be paused for whole payments and its price changed', async
   await page.getByTestId('save').click();
   await expect(page.getByTestId('outgoing-name')).toHaveText('Gym');
 });
+
+test('the budget shows what is left and links to a category', async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Council tax', 'Housing', '150');
+
+  await page.goto('/budget');
+  await settled(page);
+  await expect(page.getByTestId('budget-optional')).toHaveText('− £150.00');
+  await expect(page.getByTestId('left-everything')).toHaveText('Short by £150.00');
+
+  await page.getByTestId('category-link').filter({ hasText: 'Housing' }).click();
+  await expect(page.getByTestId('category-filter')).toContainText('Housing');
+  await expect(page.getByTestId('outgoing-name')).toHaveText(['Council tax']);
+});

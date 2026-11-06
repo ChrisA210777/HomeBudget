@@ -1,8 +1,11 @@
 using Budget.Client.Account;
+using Budget.Client.Budgeting;
 using Budget.Client.Income;
 using Budget.Client.People;
 using Budget.Shared.Account;
+using Budget.Shared.Budgeting;
 using Budget.Shared.Income;
+using Budget.Shared.Outgoings;
 using Budget.Shared.People;
 
 namespace Budget.Client.Tests.TestDoubles;
@@ -144,3 +147,41 @@ public static class IncomeSamples
         CurrencyCode: "GBP",
         Version: "AAAAAAAAAAE=");
 }
+
+/// <summary>A budget for any month, settable per test.</summary>
+public sealed class FakeBudgetApi : IBudgetApi
+{
+    public BudgetMonthResponse? Month { get; set; }
+
+    public List<(int? Year, int? Month)> Requests { get; } = [];
+
+    public Task<BudgetMonthResponse> GetMonthAsync(Guid householdId, int? year = null, int? month = null)
+    {
+        Requests.Add((year, month));
+        var budget = Month ?? Sample(year ?? 2026, month ?? 11, income: 3000m, essential: 1090m, preferred: 520m, optional: 100m);
+        return Task.FromResult(budget with { Year = year ?? budget.Year, Month = month ?? budget.Month });
+    }
+
+    public static BudgetMonthResponse Sample(int year, int month, decimal income, decimal essential, decimal preferred, decimal optional) => new(
+        year,
+        month,
+        "GBP",
+        income,
+        essential,
+        preferred,
+        optional,
+        income - essential,
+        income - essential - preferred,
+        income - essential - preferred - optional,
+        [
+            new(OutgoingKindDto.Bill, essential),
+            new(OutgoingKindDto.Savings, optional),
+            new(OutgoingKindDto.Allowance, preferred),
+        ],
+        [
+            new(Guid.Parse("eeeeeeee-0000-0000-0000-000000000001"), "Housing", essential),
+            new(Guid.Parse("eeeeeeee-0000-0000-0000-000000000002"), "Food & household", preferred),
+            new(Guid.Parse("eeeeeeee-0000-0000-0000-000000000003"), "Savings & set-asides", optional),
+        ]);
+}
+
