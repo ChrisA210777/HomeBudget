@@ -149,6 +149,35 @@ public static partial class OutgoingValidator
         return errors.ToDictionary(e => e.Key, e => e.Value.ToArray());
     }
 
+    /// <summary>Common reference names, suggested after the household's own (BUD-56).</summary>
+    public static readonly IReadOnlyList<string> CommonReferenceLabels =
+    [
+        "Policy number",
+        "Account number",
+        "Customer number",
+        "Membership number",
+        "Reference",
+        "Booking reference",
+        "Registration number",
+    ];
+
+    /// <summary>
+    /// Reference names to suggest for what's been typed: the household's own first (in the order given,
+    /// most used first), then the common ones, each once, matching anywhere and ignoring case.
+    /// </summary>
+    public static IReadOnlyList<string> SuggestReferenceLabels(IEnumerable<string> householdLabels, string? typed)
+    {
+        ArgumentNullException.ThrowIfNull(householdLabels);
+        var text = typed?.Trim() ?? string.Empty;
+        return householdLabels
+            .Concat(CommonReferenceLabels)
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .Select(l => l.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(l => text.Length == 0 || l.Contains(text, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
     /// <summary>Checks an edit of the details, with the same rules as adding one.</summary>
     public static IReadOnlyDictionary<string, string[]> Validate(UpdateOutgoingRequest request)
     {

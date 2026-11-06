@@ -87,6 +87,9 @@ public static class OutgoingRoutes
     /// <summary>PUT: correct a pause or ending. DELETE (with a reason): remove one recorded by mistake.</summary>
     public static string StatusPeriod(Guid householdId, Guid outgoingId, Guid periodId) => $"{StatusPeriods(householdId, outgoingId)}/{periodId}";
 
+    /// <summary>GET: the reference names (e.g. "Policy number") already used in the household, most used first.</summary>
+    public static string ReferenceLabels(Guid householdId) => $"{Outgoings(householdId)}/reference-labels";
+
     /// <summary>GET: the "paid from" account names already used in the household, for suggestions.</summary>
     public static string PaidFromNames(Guid householdId) => $"{Outgoings(householdId)}/paid-from";
 }

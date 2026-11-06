@@ -195,6 +195,8 @@ public sealed class OutgoingListTests : IDisposable
 
         public Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request) => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<string>> ReferenceLabelsAsync(Guid householdId) => Task.FromResult<IReadOnlyList<string>>(["Policy number"]);
+
         public Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId) => Task.FromResult<IReadOnlyList<string>>([]);
         public Task<OutgoingDetailsResponse?> GetAsync(Guid householdId, Guid outgoingId) => throw new NotSupportedException();
 

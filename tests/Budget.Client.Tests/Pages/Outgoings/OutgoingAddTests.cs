@@ -285,6 +285,8 @@ public sealed class OutgoingAddTests : IDisposable
             return Task.FromResult(ApiResult<OutgoingCreatedResponse>.Success(new OutgoingCreatedResponse(Guid.NewGuid(), request.Name, 40m)));
         }
 
+        public Task<IReadOnlyList<string>> ReferenceLabelsAsync(Guid householdId) => Task.FromResult<IReadOnlyList<string>>(["Policy number"]);
+
         public Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId) =>
             Task.FromResult<IReadOnlyList<string>>(["Joint account"]);
 

@@ -14,6 +14,9 @@ public interface IOutgoingApi
     /// <summary>Account names already used for "paid from", to suggest as people type.</summary>
     Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId);
 
+    /// <summary>Reference names already used in the household, most used first.</summary>
+    Task<IReadOnlyList<string>> ReferenceLabelsAsync(Guid householdId);
+
     /// <returns>The outgoing, or <c>null</c> if it doesn't exist (any more).</returns>
     Task<OutgoingDetailsResponse?> GetAsync(Guid householdId, Guid outgoingId);
 
@@ -44,6 +47,9 @@ public sealed class OutgoingApi(HttpClient http) : IOutgoingApi
 
     public async Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId) =>
         await http.GetFromJsonAsync<List<string>>(Relative(OutgoingRoutes.PaidFromNames(householdId))) ?? [];
+
+    public async Task<IReadOnlyList<string>> ReferenceLabelsAsync(Guid householdId) =>
+        await http.GetFromJsonAsync<List<string>>(Relative(OutgoingRoutes.ReferenceLabels(householdId))) ?? [];
 
     public async Task<OutgoingDetailsResponse?> GetAsync(Guid householdId, Guid outgoingId)
     {

@@ -334,6 +334,8 @@ public sealed class OutgoingDetailTests : IDisposable
 
         public Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request) => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<string>> ReferenceLabelsAsync(Guid householdId) => Task.FromResult<IReadOnlyList<string>>(["Policy number"]);
+
         public Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId) => throw new NotSupportedException();
 
         private Task<ApiResult<OutgoingDetailsResponse>> Respond(Action record)

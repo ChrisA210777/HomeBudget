@@ -146,17 +146,17 @@
                         case Mode.ChangeAmount:
                         case Mode.CorrectAmount:
                             <div class="d-flex gap-2 flex-wrap align-start">
-                                <MudNumericField T="decimal?" @bind-Value="_amount" Label="Amount" Immediate="true" Adornment="Adornment.Start" AdornmentText="£"
+                                <MudNumericField T="decimal?" @bind-Value="_amount" Format="F2" Label="Amount" Immediate="true" Adornment="Adornment.Start" AdornmentText="£"
                                                  InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem"
                                                  Error="Has(nameof(SaveOutgoingAmountRequest.Amount))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.Amount))" data-testid="amount" />
                                 <div class="d-flex gap-2">
                                     <div style="width: 5.5rem">
-                                        <MudNumericField T="int" @bind-Value="_every" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                        <MudNumericField T="int" @bind-Value="_every" Class="every-field" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
                                                          InputMode="InputMode.numeric" HideSpinButtons="true" Variant="Variant.Outlined"
                                                          Error="Has(nameof(SaveOutgoingAmountRequest.Every))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.Every))" data-testid="every" />
                                     </div>
                                     <div style="width: 8rem">
-                                        <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Unit" Variant="Variant.Outlined" data-testid="unit">
+                                        <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Period" Variant="Variant.Outlined" data-testid="unit">
                                             @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
                                             {
                                                 <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
