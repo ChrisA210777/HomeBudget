@@ -30,26 +30,26 @@ public static class OutgoingCategoryEndpoints
     private static async Task<IReadOnlyList<OutgoingCategorySummary>> ListAsync(BudgetDbContext db) =>
         await db.OutgoingCategories
             .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
-            .Select(c => new OutgoingCategorySummary(c.Id, c.Name, c.IsHidden, db.Outgoings.Count(o => o.CategoryId == c.Id)))
+            .Select(c => new OutgoingCategorySummary(c.Id, c.Name, c.IsHidden, db.Outgoings.Count(o => o.CategoryId == c.Id), c.Icon))
             .AsNoTracking()
             .ToListAsync();
 
     private static async Task<IResult> AddAsync(Guid householdId, AddCategoryRequest request, BudgetDbContext db)
     {
-        var errors = await ValidateNameAsync(request.Name, db, exceptId: null);
+        var errors = Merge(await ValidateNameAsync(request.Name, db, exceptId: null), CategoryValidator.ValidateIcon(request.Icon));
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
         var last = await db.OutgoingCategories.MaxAsync(c => (int?)c.SortOrder) ?? 0;
-        var category = OutgoingCategory.Create(householdId, request.Name, last + 10);
+        var category = OutgoingCategory.Create(householdId, request.Name, last + 10, request.Icon);
         db.OutgoingCategories.Add(category);
         await db.SaveChangesAsync();
 
         return Results.Created(
             OutgoingCategoryRoutes.Category(householdId, category.Id),
-            new OutgoingCategorySummary(category.Id, category.Name, category.IsHidden, 0));
+            new OutgoingCategorySummary(category.Id, category.Name, category.IsHidden, 0, category.Icon));
     }
 
     private static async Task<IResult> UpdateAsync(Guid categoryId, UpdateCategoryRequest request, BudgetDbContext db)
@@ -60,13 +60,18 @@ public static class OutgoingCategoryEndpoints
             return Results.NotFound();
         }
 
-        var errors = await ValidateNameAsync(request.Name, db, exceptId: categoryId);
+        var errors = Merge(await ValidateNameAsync(request.Name, db, exceptId: categoryId), CategoryValidator.ValidateIcon(request.Icon));
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
         category.Rename(request.Name);
+        if (request.Icon is not null)
+        {
+            category.ChangeIcon(request.Icon);
+        }
+
         if (request.IsHidden)
         {
             category.Hide();
@@ -79,8 +84,11 @@ public static class OutgoingCategoryEndpoints
         await db.SaveChangesAsync();
 
         var count = await db.Outgoings.CountAsync(o => o.CategoryId == categoryId);
-        return Results.Ok(new OutgoingCategorySummary(category.Id, category.Name, category.IsHidden, count));
+        return Results.Ok(new OutgoingCategorySummary(category.Id, category.Name, category.IsHidden, count, category.Icon));
     }
+
+    private static Dictionary<string, string[]> Merge(params IReadOnlyDictionary<string, string[]>[] errors) =>
+        errors.SelectMany(e => e).ToDictionary(e => e.Key, e => e.Value);
 
     private static async Task<IResult> DeleteAsync(Guid categoryId, BudgetDbContext db)
     {

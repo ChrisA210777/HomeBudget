@@ -453,6 +453,14 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("HouseholdId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("label");
+
                     b.Property<bool>("IsHidden")
                         .HasColumnType("bit");
 

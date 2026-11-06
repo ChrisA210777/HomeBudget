@@ -5,6 +5,7 @@
 @using Budget.Shared.Budgeting
 @using Budget.Shared.Income
 @using Budget.Shared.Outgoings
+@using Budget.Client.Outgoings
 @inject UserSession Session
 @inject IBudgetApi BudgetApi
 @inject TimeProvider Clock
@@ -113,7 +114,10 @@
                             @foreach (var line in b.ByCategory)
                             {
                                 <li class="d-flex justify-space-between py-1" data-testid="category-line">
-                                    <MudLink Href="@($"/outgoings?month={_year:D4}-{_month:D2}&category={line.CategoryId}")" data-testid="category-link">@line.Name</MudLink>
+                                    <span class="d-flex align-center gap-2">
+                                        <MudIcon Icon="@CategoryIconSvg.For(line.Icon)" Size="Size.Small" Color="Color.Primary" aria-hidden="true" data-testid="category-icon" />
+                                        <MudLink Href="@($"/outgoings?month={_year:D4}-{_month:D2}&category={line.CategoryId}")" data-testid="category-link">@line.Name</MudLink>
+                                    </span>
                                     <span data-testid="category-amount">@Format(line.Amount)</span>
                                 </li>
                             }

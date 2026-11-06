@@ -47,10 +47,13 @@
                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => SaveRenameAsync(category)" Disabled="!Online" data-testid="rename-save">Save</MudButton>
                                 <MudButton Variant="Variant.Text" OnClick="CancelRename">Cancel</MudButton>
                             </div>
+                            <CategoryIconPicker @bind-Value="_editIcon" Label="@($"Icon for {category.Name}")" />
                         }
                         else
                         {
                             <div class="d-flex align-center gap-1">
+                                <MudIcon Icon="@CategoryIconSvg.For(category.Icon)" Color="@(category.IsHidden ? Color.Secondary : Color.Primary)" Class="mr-2" aria-hidden="true"
+                                         data-testid="category-icon" data-icon="@category.Icon" />
                                 <div class="flex-grow-1" style="min-width: 0">
                                     <MudText Typo="Typo.body1" Color="@(category.IsHidden ? Color.Secondary : Color.Inherit)" data-testid="category-name">@category.Name</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="category-usage">@Usage(category)</MudText>
@@ -61,7 +64,7 @@
                                 }
                                 @if (_canEdit)
                                 {
-                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="@($"Rename {category.Name}")" OnClick="() => StartRename(category)" data-testid="rename" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="@($"Rename {category.Name} or change its icon")" OnClick="() => StartRename(category)" data-testid="rename" />
                                     <MudIconButton Icon="@(category.IsHidden ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
                                                    aria-label="@($"{(category.IsHidden ? "Show" : "Hide")} {category.Name}")"
                                                    OnClick="() => ToggleHiddenAsync(category)" Disabled="!Online" data-testid="toggle-hidden" />
@@ -94,6 +97,8 @@
                                   data-testid="add-name" />
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddAsync" Disabled="@(_saving || !Online)" Class="mt-2" data-testid="add-category">Add</MudButton>
                 </div>
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1" id="new-icon-heading">Icon</MudText>
+                <CategoryIconPicker Value="@(_newIcon ?? CategoryIcons.Default)" ValueChanged="icon => _newIcon = icon" Label="Icon for the new category" />
             </MudPaper>
         }
     }
@@ -111,10 +116,12 @@
     private string? _problem;
 
     private string? _newName;
+    private string? _newIcon;
     private string? _addError;
 
     private Guid? _editingId;
     private string? _editName;
+    private string? _editIcon;
     private string? _editError;
 
     protected override async Task OnInitializedAsync()
@@ -146,7 +153,7 @@
         try
         {
             var name = _newName!.Trim();
-            var result = await CategoryApi.AddAsync(_household!.HouseholdId, new AddCategoryRequest { Name = name });
+            var result = await CategoryApi.AddAsync(_household!.HouseholdId, new AddCategoryRequest { Name = name, Icon = _newIcon });
             if (!result.Succeeded)
             {
                 _addError = FirstError(result.Errors) ?? result.Problem;
@@ -155,6 +162,7 @@
 
             Snackbar.Add($"{name} was added.", Severity.Success);
             _newName = null;
+            _newIcon = null;
             await LoadAsync();
         }
         finally
@@ -167,6 +175,7 @@
     {
         _editingId = category.Id;
         _editName = category.Name;
+        _editIcon = category.Icon;
         _editError = null;
     }
 
@@ -180,7 +189,7 @@
             return;
         }
 
-        var result = await CategoryApi.UpdateAsync(_household!.HouseholdId, category.Id, new UpdateCategoryRequest { Name = _editName!.Trim(), IsHidden = category.IsHidden });
+        var result = await CategoryApi.UpdateAsync(_household!.HouseholdId, category.Id, new UpdateCategoryRequest { Name = _editName!.Trim(), IsHidden = category.IsHidden, Icon = _editIcon });
         if (!result.Succeeded)
         {
             _editError = FirstError(result.Errors) ?? result.Problem;

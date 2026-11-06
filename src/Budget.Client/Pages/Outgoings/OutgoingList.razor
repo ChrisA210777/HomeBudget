@@ -140,7 +140,10 @@
             var items = group.ToList();
             <section class="mt-4" data-testid="category-group" aria-label="@items[0].CategoryName">
                 <div class="d-flex align-baseline justify-space-between px-1 mb-1">
-                    <h2 class="mud-typography mud-typography-subtitle1" style="font-weight: 600" data-testid="category-name">@items[0].CategoryName</h2>
+                    <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2" style="font-weight: 600">
+                        <MudIcon Icon="@CategoryIconSvg.For(items[0].CategoryIcon)" Size="Size.Small" Color="Color.Primary" aria-hidden="true" data-testid="category-icon" data-icon="@items[0].CategoryIcon" />
+                        <span data-testid="category-name">@items[0].CategoryName</span>
+                    </h2>
                     <MudText Typo="Typo.subtitle1" data-testid="category-subtotal">@Format(OutgoingTotals.Subtotal(items))</MudText>
                 </div>
                 <MudPaper Outlined="true">

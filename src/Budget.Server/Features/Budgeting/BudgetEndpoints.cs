@@ -38,7 +38,7 @@ public static class BudgetEndpoints
 
         var streams = await db.IncomeStreams.Include(s => s.AmountChanges).Include(s => s.StatusPeriods).AsSplitQuery().AsNoTracking().ToListAsync();
         var outgoings = await db.Outgoings.Include(o => o.AmountChanges).Include(o => o.StatusPeriods).AsSplitQuery().AsNoTracking().ToListAsync();
-        var categories = await db.OutgoingCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).Select(c => new { c.Id, c.Name }).ToListAsync();
+        var categories = await db.OutgoingCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).Select(c => new { c.Id, c.Name, c.Icon }).ToListAsync();
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
         // The same rules as the Income and Outgoings pages: unrounded amounts, each total rounded once.
@@ -57,7 +57,7 @@ public static class BudgetEndpoints
             .Select(kind => new BudgetKindLine((OutgoingKindDto)kind, Total(o => o.Kind == kind)))
             .ToList();
         var byCategory = categories
-            .Select(c => new BudgetCategoryLine(c.Id, c.Name, Total(o => o.CategoryId == c.Id)))
+            .Select(c => new BudgetCategoryLine(c.Id, c.Name, Total(o => o.CategoryId == c.Id), c.Icon))
             .Where(line => amounts.Any(x => x.Outgoing.CategoryId == line.CategoryId))
             .ToList();
 

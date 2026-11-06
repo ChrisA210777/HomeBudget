@@ -40,6 +40,7 @@ public sealed class OutgoingListTests : IDisposable
 
         Assert.Equal("November 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal(new[] { "Housing", "Insurance", "Food & household" }, Texts(cut, "category-name"));
+        Assert.Equal(3, cut.FindAll("[data-testid=category-group] [data-testid=category-icon]").Count);
         Assert.Equal(new[] { "£150.00", "£40.00", "£520.00" }, Texts(cut, "category-subtotal"));
         Assert.Equal("£710.00", Text(cut, "month-total"));
         Assert.Equal("£190.00", Text(cut, "total-essential"));
