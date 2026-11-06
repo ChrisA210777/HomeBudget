@@ -4,6 +4,7 @@ using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Households;
 using Budget.Shared.Budgeting;
+using Budget.Shared.Households;
 using Budget.Shared.Outgoings;
 using Microsoft.EntityFrameworkCore;
 
