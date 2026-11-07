@@ -41,6 +41,11 @@
             @* A plain link, so the browser downloads the file with the name the server gives it. *@
             <MudButton Href="@ExportUrl" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download"
                        Disabled="!Online" download data-testid="download-json">Download (JSON)</MudButton>
+            <MudButton Href="@CsvUrl" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TableChart"
+                       Disabled="!Online" download Class="ml-sm-2 mt-2 mt-sm-0" data-testid="download-csv">Download for Excel (CSV)</MudButton>
+            <MudText Typo="Typo.caption" Class="d-block mt-2" Color="Color.Secondary">
+                The JSON file can be imported again. The CSV files are for opening in Excel, and can't be imported.
+            </MudText>
         </MudPaper>
 
         <MudPaper Class="pa-4 mt-4" Elevation="1" data-testid="import-section">
@@ -204,6 +209,8 @@
 
     private string BackupUrl => DataRoutes.Export(_household!.HouseholdId, includeHistory: true, includeAudit: true);
     private IReadOnlyList<ImportProblem>? _importErrors;
+
+    private string CsvUrl => DataRoutes.ExportCsv(_household!.HouseholdId, _includeHistory, _includeAudit);
 
     private string ExportUrl => DataRoutes.Export(_household!.HouseholdId, _includeHistory, _includeAudit);
 

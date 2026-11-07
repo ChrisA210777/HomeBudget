@@ -18,6 +18,7 @@ public static class DataExportEndpoints
 
         // Admins only: the file holds everyone's personal and financial details (ADR-012).
         household.MapGet("/export", ExportAsync).RequireAuthorization(HouseholdPolicies.Admin);
+        household.MapGet("/export/csv", ExportCsvAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapPost("/import/preview", PreviewAsync).RequireAuthorization(HouseholdPolicies.Admin);
 
         // Admins of the household they're in (confirmed 6 Nov 2026); they become the new household's owner.
@@ -35,6 +36,14 @@ public static class DataExportEndpoints
         var fileName = $"home-budget-{FileNamePart(export.Household.Name)}-{time.GetUtcNow():yyyy-MM-dd}.json";
 
         return Results.File(json, "application/json", fileName);
+    }
+
+    /// <summary>Downloads the household's data as a zip of CSV files for Excel (BUD-66), with the same options as JSON.</summary>
+    private static async Task<IResult> ExportCsvAsync(Guid householdId, bool? history, bool? audit, ExportBuilder builder, TimeProvider time)
+    {
+        var export = await builder.BuildAsync(householdId, new ExportOptions { IncludeHistory = history == true, IncludeAudit = audit == true });
+        var fileName = $"home-budget-{FileNamePart(export.Household.Name)}-{time.GetUtcNow():yyyy-MM-dd}-csv.zip";
+        return Results.File(CsvExporter.Write(export), "application/zip", fileName);
     }
 
     /// <summary>

@@ -81,3 +81,15 @@ test("a household's data can be replaced from a backup", async ({ page }) => {
   await page.goto('/outgoings');
   await expect(page.getByTestId('outgoing-name')).toHaveText(['Council tax']);
 });
+
+test('an admin can download the household as CSV files for Excel', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/household/data');
+  await settled(page);
+
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-csv').click()]);
+
+  expect(download.suggestedFilename()).toMatch(/^home-budget-my-household-\d{4}-\d{2}-\d{2}-csv\.zip$/);
+  const bytes = await readFile((await download.path())!);
+  expect(bytes.subarray(0, 2).toString('latin1')).toBe('PK');
+});
