@@ -145,6 +145,32 @@ public sealed class HouseholdDataTests : IDisposable
         Assert.Equal("http://localhost/", _context.Services.GetRequiredService<NavigationManager>().Uri);
     }
 
+    [Fact]
+    public void Replacing_says_what_will_go_needs_the_name_typed_and_offers_a_backup()
+    {
+        UseRole("Admin");
+        _importApi.Preview = GoodPreview() with
+        {
+            WouldDelete = new ImportCounts { People = 1, Categories = 16, Incomes = 2, Outgoings = 5 },
+            PeopleKept = ["Chris"],
+        };
+        var cut = _context.RenderComponent<HouseholdData>();
+        cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromText("{}", "backup.json"));
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=replace-section]")));
+
+        var deletes = System.Text.RegularExpressions.Regex.Replace(cut.Find("[data-testid=replace-deletes]").TextContent, @"\s+", " ");
+        Assert.Contains("2 incomes, 5 outgoings (with their history), 16 categories and 1 person who don't sign in", deletes, StringComparison.Ordinal);
+        Assert.Contains("(Chris)", deletes, StringComparison.Ordinal);
+        Assert.Equal($"/api/households/{FakeAccountApi.HouseholdId}/export?history=true&audit=true", cut.Find("a[data-testid=replace-backup]").GetAttribute("href"));
+        Assert.True(cut.Find("[data-testid=replace-data]").HasAttribute("disabled"));
+
+        cut.Find("input[data-testid=replace-confirm]").Input(" my household ");
+        cut.Find("[data-testid=replace-data]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal((FakeAccountApi.HouseholdId, false), Assert.Single(_importApi.Replaced)));
+        Assert.Equal("http://localhost/?replaced=true", _context.Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
     private static ImportPreviewResponse GoodPreview(params ImportPerson[] people) => new()
     {
         CanImport = true,
@@ -175,6 +201,14 @@ public sealed class HouseholdDataTests : IDisposable
         public Task<ImportResultResponse> ImportAsNewHouseholdAsync(Guid householdId, byte[] file, string? name, Guid? me)
         {
             Imported.Add((file, name, me));
+            return Task.FromResult(Result);
+        }
+
+        public List<(Guid HouseholdId, bool UseFileName)> Replaced { get; } = [];
+
+        public Task<ImportResultResponse> ReplaceAsync(Guid householdId, byte[] file, bool useFileName)
+        {
+            Replaced.Add((householdId, useFileName));
             return Task.FromResult(Result);
         }
     }

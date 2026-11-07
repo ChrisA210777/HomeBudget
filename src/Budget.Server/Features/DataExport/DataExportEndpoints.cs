@@ -22,6 +22,7 @@ public static class DataExportEndpoints
 
         // Admins of the household they're in (confirmed 6 Nov 2026); they become the new household's owner.
         household.MapPost("/import/new-household", ImportAsNewHouseholdAsync).RequireAuthorization(HouseholdPolicies.Admin);
+        household.MapPost("/import/replace", ReplaceAsync).RequireAuthorization(HouseholdPolicies.Admin);
 
         return app;
     }
@@ -87,6 +88,14 @@ public static class DataExportEndpoints
             People = export.People
                 .Select(p => new ImportPerson(p.Id, p.DisplayName, p.LinkedMemberEmail, IsSameEmail(p.LinkedMemberEmail, email)))
                 .ToList(),
+            WouldDelete = new ImportCounts
+            {
+                People = await db.People.CountAsync(p => p.HouseholdId == householdId && p.LinkedUserId == null),
+                Categories = await db.OutgoingCategories.CountAsync(c => c.HouseholdId == householdId),
+                Incomes = await db.IncomeStreams.CountAsync(i => i.HouseholdId == householdId),
+                Outgoings = await db.Outgoings.CountAsync(o => o.HouseholdId == householdId),
+            },
+            PeopleKept = await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId != null).OrderBy(p => p.DisplayName).Select(p => p.DisplayName).ToListAsync(),
         };
 
         static ImportProblem Problem(ExportProblem p) => new(p.Path, p.Message);
@@ -156,6 +165,68 @@ public static class DataExportEndpoints
 
         // One save, so it's all or nothing.
         await db.SaveChangesAsync();
+
+        return new ImportResultResponse { HouseholdId = household.Id, HouseholdName = household.Name };
+
+        static ImportResultResponse Failed(string path, string message) => new() { Errors = [new ImportProblem(path, message)] };
+    }
+
+    /// <summary>
+    /// Replaces this household's data with a file's (BUD-62), all or nothing. Categories, incomes and outgoings (with
+    /// their history) and people not linked to a member are deleted; the household, its members, and the people
+    /// linked to them stay. A person in the file with the same name as a kept person becomes them.
+    /// </summary>
+    private static async Task<ImportResultResponse> ReplaceAsync(Guid householdId, bool? useFileName, HttpRequest request, BudgetDbContext db)
+    {
+        var file = await ReadFileAsync(request);
+        if (file is null)
+        {
+            return Failed(string.Empty, $"The file is too big. Exports are at most {ExportFormat.MaxFileBytes / (1024 * 1024)} MB.");
+        }
+
+        var read = ExportReader.Read(file);
+        if (read.Document is not { } export)
+        {
+            return new ImportResultResponse { Errors = read.Errors.Select(p => new ImportProblem(p.Path, p.Message)).ToList() };
+        }
+
+        var household = await db.Households.SingleAsync(h => h.Id == householdId);
+        if (export.Household.CurrencyCode != household.CurrencyCode)
+        {
+            return Failed("household.currencyCode", $"The file's currency ({export.Household.CurrencyCode}) isn't this household's ({household.CurrencyCode}).");
+        }
+
+        var linkedPeople = await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId != null).ToListAsync();
+        var (plan, problems) = ImportPlanner.Plan(export, householdId, linkedPeople);
+        if (plan is null)
+        {
+            return new ImportResultResponse { Errors = problems.Select(p => new ImportProblem(p.Path, p.Message)).ToList() };
+        }
+
+        // Two saves in one transaction: the old data goes first, so the new can reuse its names.
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync();
+
+            await db.Outgoings.Where(o => o.HouseholdId == householdId).ExecuteDeleteAsync();
+            await db.IncomeStreams.Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
+            await db.OutgoingCategories.Where(c => c.HouseholdId == householdId).ExecuteDeleteAsync();
+            await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId == null).ExecuteDeleteAsync();
+
+            if (useFileName == true)
+            {
+                household.Rename(export.Household.Name);
+            }
+
+            db.People.AddRange(plan.People);
+            db.OutgoingCategories.AddRange(plan.Categories);
+            db.IncomeStreams.AddRange(plan.Incomes);
+            db.Outgoings.AddRange(plan.Outgoings);
+            await db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+        });
 
         return new ImportResultResponse { HouseholdId = household.Id, HouseholdName = household.Name };
 

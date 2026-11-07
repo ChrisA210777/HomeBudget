@@ -127,13 +127,14 @@ public class ImportNewHouseholdApiTests(BudgetApiFactory factory) : IntegrationT
         using var client = CreateClient(signedInAs: userId);
         var document = JsonNode.Parse(GoldenFile)!;
         document["outgoings"]![0]!["statusPeriods"]![0]!["startDate"] = "2026-12-15";
-        document["household"]!["name"] = "Should not exist";
+        var name = $"Should not exist {Guid.NewGuid():N}";
+        document["household"]!["name"] = name;
 
         var result = await ImportAsync(client, ownHouseholdId, Encoding.UTF8.GetBytes(document.ToJsonString()));
 
         Assert.False(result.Succeeded);
         Assert.Equal("outgoings[0].statusPeriods[0]", Assert.Single(result.Errors).Path);
-        await ExecuteDbContextAsync(async db => Assert.False(await db.Households.AnyAsync(h => h.Name == "Should not exist")));
+        await ExecuteDbContextAsync(async db => Assert.False(await db.Households.AnyAsync(h => h.Name == name)));
     }
 
     [Fact]

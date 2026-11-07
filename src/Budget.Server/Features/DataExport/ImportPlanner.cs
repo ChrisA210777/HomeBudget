@@ -20,7 +20,10 @@ public sealed class ImportPlan
     /// <summary>Each person's <c>linkedMemberEmail</c> in the file, for linking logins when importing.</summary>
     public Dictionary<Person, string> LinkedEmails { get; } = [];
 
-    /// <summary>The new person for each person's id in the file.</summary>
+    /// <summary>Existing people the file's people were mapped to, when replacing a household's data.</summary>
+    public List<Person> KeptPeople { get; } = [];
+
+    /// <summary>The new (or kept) person for each person's id in the file.</summary>
     public Dictionary<Guid, Person> PeopleByFileId { get; } = [];
 }
 
@@ -31,7 +34,11 @@ public sealed class ImportPlan
 /// </summary>
 public static class ImportPlanner
 {
-    public static (ImportPlan? Plan, IReadOnlyList<ExportProblem> Problems) Plan(HouseholdExport export, Guid householdId)
+    /// <param name="keepPeople">
+    /// When replacing a household's data (BUD-62): people who stay (those linked to members). A person in the file
+    /// with the same name, ignoring case, is mapped to them instead of being created.
+    /// </param>
+    public static (ImportPlan? Plan, IReadOnlyList<ExportProblem> Problems) Plan(HouseholdExport export, Guid householdId, IReadOnlyCollection<Person>? keepPeople = null)
     {
         ArgumentNullException.ThrowIfNull(export);
         var plan = new ImportPlan();
@@ -68,6 +75,15 @@ public static class ImportPlanner
         for (var i = 0; i < export.People.Count; i++)
         {
             var source = export.People[i];
+            var kept = keepPeople?.FirstOrDefault(p => string.Equals(p.DisplayName, source.DisplayName?.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (kept is not null)
+            {
+                people[source.Id] = kept.Id;
+                plan.PeopleByFileId[source.Id] = kept;
+                plan.KeptPeople.Add(kept);
+                continue;
+            }
+
             var person = Keep(Try($"people[{i}]", () => Person.Create(householdId, source.DisplayName)), source);
             if (person is not null)
             {

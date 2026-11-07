@@ -45,7 +45,8 @@ public class ImportPreviewApiTests(BudgetApiFactory factory) : IntegrationTestBa
         {
             Assert.Equal(1, await db.People.IgnoreQueryFilters().CountAsync(p => p.HouseholdId == householdId));
             Assert.Equal(0, await db.Outgoings.IgnoreQueryFilters().CountAsync(o => o.HouseholdId == householdId));
-            Assert.False(await db.Households.AnyAsync(h => h.Name == "The Austins"));
+            // No household was made for the caller (other tests share the database, so not checked by name).
+            Assert.Equal(1, await db.HouseholdMembers.CountAsync(m => m.UserId == ownerId));
         });
     }
 
