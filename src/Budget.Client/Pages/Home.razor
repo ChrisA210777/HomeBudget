@@ -44,6 +44,13 @@
         </MudAlert>
     }
 
+    @if (Replaced == true && !_importedDismissed && _household is not null)
+    {
+        <MudAlert Severity="Severity.Success" Class="my-2" ShowCloseIcon="true" CloseIconClicked="() => _importedDismissed = true" data-testid="replaced">
+            @_household.Name's data was replaced from the file.
+        </MudAlert>
+    }
+
     @if (_notice is not null)
     {
         <MudAlert Severity="Severity.Warning" Dense="true" Class="my-2" ShowCloseIcon="true" CloseIconClicked="() => _notice = null" data-testid="rename-conflict">@_notice</MudAlert>
@@ -173,6 +180,10 @@
     /// <summary>Set after importing a file as a new household (BUD-63), to say it worked.</summary>
     [SupplyParameterFromQuery(Name = "imported")]
     public bool? Imported { get; set; }
+
+    /// <summary>Set after replacing the household's data from a file (BUD-62), to say it worked.</summary>
+    [SupplyParameterFromQuery(Name = "replaced")]
+    public bool? Replaced { get; set; }
 
     private bool _importedDismissed;
 

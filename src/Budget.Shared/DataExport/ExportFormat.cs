@@ -86,6 +86,16 @@ public static class DataRoutes
     }
 }
 
+public static class ReplaceRoutes
+{
+    /// <summary>
+    /// POST (Admins) the file's bytes: replaces this household's data with the file's (BUD-62). Members and the people
+    /// linked to them stay. <paramref name="useFileName"/> renames the household to the file's name.
+    /// </summary>
+    public static string Replace(Guid householdId, bool useFileName) =>
+        $"/api/households/{householdId}/import/replace?useFileName={(useFileName ? "true" : "false")}";
+}
+
 /// <summary>The outcome of an import: the household it went into, or why it couldn't be done.</summary>
 public sealed record ImportResultResponse
 {
@@ -138,6 +148,12 @@ public sealed record ImportPreviewResponse
 
     /// <summary>The people in the file, so the importer can say which one is them.</summary>
     public IReadOnlyList<ImportPerson> People { get; init; } = [];
+
+    /// <summary>What replacing this household's data would delete (BUD-62).</summary>
+    public ImportCounts WouldDelete { get; init; } = new();
+
+    /// <summary>People linked to members, who stay when replacing; a person in the file with the same name becomes them.</summary>
+    public IReadOnlyList<string> PeopleKept { get; init; } = [];
 }
 
 public sealed record ImportCounts

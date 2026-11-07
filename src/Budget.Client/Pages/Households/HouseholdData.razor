@@ -151,6 +151,27 @@
                         }
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddHome" OnClick="ImportAsNewHouseholdAsync"
                                    Disabled="@(_importing || !Online)" data-testid="import-new-household">Import as a new household</MudButton>
+
+                        <div class="mt-6 pa-3 confirm-panel" data-testid="replace-section">
+                            <MudText Typo="Typo.subtitle1" Class="mb-1"><strong>Replace @_household.Name's data</strong></MudText>
+                            <MudText Typo="Typo.body2" Class="mb-2" data-testid="replace-deletes">
+                                This permanently deletes @_household.Name's
+                                @Count(_preview.WouldDelete.Incomes, "income", "incomes"),
+                                @Count(_preview.WouldDelete.Outgoings, "outgoing", "outgoings") (with their history),
+                                @Count(_preview.WouldDelete.Categories, "category", "categories") and
+                                @Count(_preview.WouldDelete.People, "person", "people") who don't sign in, and puts the file's in their place.
+                                Members, their roles, and the people linked to them stay@(_preview.PeopleKept.Count > 0 ? $" ({string.Join(", ", _preview.PeopleKept)})" : string.Empty);
+                                a person in the file with the same name becomes them. It can't be undone.
+                            </MudText>
+                            <MudButton Href="@BackupUrl" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" download
+                                       Class="mb-2" data-testid="replace-backup">Download a backup first</MudButton>
+                            <MudCheckBox T="bool" @bind-Value="_useFileName" Label="@($"Rename the household to “{_preview.HouseholdName}”")" Color="Color.Primary"
+                                         data-testid="replace-use-file-name" />
+                            <MudTextField @bind-Value="_replaceConfirm" Label="@($"Type {_household.Name} to confirm")" Variant="Variant.Outlined" Immediate="true"
+                                          autocomplete="off" Class="mb-2" data-testid="replace-confirm" />
+                            <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.SettingsBackupRestore" OnClick="ReplaceAsync"
+                                       Disabled="@(_importing || !Online || !ReplaceConfirmed)" data-testid="replace-data">Replace this household's data</MudButton>
+                        </div>
                     }
                 </div>
             }
@@ -176,6 +197,12 @@
     private string? _newName;
     private Guid? _me;
     private bool _importing;
+    private bool _useFileName;
+    private string? _replaceConfirm;
+
+    private bool ReplaceConfirmed => string.Equals(_replaceConfirm?.Trim(), _household?.Name, StringComparison.OrdinalIgnoreCase);
+
+    private string BackupUrl => DataRoutes.Export(_household!.HouseholdId, includeHistory: true, includeAudit: true);
     private IReadOnlyList<ImportProblem>? _importErrors;
 
     private string ExportUrl => DataRoutes.Export(_household!.HouseholdId, _includeHistory, _includeAudit);
@@ -232,6 +259,36 @@
         catch (HttpRequestException)
         {
             _importErrors = [new ImportProblem(string.Empty, "The file couldn't be imported. Check your connection and try again.")];
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    /// <summary>Replaces this household's data with the checked file, then reloads the app in it (BUD-62).</summary>
+    private async Task ReplaceAsync()
+    {
+        if (!ReplaceConfirmed)
+        {
+            return;
+        }
+
+        _importing = true;
+        try
+        {
+            var result = await ImportApi.ReplaceAsync(_household!.HouseholdId, _file!, _useFileName);
+            if (!result.Succeeded)
+            {
+                _importErrors = result.Errors;
+                return;
+            }
+
+            Navigation.NavigateTo("/?replaced=true", forceLoad: true);
+        }
+        catch (HttpRequestException)
+        {
+            _importErrors = [new ImportProblem(string.Empty, "The data couldn't be replaced. Check your connection and try again.")];
         }
         finally
         {

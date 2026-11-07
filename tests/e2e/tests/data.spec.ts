@@ -58,3 +58,26 @@ test('a downloaded file can be imported as a new household', async ({ page }) =>
   await page.goto('/outgoings');
   await expect(page.getByTestId('outgoing-name')).toHaveText(['Council tax']);
 });
+
+test("a household's data can be replaced from a backup", async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Council tax', 'Housing', '150');
+  await page.goto('/household/data');
+  await settled(page);
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-json').click()]);
+  const backup = (await download.path())!;
+
+  await addOutgoing(page, 'Added after the backup', 'Leisure & memberships', '20');
+
+  await page.goto('/household/data');
+  await settled(page);
+  await page.getByTestId('import-file').setInputFiles(backup);
+  await expect(page.getByTestId('replace-deletes')).toContainText('2 outgoings');
+  await expect(page.getByTestId('replace-data')).toBeDisabled();
+  await page.getByTestId('replace-confirm').fill('My Household');
+  await page.getByTestId('replace-data').click();
+
+  await expect(page.getByTestId('replaced')).toBeVisible();
+  await page.goto('/outgoings');
+  await expect(page.getByTestId('outgoing-name')).toHaveText(['Council tax']);
+});
