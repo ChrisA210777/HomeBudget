@@ -68,8 +68,9 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
             options.IncludeAudit
                 ? exported with
                 {
-                    RecordedBy = source.CreatedBy is { } c ? users.GetValueOrDefault(c)?.DisplayName : null,
-                    RecordedAt = source.CreatedAt,
+                    RecordedBy = (source as AuditableEntity)?.OriginallyRecordedBy
+                        ?? (source.CreatedBy is { } c ? users.GetValueOrDefault(c)?.DisplayName : null),
+                    RecordedAt = (source as AuditableEntity)?.OriginallyRecordedAt ?? source.CreatedAt,
                     ChangedBy = source.ModifiedBy is { } m ? users.GetValueOrDefault(m)?.DisplayName : null,
                     ChangedAt = source.ModifiedAt,
                 }
@@ -118,7 +119,7 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                             Comment = p.Comment,
                         }, p)).ToList(),
                     Corrections = options.IncludeHistory
-                        ? i.Corrections.OrderBy(c => c.CreatedAt)
+                        ? i.Corrections.OrderBy(c => c.RecordedAt).ThenBy(c => c.CreatedAt)
                             .Select(c => Audit(Correction(c.EntryType.ToString(), c.EntryId, c.Action.ToString(), c.Before, c.After, c.Reason), c)).ToList()
                         : [],
                 }, i)).ToList(),
@@ -161,7 +162,7 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                             Comment = p.Comment,
                         }, p)).ToList(),
                     Corrections = options.IncludeHistory
-                        ? o.Corrections.OrderBy(c => c.CreatedAt)
+                        ? o.Corrections.OrderBy(c => c.RecordedAt).ThenBy(c => c.CreatedAt)
                             .Select(c => Audit(Correction(c.EntryType.ToString(), c.EntryId, c.Action.ToString(), c.Before, c.After, c.Reason), c)).ToList()
                         : [],
                 }, o)).ToList(),

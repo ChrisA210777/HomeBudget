@@ -43,6 +43,17 @@ public sealed class Person : AuditableEntity, IHouseholdOwned
     /// <summary>Unlinks the person from their login, e.g. when that member leaves. The person and their income stay.</summary>
     public void Unlink() => LinkedUserId = null;
 
+    /// <summary>Links the person to a login, e.g. the person in an imported file who is the importer.</summary>
+    public void LinkTo(Guid userId)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("A person can only be linked to a login.", nameof(userId));
+        }
+
+        LinkedUserId = userId;
+    }
+
     /// <summary>
     /// A person for a login, named with just the first name from the sign-in provider, e.g. "Chris" for
     /// "Chris Austin" or "Austin, Chris". It can be renamed afterwards.

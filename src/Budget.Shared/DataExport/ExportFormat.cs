@@ -63,7 +63,45 @@ public static class DataRoutes
 
     /// <summary>POST (Admins) the file's bytes: checks it and says what's in it, without saving anything (BUD-67).</summary>
     public static string Preview(Guid householdId) => $"/api/households/{householdId}/import/preview";
+
+    /// <summary>
+    /// POST (Admins) the file's bytes: imports it as a new household owned by the caller (BUD-63).
+    /// <paramref name="name"/> overrides the file's household name; <paramref name="me"/> is the id, in the file,
+    /// of the person who is the caller.
+    /// </summary>
+    public static string ImportAsNewHousehold(Guid householdId, string? name, Guid? me)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            query.Add($"name={Uri.EscapeDataString(name.Trim())}");
+        }
+
+        if (me is { } person)
+        {
+            query.Add($"me={person}");
+        }
+
+        return $"/api/households/{householdId}/import/new-household{(query.Count > 0 ? "?" + string.Join('&', query) : string.Empty)}";
+    }
 }
+
+/// <summary>The outcome of an import: the household it went into, or why it couldn't be done.</summary>
+public sealed record ImportResultResponse
+{
+    public bool Succeeded => HouseholdId is not null;
+
+    public Guid? HouseholdId { get; init; }
+
+    public string? HouseholdName { get; init; }
+
+    public IReadOnlyList<ImportProblem> Errors { get; init; } = [];
+}
+
+/// <summary>A person in an import file, so the importer can say which one is them.</summary>
+/// <param name="Id">The person's id in the file.</param>
+/// <param name="IsYou">The file links this person to the caller's email.</param>
+public sealed record ImportPerson(Guid Id, string DisplayName, string? LinkedMemberEmail, bool IsYou);
 
 /// <summary>A problem with an import file and where it is, e.g. <c>outgoings[3].amountChanges[0].amount</c>.</summary>
 public sealed record ImportProblem(string Path, string Message);
@@ -97,6 +135,9 @@ public sealed record ImportPreviewResponse
 
     /// <summary>The members listed in the file, to invite again after importing.</summary>
     public IReadOnlyList<ImportMember> Members { get; init; } = [];
+
+    /// <summary>The people in the file, so the importer can say which one is them.</summary>
+    public IReadOnlyList<ImportPerson> People { get; init; } = [];
 }
 
 public sealed record ImportCounts

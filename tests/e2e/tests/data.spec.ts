@@ -39,3 +39,22 @@ test('a downloaded file can be checked before importing', async ({ page }) => {
   await page.getByTestId('import-file').setInputFiles({ name: 'other.json', mimeType: 'application/json', buffer: Buffer.from('{"hello":"world"}') });
   await expect(page.getByTestId('import-error')).toHaveText("This isn't a Home Budget export file.");
 });
+
+test('a downloaded file can be imported as a new household', async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Council tax', 'Housing', '150');
+  await page.goto('/household/data');
+  await settled(page);
+
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-json').click()]);
+  await page.getByTestId('import-file').setInputFiles((await download.path())!);
+  await expect(page.getByTestId('import-ok')).toBeVisible();
+
+  await page.getByTestId('import-name').fill('Restored copy');
+  await page.getByTestId('import-new-household').click();
+
+  await expect(page.getByTestId('imported')).toContainText('Restored copy');
+  await expect(page.getByTestId('appbar-household')).toHaveText('Restored copy');
+  await page.goto('/outgoings');
+  await expect(page.getByTestId('outgoing-name')).toHaveText(['Council tax']);
+});
