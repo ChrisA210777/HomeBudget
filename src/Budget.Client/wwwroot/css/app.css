@@ -177,6 +177,44 @@ body {
     border-top: 1px solid var(--mud-palette-lines-default);
 }
 
+/* The import file picker (BUD-67): a real file input inside a label styled as a button, so it works with the
+   keyboard and screen readers. */
+.import-file-button {
+    cursor: pointer;
+    min-height: 44px;
+}
+
+.import-file-button:focus-within {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+/* A preview's key facts: label then value, two columns on wider screens. */
+.import-facts {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px 16px;
+    margin: 0;
+}
+
+.import-facts dt {
+    font-weight: 600;
+}
+
+.import-facts dd {
+    margin: 0 0 6px;
+}
+
+@media (min-width: 600px) {
+    .import-facts {
+        grid-template-columns: max-content 1fr;
+    }
+
+    .import-facts dd {
+        margin-bottom: 0;
+    }
+}
+
 /* The category icon picker (BUD-69): a wrapping grid of icon buttons. */
 .category-icon-picker {
     display: flex;

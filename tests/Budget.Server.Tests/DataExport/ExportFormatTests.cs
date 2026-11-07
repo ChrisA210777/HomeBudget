@@ -25,6 +25,10 @@ public class ExportFormatTests
 
         Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Errors));
         Assert.Equal(ExportFormat.CurrentSchemaVersion, result.Document!.SchemaVersion);
+
+        // And every domain rule is met, so it would import.
+        var (plan, problems) = ImportPlanner.Plan(result.Document, Guid.NewGuid());
+        Assert.True(plan is not null, string.Join(Environment.NewLine, problems));
     }
 
     [Fact]
