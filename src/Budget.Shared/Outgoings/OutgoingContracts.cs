@@ -131,7 +131,8 @@ public sealed record RenewalEntry(
     PaymentUnitDto Unit,
     string? PaidFrom,
     bool AutoRenews,
-    bool IsPaused);
+    bool IsPaused,
+    string? PersonName = null);
 
 /// <summary>The payments due between <see cref="From"/> and <see cref="To"/>, in date order (BUD-82, ADR-013).</summary>
 public sealed record UpcomingPaymentsResponse(DateOnly From, DateOnly To, string CurrencyCode, IReadOnlyList<UpcomingPayment> Payments);

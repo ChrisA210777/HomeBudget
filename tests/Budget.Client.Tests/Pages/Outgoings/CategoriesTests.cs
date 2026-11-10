@@ -37,6 +37,10 @@ public sealed class CategoriesTests : IDisposable
         Assert.Equal("Housing", rows[0].QuerySelector("[data-testid=category-name]")!.TextContent.Trim());
         Assert.Equal("2 outgoings", rows[0].QuerySelector("[data-testid=category-usage]")!.TextContent.Trim());
         Assert.Equal("Nothing in it yet", rows[1].QuerySelector("[data-testid=category-usage]")!.TextContent.Trim());
+
+        // The count opens Outgoings filtered to that category (BUD-98); an empty one isn't a link.
+        Assert.StartsWith("/outgoings?category=", rows[0].QuerySelector("[data-testid=category-usage]")!.GetAttribute("href"), StringComparison.Ordinal);
+        Assert.Null(rows[1].QuerySelector("[data-testid=category-usage]")!.GetAttribute("href"));
         Assert.Null(rows[0].QuerySelector("[data-testid=hidden]"));
         Assert.NotNull(rows[2].QuerySelector("[data-testid=hidden]"));
     }

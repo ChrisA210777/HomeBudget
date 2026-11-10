@@ -56,7 +56,16 @@
                                          data-testid="category-icon" data-icon="@category.Icon" />
                                 <div class="flex-grow-1" style="min-width: 0">
                                     <MudText Typo="Typo.body1" Color="@(category.IsHidden ? Color.Secondary : Color.Inherit)" data-testid="category-name">@category.Name</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="category-usage">@Usage(category)</MudText>
+                                    @* The count opens Outgoings filtered to this category (BUD-98). *@
+                                    @if (category.OutgoingCount > 0)
+                                    {
+                                        <MudLink Href="@($"/outgoings?category={category.Id}")" Typo="Typo.caption" aria-label="@($"{Usage(category)} in {category.Name}")"
+                                                 Class="d-block" data-testid="category-usage">@Usage(category)</MudLink>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="category-usage">@Usage(category)</MudText>
+                                    }
                                 </div>
                                 @if (category.IsHidden)
                                 {
