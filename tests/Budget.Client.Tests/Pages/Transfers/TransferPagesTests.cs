@@ -43,7 +43,9 @@ public sealed class TransferPagesTests : IDisposable
         var cut = _context.RenderComponent<TransferList>();
 
         Assert.Equal(new[] { "Into Joint" }, Texts(cut, "transfer-group-name"));
-        Assert.Equal(new[] { "£450.00 a month" }, Texts(cut, "transfer-group-total"));
+        Assert.Equal(new[] { "£450.00" }, Texts(cut, "transfer-group-total"));
+        Assert.Equal(new[] { "£400.00", "£50.00" }, Texts(cut, "transfer-amount"));
+        Assert.Equal(new[] { "a month", "a month" }, Texts(cut, "transfer-period"));
         Assert.Equal(new[] { "Bills top-up", "Chris current → Joint › Holiday" }, Texts(cut, "transfer-name"));
         Assert.Equal(new[] { "Chris current → Joint · next 25 Nov 2026", "next 1 Dec 2026" }, Texts(cut, "transfer-details"));
         Assert.Equal("/transfers/new", cut.Find("[data-testid=add-transfer]").GetAttribute("href"));

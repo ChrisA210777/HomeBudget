@@ -11,7 +11,7 @@
 <PageTitle>Transfers · Home Budget</PageTitle>
 
 @* Money moved between accounts and pots (BUD-91, ADR-014), grouped by the account it goes into. *@
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
     <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-2">
         <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/accounts">Accounts</MudButton>
         <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Timeline" Href="/cash-flow" data-testid="go-to-cash-flow">Cash flow</MudButton>
@@ -48,27 +48,35 @@
         @foreach (var group in _data.Transfers.GroupBy(t => t.ToTopAccountId))
         {
             var name = group.First().ToTopAccountName;
-            <section class="mb-4" data-testid="transfer-group" aria-label="@($"Into {name}")">
-                <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2 mb-1" style="font-weight: 600">
+            @* Laid out like the Outgoings list: monthly amount and "a month" on the right, totals lined up with them. *@
+            <section class="mt-4" data-testid="transfer-group" aria-label="@($"Into {name}")">
+                <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2 mb-1 category-heading" style="font-weight: 600">
                     <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
                     <span class="flex-grow-1" data-testid="transfer-group-name">Into @name</span>
-                    <span style="font-weight: 400" data-testid="transfer-group-total">@Format(group.Where(t => t.Status is null).Sum(t => t.MonthlyAmount)) a month</span>
+                    <span style="font-weight: 400" class="text-nowrap" data-testid="transfer-group-total">@Format(group.Where(t => t.Status is null).Sum(t => t.MonthlyAmount))</span>
                 </h2>
                 <MudPaper Outlined="true">
-                    <MudList T="string" Dense="true" Padding="false">
+                    <ul class="plain-list">
                         @foreach (var transfer in group)
                         {
-                            <MudListItem T="string" Href="@($"/transfers/{transfer.Id}")" data-testid="transfer">
+                            <li class="plain-list-item" data-testid="transfer">
                                 <div class="d-flex align-start gap-2">
                                     <div class="flex-grow-1" style="min-width: 0">
-                                        <MudText Typo="Typo.body1" data-testid="transfer-name">@TransferScheduleBackend.Title(transfer.Name, transfer.FromName, transfer.ToName)</MudText>
-                                        <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="transfer-details">@Details(transfer)</MudText>
+                                        <MudLink Href="@($"/transfers/{transfer.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="transfer-name">@TransferScheduleBackend.Title(transfer.Name, transfer.FromName, transfer.ToName)</MudLink>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1" data-testid="transfer-details">@Details(transfer)</MudText>
+                                        @if (!(transfer.Every == 1 && transfer.Unit == PaymentUnitDto.Month))
+                                        {
+                                            <MudText Typo="Typo.caption" Class="d-block mt-1" data-testid="transfer-paid">@Format(transfer.Amount) @OutgoingValidator.DescribeSchedule(transfer.Every, transfer.Unit)</MudText>
+                                        }
                                     </div>
-                                    <MudText Typo="Typo.body1" Class="text-right" data-testid="transfer-amount">@Format(transfer.Amount) @OutgoingValidator.DescribeSchedule(transfer.Every, transfer.Unit)</MudText>
+                                    <div class="d-flex flex-column align-end text-right">
+                                        <MudText Typo="Typo.subtitle1" Class="text-nowrap" data-testid="transfer-amount">@Format(transfer.MonthlyAmount)</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="transfer-period">a month</MudText>
+                                    </div>
                                 </div>
-                            </MudListItem>
+                            </li>
                         }
-                    </MudList>
+                    </ul>
                 </MudPaper>
             </section>
         }
