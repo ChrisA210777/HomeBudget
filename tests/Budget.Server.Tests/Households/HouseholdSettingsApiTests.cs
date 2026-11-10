@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Budget.Domain.Households;
 using Budget.Server.Tests.Infrastructure;
+using Budget.Shared;
 using Budget.Shared.Account;
 using Budget.Shared.Households;
 
