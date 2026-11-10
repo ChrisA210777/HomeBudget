@@ -169,7 +169,7 @@ public static class AccountEndpoints
                     .Select(p => new { p.Id, p.DisplayName })
                     .FirstOrDefault()
                 select new HouseholdMembershipSummary(
-                    household.Id, household.Name, member.Role.ToString(), member.IsOwner, person == null ? null : person.Id, person == null ? null : person.DisplayName))
+                    household.Id, household.Name, member.Role.ToString(), member.IsOwner, person == null ? null : person.Id, person == null ? null : person.DisplayName, household.TransfersEnabled))
             .ToListAsync();
 
         // Fall back to another household if the last active one is gone or no longer theirs.

@@ -13,6 +13,9 @@ public static class HouseholdRoutes
 
     /// <summary>GET (any member): how far the household has got setting up, for the home page's prompts (BUD-68).</summary>
     public static string Setup(Guid householdId) => $"/api/households/{householdId}/setup";
+
+    /// <summary>PUT (Admins): the household's settings, e.g. "Accounts and transfers" (BUD-91).</summary>
+    public static string Settings(Guid householdId) => $"/api/households/{householdId}/settings";
 }
 
 /// <summary>How many of each thing the household has, whatever their dates.</summary>
@@ -26,7 +29,15 @@ public sealed record HouseholdResponse(
     string CurrencyCode,
     string Role,
     bool IsOwner,
-    int MemberCount);
+    int MemberCount,
+    bool TransfersEnabled = false);
+
+/// <summary>The household's settings. Only Admins can change them.</summary>
+public sealed record HouseholdSettingsRequest
+{
+    /// <summary>"Accounts and transfers" (ADR-014): transfers, the account check and calculated transfers.</summary>
+    public bool TransfersEnabled { get; init; }
+}
 
 /// <summary>Rename a household.</summary>
 public sealed record RenameHouseholdRequest

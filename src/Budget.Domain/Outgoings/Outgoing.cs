@@ -66,7 +66,7 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     public const int ContactPhoneMaxLength = 30;
     public const int NotesMaxLength = 2000;
     public const int MaxRenewalEveryMonths = 120;
-    public const int MaxPausedPayments = 520;
+    public const int MaxPausedPayments = PaymentTimeline.MaxPausedPayments;
 
     private readonly List<OutgoingAmountChange> _amountChanges = [];
     private readonly List<OutgoingStatusPeriod> _statusPeriods = [];
@@ -124,10 +124,13 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     public IReadOnlyCollection<OutgoingCorrection> Corrections => _corrections.AsReadOnly();
 
     /// <summary>When the first amount applies from.</summary>
-    public DateOnly StartsOn => _amountChanges.Min(c => c.EffectiveFrom);
+    public DateOnly StartsOn => Timeline.StartsOn;
 
     /// <summary>When it ended, if it has.</summary>
-    public DateOnly? EndsOn => _statusPeriods.Where(p => p.Reason == OutgoingStatusReason.Ended).Select(p => (DateOnly?)p.StartDate).Min();
+    public DateOnly? EndsOn => Timeline.EndsOn;
+
+    /// <summary>The payment-date and amount rules, shared with transfers.</summary>
+    private PaymentTimeline Timeline => new(FirstPaymentDate, _amountChanges, _statusPeriods);
 
     public static Outgoing Create(Guid householdId, OutgoingDetails details, decimal amount, PaymentSchedule schedule, string comment)
     {
@@ -211,16 +214,14 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     // ---- Working out amounts and dates ------------------------------------------
 
     /// <summary>Whether it's being paid on a date: started, and not paused or ended.</summary>
-    public bool IsActiveOn(DateOnly date) =>
-        _amountChanges.Any(c => c.EffectiveFrom <= date) && !_statusPeriods.Any(p => p.Covers(date));
+    public bool IsActiveOn(DateOnly date) => Timeline.IsActiveOn(date);
 
     /// <summary>The amount change in force on a date (ignoring pauses), if it has started.</summary>
     public OutgoingAmountChange? AmountChangeOn(DateOnly date) =>
         _amountChanges.Where(c => c.EffectiveFrom <= date).MaxBy(c => c.EffectiveFrom);
 
     /// <summary>The monthly equivalent on a date: 0 before it starts and while paused or ended.</summary>
-    public decimal MonthlyEquivalentOn(DateOnly date) =>
-        _statusPeriods.Any(p => p.Covers(date)) ? 0m : AmountChangeOn(date)?.MonthlyEquivalent ?? 0m;
+    public decimal MonthlyEquivalentOn(DateOnly date) => Timeline.MonthlyEquivalentOn(date);
 
     /// <summary>
     /// The monthly equivalent for a calendar month (ADR-011). Unrounded.
@@ -229,99 +230,25 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     /// monthly or yearly outgoing counts in full or not at all, and a weekly one loses the share of the
     /// month's payments that are paused or after the end.</para>
     /// </summary>
-    public decimal MonthlyEquivalentForMonth(int year, int month)
-    {
-        var days = CountingDaysIn(year, month).Where(d => d >= StartsOn).ToList();
-        return days.Count == 0 ? 0m : days.Sum(MonthlyEquivalentOn) / days.Count;
-    }
+    public decimal MonthlyEquivalentForMonth(int year, int month) => Timeline.MonthlyEquivalentForMonth(year, month);
 
-    /// <summary>
-    /// The days that decide a month's amount. For a weekly schedule, its payment dates in the month
-    /// (or, when payments are further apart than a month, the latest one before the month ends). For
-    /// monthly or longer schedules, one day each month on the first payment's day of the month, because
-    /// those are averaged into every month.
-    /// </summary>
-    public IReadOnlyList<DateOnly> CountingDaysIn(int year, int month)
-    {
-        var first = new DateOnly(year, month, 1);
-        var last = first.AddMonths(1).AddDays(-1);
-        var schedule = (AmountChangeOn(last) ?? _amountChanges.MinBy(c => c.EffectiveFrom)!).Schedule;
-
-        if (schedule.Unit != PaymentUnit.Week)
-        {
-            return [new DateOnly(year, month, Math.Min(FirstPaymentDate.Day, DateTime.DaysInMonth(year, month)))];
-        }
-
-        var period = 7 * schedule.Every;
-        var dates = new List<DateOnly>();
-        var next = schedule.NextOnOrAfter(FirstPaymentDate, first);
-        for (var date = next; date <= last; date = date.AddDays(period))
-        {
-            dates.Add(date);
-        }
-
-        if (dates.Count == 0 && next > FirstPaymentDate)
-        {
-            dates.Add(next.AddDays(-period));
-        }
-
-        return dates;
-    }
+    /// <inheritdoc cref="PaymentTimeline.CountingDaysIn"/>
+    public IReadOnlyList<DateOnly> CountingDaysIn(int year, int month) => Timeline.CountingDaysIn(year, month);
 
     /// <summary>Whether a payment is due on a date under the schedule in force then (ignoring pauses).</summary>
-    public bool IsPaymentDate(DateOnly date) =>
-        date >= StartsOn && AmountChangeOn(date)!.Schedule.NextOnOrAfter(FirstPaymentDate, date) == date;
+    public bool IsPaymentDate(DateOnly date) => Timeline.IsPaymentDate(date);
 
     /// <summary>The payment after <paramref name="date"/>, ignoring pauses.</summary>
-    public DateOnly PaymentAfter(DateOnly date)
-    {
-        var from = date < StartsOn ? StartsOn : date.AddDays(1);
-        var schedule = (AmountChangeOn(from) ?? _amountChanges.MinBy(c => c.EffectiveFrom)!).Schedule;
-        return schedule.NextOnOrAfter(FirstPaymentDate, from);
-    }
+    public DateOnly PaymentAfter(DateOnly date) => Timeline.PaymentAfter(date);
 
     /// <summary>The next payment on or after a date, or <c>null</c> if none is due (ended, or paused until further notice).</summary>
-    public DateOnly? NextPaymentOnOrAfter(DateOnly date)
-    {
-        var from = date < StartsOn ? StartsOn : date;
-        for (var attempt = 0; attempt < 500; attempt++)
-        {
-            var schedule = (AmountChangeOn(from) ?? _amountChanges.MinBy(c => c.EffectiveFrom)!).Schedule;
-            var next = schedule.NextOnOrAfter(FirstPaymentDate, from);
-            var blocking = _statusPeriods.FirstOrDefault(p => p.Covers(next));
-            if (blocking is null)
-            {
-                return next;
-            }
-
-            if (blocking.ResumesOn is not { } resumes)
-            {
-                return null;
-            }
-
-            from = resumes;
-        }
-
-        return null;
-    }
+    public DateOnly? NextPaymentOnOrAfter(DateOnly date) => Timeline.NextPaymentOnOrAfter(date);
 
     /// <summary>
     /// The payments actually due from <paramref name="from"/> to <paramref name="to"/> inclusive (ADR-013,
-    /// BUD-82): on the schedule in force on each date, anchored on the first payment date (clamped to short
-    /// months), at the amount in force that day. Paused payments are skipped and there are none before it
-    /// starts or once it has ended. Weekends and bank holidays aren't moved.
+    /// BUD-82). Weekends and bank holidays aren't moved.
     /// </summary>
-    public IReadOnlyList<ScheduledPayment> PaymentsBetween(DateOnly from, DateOnly to)
-    {
-        var payments = new List<ScheduledPayment>();
-        for (var next = NextPaymentOnOrAfter(from); next is { } date && date <= to; next = NextPaymentOnOrAfter(date.AddDays(1)))
-        {
-            var change = AmountChangeOn(date)!;
-            payments.Add(new ScheduledPayment(date, change.Amount, change.Schedule));
-        }
-
-        return payments;
-    }
+    public IReadOnlyList<ScheduledPayment> PaymentsBetween(DateOnly from, DateOnly to) => Timeline.PaymentsBetween(from, to);
 
     /// <summary>
     /// Renewals to show between <paramref name="from"/> and <paramref name="to"/> inclusive (BUD-81, ADR-013).
@@ -362,8 +289,7 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         return EndsOn is { } ended ? occurrences.Where(o => o.Date < ended).ToList() : occurrences;
     }
 
-    private bool IsPausedOn(DateOnly date) =>
-        _statusPeriods.Any(p => p.Reason == OutgoingStatusReason.Paused && p.Covers(date));
+    private bool IsPausedOn(DateOnly date) => Timeline.IsPausedOn(date);
 
     /// <summary>The next renewal on or after a date, rolling the renewal date forward by the renewal cycle.</summary>
     public DateOnly? NextRenewalOnOrAfter(DateOnly date) =>
@@ -454,54 +380,13 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     }
 
     /// <summary>When payments resume after skipping <paramref name="payments"/> payments from <paramref name="firstSkipped"/>.</summary>
-    public DateOnly ResumesAfterSkipping(DateOnly firstSkipped, int payments)
-    {
-        if (payments is < 1 or > MaxPausedPayments)
-        {
-            throw new ArgumentOutOfRangeException(nameof(payments), $"A pause skips from 1 to {MaxPausedPayments} payments.");
-        }
-
-        var resumesOn = firstSkipped;
-        for (var i = 0; i < payments; i++)
-        {
-            resumesOn = PaymentAfter(resumesOn);
-        }
-
-        return resumesOn;
-    }
+    public DateOnly ResumesAfterSkipping(DateOnly firstSkipped, int payments) => Timeline.ResumesAfterSkipping(firstSkipped, payments);
 
     /// <summary>How many payments a pause skips, or <c>null</c> if it's until further notice (or an ending).</summary>
-    public int? PaymentsSkippedBy(OutgoingStatusPeriod period)
-    {
-        ArgumentNullException.ThrowIfNull(period);
-        if (period.Reason != OutgoingStatusReason.Paused || period.ResumesOn is not { } resumes)
-        {
-            return null;
-        }
-
-        var count = 0;
-        for (var date = period.StartDate; date < resumes && count <= MaxPausedPayments; date = PaymentAfter(date))
-        {
-            count++;
-        }
-
-        return count;
-    }
+    public int? PaymentsSkippedBy(OutgoingStatusPeriod period) => Timeline.PaymentsSkippedBy(period);
 
     /// <summary>The next <paramref name="count"/> payment dates on or after <paramref name="from"/>, ignoring pauses.</summary>
-    public IReadOnlyList<DateOnly> PaymentDatesFrom(DateOnly from, int count)
-    {
-        var dates = new List<DateOnly>(count);
-        var start = from < StartsOn ? StartsOn : from;
-        var date = (AmountChangeOn(start) ?? _amountChanges.MinBy(c => c.EffectiveFrom)!).Schedule.NextOnOrAfter(FirstPaymentDate, start);
-        for (var i = 0; i < count; i++)
-        {
-            dates.Add(date);
-            date = PaymentAfter(date);
-        }
-
-        return dates;
-    }
+    public IReadOnlyList<DateOnly> PaymentDatesFrom(DateOnly from, int count) => Timeline.PaymentDatesFrom(from, count);
 
     /// <summary>Stops the outgoing from a date. It stays in the history for earlier months.</summary>
     public OutgoingStatusPeriod End(DateOnly from, string comment) =>
@@ -567,18 +452,7 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         }
     }
 
-    private void EnsurePausedOnPaymentDates(DateOnly from, DateOnly? resumesOn)
-    {
-        if (!IsPaymentDate(from))
-        {
-            throw new InvalidOperationException("A pause has to start on a payment date.");
-        }
-
-        if (resumesOn is { } resumes && resumes > from && !IsPaymentDate(resumes))
-        {
-            throw new InvalidOperationException("A pause has to resume on a payment date.");
-        }
-    }
+    private void EnsurePausedOnPaymentDates(DateOnly from, DateOnly? resumesOn) => Timeline.EnsurePausedOnPaymentDates(from, resumesOn);
 
     private void EnsureNoOverlap(DateOnly start, DateOnly? resumesOn, Guid? exceptId)
     {

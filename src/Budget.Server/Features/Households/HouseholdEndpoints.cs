@@ -19,6 +19,7 @@ public static class HouseholdEndpoints
 
         household.MapGet("/", GetHouseholdAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         household.MapPut("/", RenameAsync).RequireAuthorization(HouseholdPolicies.Admin);
+        household.MapPut("/settings", SaveSettingsAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapDelete("/", DeleteAsync).RequireAuthorization(HouseholdPolicies.Owner);
         household.MapGet("/setup", GetSetupAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         household.MapGet("/members", GetMembersAsync).RequireAuthorization(HouseholdPolicies.Viewer);
@@ -101,6 +102,7 @@ public static class HouseholdEndpoints
                 .Where(u => u.LastActiveHouseholdId == householdId)
                 .ExecuteUpdateAsync(u => u.SetProperty(x => x.LastActiveHouseholdId, (Guid?)null));
             await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId).ExecuteDeleteAsync();
+            await db.Transfers.IgnoreQueryFilters().Where(t => t.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.IncomeStreams.IgnoreQueryFilters().Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.ParentAccountId != null).ExecuteDeleteAsync();
             await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ExecuteDeleteAsync();
@@ -217,6 +219,15 @@ public static class HouseholdEndpoints
         return await GetHouseholdAsync(householdId, principal, db);
     }
 
+    private static async Task<IResult> SaveSettingsAsync(Guid householdId, HouseholdSettingsRequest request, ClaimsPrincipal principal, BudgetDbContext db)
+    {
+        var household = await db.Households.SingleAsync(h => h.Id == householdId);
+        household.SetTransfersEnabled(request.TransfersEnabled);
+        await db.SaveChangesAsync();
+
+        return await GetHouseholdAsync(householdId, principal, db);
+    }
+
     private static async Task<IResult> GetHouseholdAsync(Guid householdId, ClaimsPrincipal principal, BudgetDbContext db)
     {
         var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -229,6 +240,7 @@ public static class HouseholdEndpoints
                 h.Id,
                 h.Name,
                 h.CurrencyCode,
+                h.TransfersEnabled,
                 Me = h.Members.Where(m => m.UserId == userId).Select(m => new { m.Role, m.IsOwner }).FirstOrDefault(),
                 MemberCount = h.Members.Count,
             })
@@ -242,6 +254,7 @@ public static class HouseholdEndpoints
             response.CurrencyCode,
             me.Role.ToString(),
             me.IsOwner,
-            response.MemberCount));
+            response.MemberCount,
+            response.TransfersEnabled));
     }
 }

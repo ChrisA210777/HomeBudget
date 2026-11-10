@@ -4,6 +4,7 @@ using Budget.Domain.Households;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Domain.People;
+using Budget.Domain.Transfers;
 using Budget.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +50,9 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
 
     /// <summary>Accounts and pots (BUD-89). Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
     public DbSet<Account> Accounts => Set<Account>();
+
+    /// <summary>Transfers between accounts (BUD-91). Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
+    public DbSet<Transfer> Transfers => Set<Transfer>();
 
     /// <summary>Read by the household query filters each time a query runs.</summary>
     private Guid? CurrentHouseholdId => _currentHousehold.HouseholdId;
