@@ -22,6 +22,64 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Budget.Domain.Accounts.Account", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset>("ModifiedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("OriginallyRecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginallyRecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("OwnerPersonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ParentAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerPersonId");
+
+                    b.HasIndex("ParentAccountId");
+
+                    b.HasIndex("HouseholdId", "ParentAccountId", "Name")
+                        .IsUnique()
+                        .HasFilter("[ParentAccountId] IS NOT NULL");
+
+                    b.ToTable("Accounts", (string)null);
+                });
+
             modelBuilder.Entity("Budget.Domain.Households.Household", b =>
                 {
                     b.Property<Guid>("Id")
@@ -332,6 +390,9 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("AlertPeriod")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -386,10 +447,6 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<string>("PaidFrom")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<string>("PaymentMethod")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
@@ -430,6 +487,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(300)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
 
                     b.HasIndex("CategoryId");
 
@@ -864,6 +923,25 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Budget.Domain.Accounts.Account", b =>
+                {
+                    b.HasOne("Budget.Domain.Households.Household", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Budget.Domain.People.Person", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerPersonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Budget.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("ParentAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Budget.Domain.Households.HouseholdMember", b =>
                 {
                     b.HasOne("Budget.Domain.Households.Household", null)
@@ -923,6 +1001,11 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Budget.Domain.Outgoings.Outgoing", b =>
                 {
+                    b.HasOne("Budget.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Budget.Domain.Outgoings.OutgoingCategory", null)
                         .WithMany()
                         .HasForeignKey("CategoryId")

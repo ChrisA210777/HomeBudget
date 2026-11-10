@@ -1,0 +1,340 @@
+@page "/accounts"
+@attribute [Authorize]
+@using Budget.Client.Accounts
+@using Budget.Client.People
+@using Budget.Shared.Accounts
+@using Budget.Shared.People
+@inject UserSession Session
+@inject IAccountsApi AccountsApi
+@inject IPeopleApi PeopleApi
+@inject ISnackbar Snackbar
+
+<PageTitle>Accounts · Home Budget</PageTitle>
+
+@* The household's accounts and their pots (BUD-89, ADR-014). Archived, never deleted. *@
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <h1 class="mud-typography mud-typography-h4 mb-1">Accounts</h1>
+    <MudText Typo="Typo.body2" Class="mb-4">
+        The bank accounts, and pots within them, that money is paid from. Choose one for each outgoing, or type a new name there to add it.
+    </MudText>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" ShowCloseIcon="true" CloseIconClicked="() => _error = null" data-testid="account-error">@_error</MudAlert>
+    }
+
+    @if (_accounts is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        @if (_canEdit)
+        {
+            <MudPaper Outlined="true" Class="pa-4 mb-4" data-testid="add-account-form">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Add an account</MudText>
+                <div class="d-flex flex-wrap gap-3">
+                    <div style="flex: 2 1 12rem">
+                        <MudTextField @bind-Value="_newName" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" Immediate="true" data-testid="new-account-name" />
+                    </div>
+                    <div style="flex: 1 1 8rem">
+                        <MudTextField @bind-Value="_newProvider" Label="Bank (optional)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" data-testid="new-account-provider" />
+                    </div>
+                    <div style="flex: 1 1 10rem">
+                        <MudSelect T="Guid?" @bind-Value="_newOwner" ToStringFunc="OwnerName" Label="Whose" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="new-account-owner">
+                            @foreach (var owner in Owners)
+                            {
+                                <MudSelectItem T="Guid?" Value="owner">@OwnerName(owner)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="mt-3"
+                           OnClick="AddAccountAsync" Disabled="@(_saving || !Online || string.IsNullOrWhiteSpace(_newName))" data-testid="add-account">Add account</MudButton>
+            </MudPaper>
+        }
+
+        @if (_accounts.Count == 0)
+        {
+            <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="accounts-empty">
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.body1" Class="mt-2">No accounts yet.</MudText>
+            </MudPaper>
+        }
+
+        @foreach (var account in Shown.Where(a => a.ParentAccountId is null))
+        {
+            var pots = Shown.Where(p => p.ParentAccountId == account.Id).ToList();
+            <MudPaper Outlined="true" Class="mb-3" data-testid="account" aria-label="@account.Name">
+                @AccountRow(account, isPot: false)
+                @if (pots.Count > 0 || _canEdit)
+                {
+                    <ul class="plain-list pl-6" aria-label="@($"Pots in {account.Name}")">
+                        @foreach (var pot in pots)
+                        {
+                            <li data-testid="pot">@AccountRow(pot, isPot: true)</li>
+                        }
+                    </ul>
+                }
+                @if (_canEdit && !account.IsArchived)
+                {
+                    <div class="d-flex align-center gap-2 px-4 pb-3 pl-10">
+                        @if (_addingPotTo == account.Id)
+                        {
+                            <MudTextField @bind-Value="_newPotName" Label="Pot name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" Immediate="true" data-testid="new-pot-name" />
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="() => AddPotAsync(account)"
+                                       Disabled="@(_saving || !Online || string.IsNullOrWhiteSpace(_newPotName))" data-testid="add-pot-save">Add</MudButton>
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => _addingPotTo = null">Cancel</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add"
+                                       OnClick="() => StartPot(account)" Disabled="!Online" data-testid="add-pot">Add a pot</MudButton>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        }
+
+        @if (_accounts.Any(a => a.IsArchived))
+        {
+            <MudSwitch T="bool" @bind-Value="_showArchived" Color="Color.Primary" Label="Show archived accounts and pots" data-testid="show-archived" />
+        }
+    }
+</MudContainer>
+
+@code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    private HouseholdMembershipSummary? _household;
+    private IReadOnlyList<AccountSummary>? _accounts;
+    private IReadOnlyList<PersonSummary> _people = [];
+    private bool _canEdit;
+    private bool _isAdmin;
+    private bool _saving;
+    private bool _showArchived;
+    private string? _error;
+
+    private string? _newName;
+    private string? _newProvider;
+    private Guid? _newOwner;
+
+    private Guid? _addingPotTo;
+    private string? _newPotName;
+
+    private Guid? _editingId;
+    private string? _editName;
+    private string? _editProvider;
+    private Guid? _editOwner;
+
+    private Guid? _mergingId;
+    private Guid? _mergeInto;
+
+    private IEnumerable<AccountSummary> Shown => (_accounts ?? []).Where(a => _showArchived || !a.IsArchived);
+
+    /// <summary>The household itself (<c>null</c>), then each person.</summary>
+    private IEnumerable<Guid?> Owners => new Guid?[] { null }.Concat(_people.Select(p => (Guid?)p.Id));
+
+    private string OwnerName(Guid? owner) =>
+        owner is { } id ? _people.FirstOrDefault(p => p.Id == id)?.DisplayName ?? "Someone" : "The household (joint)";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        _canEdit = _household is not null && _household.Role != "Viewer";
+        _isAdmin = _household?.Role == "Admin";
+        if (_household is not null)
+        {
+            _people = await PeopleApi.ListAsync(_household.HouseholdId);
+            _accounts = await AccountsApi.ListAsync(_household.HouseholdId);
+        }
+        else
+        {
+            _accounts = [];
+        }
+    }
+
+    private RenderFragment AccountRow(AccountSummary account, bool isPot) =>
+        @<div class="@(isPot ? "py-2 pr-4" : "pa-4")" data-testid="account-row">
+            @if (_editingId == account.Id)
+            {
+                <div class="d-flex flex-wrap gap-3">
+                    <div style="flex: 2 1 12rem">
+                        <MudTextField @bind-Value="_editName" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" Immediate="true" data-testid="edit-account-name" />
+                    </div>
+                    @if (!isPot)
+                    {
+                        <div style="flex: 1 1 8rem">
+                            <MudTextField @bind-Value="_editProvider" Label="Bank (optional)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" />
+                        </div>
+                        <div style="flex: 1 1 10rem">
+                            <MudSelect T="Guid?" @bind-Value="_editOwner" ToStringFunc="OwnerName" Label="Whose" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="edit-account-owner">
+                                @foreach (var owner in Owners)
+                                {
+                                    <MudSelectItem T="Guid?" Value="owner">@OwnerName(owner)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </div>
+                    }
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="() => SaveEditAsync(account)"
+                               Disabled="@(_saving || !Online || string.IsNullOrWhiteSpace(_editName))" data-testid="edit-account-save">Save</MudButton>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => _editingId = null">Cancel</MudButton>
+                </div>
+            }
+            else if (_mergingId == account.Id)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    Move everything paid from @account.DisplayName into another account or pot, then archive it.
+                    @(isPot ? string.Empty : "Its pots move too, joining any with the same name.")
+                </MudText>
+                <MudSelect T="Guid?" @bind-Value="_mergeInto" ToStringFunc="MergeName" Label="Merge into" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="merge-into">
+                    @foreach (var target in MergeTargets(account))
+                    {
+                        <MudSelectItem T="Guid?" Value="target.Id">@target.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+                <div class="d-flex gap-2 mt-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Small" OnClick="() => MergeAsync(account)"
+                               Disabled="@(_saving || !Online || _mergeInto is null)" data-testid="merge-save">Merge</MudButton>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => _mergingId = null">Cancel</MudButton>
+                </div>
+            }
+            else
+            {
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@(isPot ? Icons.Material.Filled.Savings : Icons.Material.Filled.AccountBalance)" Size="Size.Small" Color="Color.Secondary" aria-hidden="true" />
+                    <div class="flex-grow-1" style="min-width: 0">
+                        <MudText Typo="@(isPot ? Typo.body2 : Typo.subtitle1)" data-testid="account-name">@account.Name</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="account-details">@Details(account, isPot)</MudText>
+                    </div>
+                    @if (account.IsArchived)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0" data-testid="account-archived">Archived</MudChip>
+                    }
+                    @if (_canEdit)
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" AriaLabel="@($"Change {account.DisplayName}")" Dense="true" data-testid="account-menu">
+                            @if (!account.IsArchived)
+                            {
+                                <MudMenuItem OnClick="() => StartEdit(account)" data-testid="edit-account">Edit</MudMenuItem>
+                                @if (_isAdmin)
+                                {
+                                    <MudMenuItem OnClick="() => StartMerge(account)" data-testid="merge-account">Merge into another…</MudMenuItem>
+                                }
+                                <MudMenuItem OnClick="() => SetArchivedAsync(account, true)" data-testid="archive-account">Archive</MudMenuItem>
+                            }
+                            else
+                            {
+                                <MudMenuItem OnClick="() => SetArchivedAsync(account, false)" data-testid="restore-account">Restore</MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+                </div>
+            }
+        </div>;
+
+    private string Details(AccountSummary account, bool isPot)
+    {
+        var parts = new List<string>();
+        if (!isPot)
+        {
+            parts.Add(account.OwnerName ?? "Joint");
+            if (!string.IsNullOrWhiteSpace(account.Provider))
+            {
+                parts.Add(account.Provider);
+            }
+        }
+
+        parts.Add(account.OutgoingCount == 1 ? "1 outgoing" : $"{account.OutgoingCount} outgoings");
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>Any other open account or pot; an account with pots can only go into another account.</summary>
+    private IEnumerable<AccountSummary> MergeTargets(AccountSummary account)
+    {
+        var hasPots = _accounts!.Any(p => p.ParentAccountId == account.Id);
+        return _accounts!.Where(a => a.Id != account.Id && !a.IsArchived && a.ParentAccountId != account.Id && !(hasPots && a.ParentAccountId is not null));
+    }
+
+    private string MergeName(Guid? id) => _accounts?.FirstOrDefault(a => a.Id == id)?.DisplayName ?? string.Empty;
+
+    private void StartPot(AccountSummary account)
+    {
+        _addingPotTo = account.Id;
+        _newPotName = null;
+    }
+
+    private void StartEdit(AccountSummary account)
+    {
+        _mergingId = null;
+        _editingId = account.Id;
+        _editName = account.Name;
+        _editProvider = account.Provider;
+        _editOwner = account.OwnerPersonId;
+    }
+
+    private void StartMerge(AccountSummary account)
+    {
+        _editingId = null;
+        _mergingId = account.Id;
+        _mergeInto = null;
+    }
+
+    private Task AddAccountAsync() =>
+        SaveAsync(
+            () => AccountsApi.AddAsync(_household!.HouseholdId, new SaveAccountRequest { Name = _newName ?? string.Empty, Provider = _newProvider, OwnerPersonId = _newOwner }),
+            $"Added {_newName?.Trim()}.",
+            () => (_newName, _newProvider, _newOwner) = (null, null, null));
+
+    private Task AddPotAsync(AccountSummary account) =>
+        SaveAsync(
+            () => AccountsApi.AddAsync(_household!.HouseholdId, new SaveAccountRequest { Name = _newPotName ?? string.Empty, ParentAccountId = account.Id }),
+            $"Added the {_newPotName?.Trim()} pot to {account.Name}.",
+            () => _addingPotTo = null);
+
+    private Task SaveEditAsync(AccountSummary account) =>
+        SaveAsync(
+            () => AccountsApi.UpdateAsync(_household!.HouseholdId, account.Id, new SaveAccountRequest { Name = _editName ?? string.Empty, Provider = _editProvider, OwnerPersonId = _editOwner }),
+            "Saved.",
+            () => _editingId = null);
+
+    private Task SetArchivedAsync(AccountSummary account, bool archived) =>
+        SaveAsync(
+            () => AccountsApi.SetArchivedAsync(_household!.HouseholdId, account.Id, archived),
+            archived ? $"Archived {account.DisplayName}." : $"Restored {account.DisplayName}.",
+            () => { });
+
+    private Task MergeAsync(AccountSummary account) =>
+        SaveAsync(
+            () => AccountsApi.MergeAsync(_household!.HouseholdId, account.Id, _mergeInto!.Value),
+            $"Merged {account.DisplayName} into {MergeName(_mergeInto)}.",
+            () => _mergingId = null);
+
+    private async Task SaveAsync(Func<Task<AccountsResult>> save, string done, Action reset)
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var result = await save();
+            if (result.Succeeded)
+            {
+                _accounts = result.Accounts;
+                reset();
+                Snackbar.Add(done, Severity.Success);
+            }
+            else
+            {
+                _error = result.Problem ?? "That couldn't be saved.";
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

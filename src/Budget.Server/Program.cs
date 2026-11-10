@@ -2,7 +2,8 @@ using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Budget.Infrastructure;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
-using Budget.Server.Features.Account;
+using Budget.Server.Features.SignIn;
+using Budget.Server.Features.Accounts;
 using Budget.Server.Features.Budgeting;
 using Budget.Server.Features.DataExport;
 using Budget.Server.Features.Households;
@@ -80,6 +81,7 @@ app.MapIncomeStreamEndpoints();
 app.MapPeopleEndpoints();
 app.MapOutgoingCategoryEndpoints();
 app.MapOutgoingEndpoints();
+app.MapHouseholdAccountEndpoints();
 app.MapBudgetEndpoints();
 app.MapDataExportEndpoints();
 

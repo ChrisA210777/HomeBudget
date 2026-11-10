@@ -34,8 +34,8 @@ public sealed record OutgoingDetails
 
     public PaymentMethod? PaymentMethod { get; init; }
 
-    /// <summary>The name of the account it's paid from, e.g. "Joint current account".</summary>
-    public string? PaidFrom { get; init; }
+    /// <summary>The account or pot it's paid from (BUD-89, ADR-014), in the same household.</summary>
+    public Guid? AccountId { get; init; }
 
     /// <summary>What the reference is called, e.g. "Policy number".</summary>
     public string? ReferenceLabel { get; init; }
@@ -60,7 +60,6 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
     public const int NameMaxLength = 100;
     public const int CommentMaxLength = 200;
     public const int RecipientMaxLength = 100;
-    public const int PaidFromMaxLength = 100;
     public const int ReferenceLabelMaxLength = 50;
     public const int ReferenceValueMaxLength = 100;
     public const int WebsiteMaxLength = 300;
@@ -105,7 +104,8 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
 
     public PaymentMethod? PaymentMethod { get; private set; }
 
-    public string? PaidFrom { get; private set; }
+    /// <summary>The account or pot it's paid from (BUD-89).</summary>
+    public Guid? AccountId { get; private set; }
 
     public string? ReferenceLabel { get; private set; }
 
@@ -200,7 +200,7 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         AlertPeriod = details.RenewalDate is null ? AlertPeriod.None : details.AlertPeriod;
         Recipient = Values.Optional(details.Recipient, nameof(details.Recipient), RecipientMaxLength);
         PaymentMethod = details.PaymentMethod;
-        PaidFrom = Values.Optional(details.PaidFrom, nameof(details.PaidFrom), PaidFromMaxLength);
+        AccountId = details.AccountId;
         ReferenceLabel = Values.Optional(details.ReferenceLabel, nameof(details.ReferenceLabel), ReferenceLabelMaxLength);
         ReferenceValue = Values.Optional(details.ReferenceValue, nameof(details.ReferenceValue), ReferenceValueMaxLength);
         Website = ValidWebsite(details.Website);

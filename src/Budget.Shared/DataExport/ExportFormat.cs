@@ -11,7 +11,7 @@ public static class ExportFormat
     public const string FormatName = "home-budget-export";
 
     /// <summary>The version this app writes. It reads this and every earlier version.</summary>
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>Files bigger than this are refused.</summary>
     public const long MaxFileBytes = 10 * 1024 * 1024;

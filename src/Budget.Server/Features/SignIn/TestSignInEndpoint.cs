@@ -5,7 +5,7 @@ using Budget.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace Budget.Server.Features.Account;
+namespace Budget.Server.Features.SignIn;
 
 /// <summary>
 /// Signs in as a named test person without an external provider, for the end-to-end tests

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace Budget.Server.Features.Account;
+namespace Budget.Server.Features.SignIn;
 
 public static class AccountEndpoints
 {

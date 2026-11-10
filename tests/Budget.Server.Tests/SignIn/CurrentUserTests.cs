@@ -5,7 +5,7 @@ using Budget.Shared;
 using Budget.Shared.Account;
 using Microsoft.EntityFrameworkCore;
 
-namespace Budget.Server.Tests.Account;
+namespace Budget.Server.Tests.SignIn;
 
 [Collection(ApiCollection.Name)]
 public class CurrentUserTests(BudgetApiFactory factory) : IntegrationTestBase(factory)

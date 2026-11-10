@@ -7,7 +7,7 @@ using Budget.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace Budget.Server.Features.Account;
+namespace Budget.Server.Features.SignIn;
 
 /// <summary>
 /// Finds the user linked to an external login. The first time someone signs in it creates their

@@ -4,7 +4,7 @@ using System.Security.Claims;
 using Budget.Domain.Households;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
-using Budget.Server.Features.Account;
+using Budget.Server.Features.SignIn;
 using Budget.Shared;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;

@@ -18,7 +18,7 @@ test('an admin can download the household as a JSON file', async ({ page }) => {
 
   const file = JSON.parse(await readFile((await download.path())!, 'utf8'));
   expect(file.format).toBe('home-budget-export');
-  expect(file.schemaVersion).toBe(1);
+  expect(file.schemaVersion).toBe(2);
   expect(file.household.name).toBe('My Household');
   expect(file.outgoings.map((o: { name: string }) => o.name)).toEqual(['Council tax']);
 });

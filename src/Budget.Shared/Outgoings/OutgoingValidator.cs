@@ -12,7 +12,8 @@ public static partial class OutgoingValidator
     public const int NameMaxLength = 100;
     public const int CommentMaxLength = 200;
     public const int RecipientMaxLength = 100;
-    public const int PaidFromMaxLength = 100;
+    /// <summary>Room for "Account › Pot" with both names at their longest (BUD-89).</summary>
+    public const int PaidFromMaxLength = 203;
     public const int ReferenceLabelMaxLength = 50;
     public const int ReferenceValueMaxLength = 100;
     public const int WebsiteMaxLength = 300;

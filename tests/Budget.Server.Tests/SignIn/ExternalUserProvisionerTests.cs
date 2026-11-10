@@ -1,13 +1,13 @@
 using System.Security.Claims;
 using Budget.Domain.Households;
 using Budget.Infrastructure.Identity;
-using Budget.Server.Features.Account;
+using Budget.Server.Features.SignIn;
 using Budget.Server.Tests.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Budget.Server.Tests.Account;
+namespace Budget.Server.Tests.SignIn;
 
 [Collection(ApiCollection.Name)]
 public class ExternalUserProvisionerTests(BudgetApiFactory factory) : IntegrationTestBase(factory)

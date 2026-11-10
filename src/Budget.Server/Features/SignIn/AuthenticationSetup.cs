@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 
-namespace Budget.Server.Features.Account;
+namespace Budget.Server.Features.SignIn;
 
 public static class AuthenticationSetup
 {

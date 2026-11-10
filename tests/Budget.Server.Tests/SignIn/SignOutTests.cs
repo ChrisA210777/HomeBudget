@@ -2,7 +2,7 @@ using System.Net;
 using Budget.Server.Tests.Infrastructure;
 using Budget.Shared;
 
-namespace Budget.Server.Tests.Account;
+namespace Budget.Server.Tests.SignIn;
 
 [Collection(ApiCollection.Name)]
 public class SignOutTests(BudgetApiFactory factory) : IntegrationTestBase(factory)

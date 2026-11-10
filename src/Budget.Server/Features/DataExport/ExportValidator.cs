@@ -1,3 +1,4 @@
+using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
@@ -113,6 +114,36 @@ public static class ExportValidator
         var peopleIds = export.People.Select(p => p.Id).ToHashSet();
         var categoryIds = export.Categories.Select(c => c.Id).ToHashSet();
 
+        // Accounts and their pots (version 2, BUD-89): names unique among accounts, and among an account's pots.
+        var accountNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < export.Accounts.Count; i++)
+        {
+            var account = export.Accounts[i];
+            Text($"accounts[{i}].name", account.Name, Account.NameMaxLength);
+            Text($"accounts[{i}].provider", account.Provider, Account.ProviderMaxLength, required: false);
+            if (account.OwnerPersonId is { } owner && !peopleIds.Contains(owner))
+            {
+                Add($"accounts[{i}].ownerPersonId", "isn't a person in this file.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(account.Name) && !accountNames.Add(account.Name.Trim()))
+            {
+                Add($"accounts[{i}].name", $"\"{account.Name}\" is used by more than one account.");
+            }
+
+            var potNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var j = 0; j < account.Pots.Count; j++)
+            {
+                var pot = account.Pots[j];
+                Text($"accounts[{i}].pots[{j}].name", pot.Name, Account.NameMaxLength);
+                if (!string.IsNullOrWhiteSpace(pot.Name) && !potNames.Add(pot.Name.Trim()))
+                {
+                    Add($"accounts[{i}].pots[{j}].name", $"\"{pot.Name}\" is used by more than one pot in {account.Name}.");
+                }
+            }
+        }
+
+
         UniqueIds("incomes", export.Incomes.Select(i => i.Id));
         for (var i = 0; i < export.Incomes.Count; i++)
         {
@@ -183,7 +214,7 @@ public static class ExportValidator
             var details = outgoing.Details ?? new ExportedOutgoingDetails();
             Text($"{path}.details.recipient", details.Recipient, Outgoing.RecipientMaxLength, required: false);
             OneOf($"{path}.details.paymentMethod", details.PaymentMethod, ExportValues.PaymentMethods, required: false);
-            Text($"{path}.details.paidFrom", details.PaidFrom, Outgoing.PaidFromMaxLength, required: false);
+            Text($"{path}.details.paidFrom", details.PaidFrom, OutgoingValidator.PaidFromMaxLength, required: false);
             Text($"{path}.details.referenceLabel", details.ReferenceLabel, Outgoing.ReferenceLabelMaxLength, required: false);
             Text($"{path}.details.referenceValue", details.ReferenceValue, Outgoing.ReferenceValueMaxLength, required: false);
             Text($"{path}.details.website", details.Website, Outgoing.WebsiteMaxLength, required: false);

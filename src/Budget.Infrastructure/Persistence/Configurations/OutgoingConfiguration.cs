@@ -1,3 +1,4 @@
+using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Outgoings;
 using Budget.Domain.People;
@@ -52,7 +53,6 @@ public sealed class OutgoingConfiguration : IEntityTypeConfiguration<Outgoing>
         builder.Property(o => o.AlertPeriod).HasConversion<string>().HasMaxLength(20);
         builder.Property(o => o.PaymentMethod).HasConversion<string>().HasMaxLength(20);
         builder.Property(o => o.Recipient).HasMaxLength(Outgoing.RecipientMaxLength);
-        builder.Property(o => o.PaidFrom).HasMaxLength(Outgoing.PaidFromMaxLength);
         builder.Property(o => o.ReferenceLabel).HasMaxLength(Outgoing.ReferenceLabelMaxLength);
         builder.Property(o => o.ReferenceValue).HasMaxLength(Outgoing.ReferenceValueMaxLength);
         builder.Property(o => o.Website).HasMaxLength(Outgoing.WebsiteMaxLength);
@@ -63,6 +63,12 @@ public sealed class OutgoingConfiguration : IEntityTypeConfiguration<Outgoing>
             .WithMany()
             .HasForeignKey(o => o.HouseholdId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Accounts are archived, never deleted (ADR-014).
+        builder.HasOne<Account>()
+            .WithMany()
+            .HasForeignKey(o => o.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // A category in use can't be deleted (BUD-47).
         builder.HasOne<OutgoingCategory>()

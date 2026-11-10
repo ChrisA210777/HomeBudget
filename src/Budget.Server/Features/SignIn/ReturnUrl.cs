@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Budget.Server.Features.Account;
+namespace Budget.Server.Features.SignIn;
 
 /// <summary>
 /// Makes sure we only ever redirect back into this app after sign-in, never to another site

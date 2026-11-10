@@ -1,3 +1,4 @@
+using Budget.Domain.Accounts;
 using Budget.Domain.Common;
 using Budget.Domain.Households;
 using Budget.Domain.Income;
@@ -45,6 +46,9 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
 
     /// <summary>Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
     public DbSet<Outgoing> Outgoings => Set<Outgoing>();
+
+    /// <summary>Accounts and pots (BUD-89). Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
+    public DbSet<Account> Accounts => Set<Account>();
 
     /// <summary>Read by the household query filters each time a query runs.</summary>
     private Guid? CurrentHouseholdId => _currentHousehold.HouseholdId;

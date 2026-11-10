@@ -1,6 +1,6 @@
-using Budget.Server.Features.Account;
+using Budget.Server.Features.SignIn;
 
-namespace Budget.Server.Tests.Account;
+namespace Budget.Server.Tests.SignIn;
 
 public class ReturnUrlTests
 {
