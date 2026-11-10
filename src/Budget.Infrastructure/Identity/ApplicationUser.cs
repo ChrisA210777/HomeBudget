@@ -17,4 +17,32 @@ public class ApplicationUser : IdentityUser<Guid>
 
     /// <summary>The household shown after sign-in (see ADR-008).</summary>
     public Guid? LastActiveHouseholdId { get; set; }
+
+    // ---- Settings (BUD-87): the defaults are 0, so existing users get them without a data migration. ----
+
+    /// <summary>The first day of the week in week views, e.g. upcoming payments (BUD-82).</summary>
+    public DayOfWeek FirstDayOfWeek { get; set; } = DayOfWeek.Sunday;
+
+    /// <summary>Whether Outgoings shows a month or 12 months (BUD-80).</summary>
+    public ListPeriod OutgoingsPeriod { get; set; } = ListPeriod.Month;
+
+    /// <summary>How Outgoings is grouped (BUD-80).</summary>
+    public OutgoingsGrouping OutgoingsGrouping { get; set; } = OutgoingsGrouping.Category;
+
+    /// <summary>Whether Income shows a month or 12 months (BUD-80).</summary>
+    public ListPeriod IncomePeriod { get; set; } = ListPeriod.Month;
+}
+
+/// <summary>A month or 12 months.</summary>
+public enum ListPeriod
+{
+    Month = 0,
+    Year = 1,
+}
+
+/// <summary>How the Outgoings list is grouped.</summary>
+public enum OutgoingsGrouping
+{
+    Category = 0,
+    PaidFrom = 1,
 }
