@@ -341,6 +341,9 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -377,6 +380,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("rowversion");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
 
                     b.HasIndex("HouseholdId");
 
@@ -986,6 +991,11 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Budget.Domain.Income.IncomeStream", b =>
                 {
+                    b.HasOne("Budget.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Budget.Domain.Households.Household", null)
                         .WithMany()
                         .HasForeignKey("HouseholdId")
