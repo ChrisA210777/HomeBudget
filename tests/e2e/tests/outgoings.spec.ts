@@ -142,11 +142,11 @@ test('amounts, their period and the category subtotal line up on the right', asy
 
 test('outgoings can be shown for 12 months and grouped by the account they are paid from', async ({ page }) => {
   await signIn(page);
-  await addOutgoing(page, 'Window cleaner', 'Home maintenance', '20');
+  await addOutgoing(page, 'Hedge trimming fund', 'Home maintenance', '20');
   await page.goto('/outgoings');
   await settled(page);
 
-  const item = page.getByTestId('outgoing-item').filter({ hasText: 'Window cleaner' });
+  const item = page.getByTestId('outgoing-item').filter({ hasText: 'Hedge trimming fund' });
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£20.00');
 
   // BUD-80: a year adds up the 12 monthly budget amounts, starting with the shown month.
