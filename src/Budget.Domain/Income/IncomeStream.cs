@@ -82,6 +82,51 @@ public sealed class IncomeStream : AuditableEntity, IHouseholdOwned
 
     public decimal AmountForMonth(int year, int month) => IncomeTimeline.AmountForMonth(_amountChanges, _statusPeriods, year, month);
 
+    /// <summary>
+    /// The payments received from <paramref name="from"/> to <paramref name="to"/> inclusive, for the cash flow
+    /// (BUD-92). Income is taken to arrive on its schedule, counted from its first amount's date, at the amount in
+    /// force that day. During leave the payment is scaled to the reduced monthly amount, and nothing arrives once
+    /// it has ended or while the reduced amount is nothing.
+    /// </summary>
+    public IReadOnlyList<ScheduledPayment> PaymentsBetween(DateOnly from, DateOnly to)
+    {
+        var payments = new List<ScheduledPayment>();
+        if (_amountChanges.Count == 0)
+        {
+            return payments;
+        }
+
+        var first = StartsOn;
+        var date = from < first ? first : from;
+        while (date <= to)
+        {
+            var change = _amountChanges.Where(c => c.EffectiveFrom <= date).MaxBy(c => c.EffectiveFrom)!;
+            var next = change.Schedule.NextOnOrAfter(first, date);
+            if (next > to)
+            {
+                break;
+            }
+
+            if (EndsOn is { } ends && next >= ends)
+            {
+                break;
+            }
+
+            var current = _amountChanges.Where(c => c.EffectiveFrom <= next).MaxBy(c => c.EffectiveFrom)!;
+            var usual = current.MonthlyEquivalent;
+            var actual = AmountOn(next);
+            var amount = usual == 0m ? 0m : Math.Round(current.Amount * actual / usual, 2, MidpointRounding.AwayFromZero);
+            if (amount > 0m)
+            {
+                payments.Add(new ScheduledPayment(next, amount, current.Schedule));
+            }
+
+            date = next.AddDays(1);
+        }
+
+        return payments;
+    }
+
     // Amount changes
 
     public IncomeAmountChange ChangeAmount(DateOnly effectiveFrom, decimal amount, string comment, PaymentSchedule? schedule = null)

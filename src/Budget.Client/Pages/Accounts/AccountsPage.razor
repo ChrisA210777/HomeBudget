@@ -33,7 +33,10 @@
             </MudText>
             @if (_transfersEnabled)
             {
-                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz" Href="/transfers" Class="mt-1" data-testid="go-to-transfers">Transfers</MudButton>
+                <div class="d-flex flex-wrap gap-2 mt-1">
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz" Href="/transfers" data-testid="go-to-transfers">Transfers</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Timeline" Href="/cash-flow" data-testid="go-to-cash-flow">Cash flow</MudButton>
+                </div>
             }
         </MudPaper>
     }

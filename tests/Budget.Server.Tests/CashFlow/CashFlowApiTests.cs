@@ -1,0 +1,120 @@
+using System.Net;
+using System.Net.Http.Json;
+using Budget.Domain.Accounts;
+using Budget.Domain.Households;
+using Budget.Domain.Income;
+using Budget.Domain.Outgoings;
+using Budget.Domain.Transfers;
+using Budget.Server.Tests.Infrastructure;
+using Budget.Shared.CashFlow;
+using Budget.Shared.Households;
+using Microsoft.EntityFrameworkCore;
+
+namespace Budget.Server.Tests.CashFlow;
+
+/// <summary>/api/households/{id}/cash-flow (BUD-92).</summary>
+[Collection(ApiCollection.Name)]
+public class CashFlowApiTests(BudgetApiFactory factory) : IntegrationTestBase(factory)
+{
+    [Fact]
+    public async Task Each_account_shows_its_money_in_and_out_for_the_month_with_pots_rolled_up()
+    {
+        var (client, householdId) = await HouseholdAsync();
+
+        var month = (await client.GetFromJsonAsync<CashFlowMonthResponse>(Url(CashFlowRoutes.Month(householdId, 2026, 11))))!;
+
+        Assert.Equal(new[] { "Current", "Joint", "Not set" }, month.Accounts.Select(a => a.Name));
+        var current = month.Accounts[0];
+        Assert.Equal((3000m, 1000m, 2000m), (current.TotalIn, current.TotalOut, current.Net));
+        Assert.Equal(new[] { (CashFlowKindDto.TransferOut, "Bills top-up", (string?)null) }, current.Out.Select(e => (e.Kind, e.Name, e.Pot)));
+
+        var joint = month.Accounts[1];
+        Assert.Equal((1000m, 1150m, -150m), (joint.TotalIn, joint.TotalOut, joint.Net));
+        Assert.Equal(new[] { (CashFlowKindDto.TransferIn, "Bills top-up", (string?)"Bills") }, joint.In.Select(e => (e.Kind, e.Name, e.Pot)));
+        Assert.Equal(new[] { ("Mortgage", (string?)"Bills"), ("Council tax", null) }, joint.Out.Select(e => (e.Name, e.Pot)));
+
+        // A transfer between an account and its own pot stays in the account, so it isn't shown.
+        Assert.DoesNotContain(joint.Out, e => e.Name == "Holiday saving");
+
+        Assert.Equal((0m, 20m), (month.Accounts[2].TotalIn, month.Accounts[2].TotalOut));
+    }
+
+    [Fact]
+    public async Task Day_by_day_shows_a_running_total_and_the_days_that_are_short()
+    {
+        var (client, householdId) = await HouseholdAsync();
+
+        var days = (await client.GetFromJsonAsync<CashFlowDaysResponse>(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)))))!;
+
+        var joint = days.Accounts.Single(a => a.Name == "Joint");
+        // The mortgage on the 1st and council tax on the 5th go out before the top-up arrives on the 25th.
+        Assert.Equal(
+            new[] { (new DateOnly(2026, 11, 1), -1000m, true), (new DateOnly(2026, 11, 5), -1150m, true), (new DateOnly(2026, 11, 25), -150m, true) },
+            joint.Days.Select(d => (d.Date, d.RunningTotal, d.IsShort)));
+        var current = days.Accounts.Single(a => a.Name == "Current");
+        Assert.Equal(new[] { (new DateOnly(2026, 11, 25), 2000m, false) }, current.Days.Select(d => (d.Date, d.RunningTotal, d.IsShort)));
+        Assert.Equal(2, current.Days[0].Entries.Count);
+        Assert.True(current.Days[0].Entries[0].IsIn);
+    }
+
+    [Fact]
+    public async Task Only_while_transfers_are_on_and_for_the_household()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        using var client = CreateClient(signedInAs: ownerId);
+
+        using var off = await client.GetAsync(Url(CashFlowRoutes.Month(householdId, 2026, 11)));
+        Assert.Equal(HttpStatusCode.Conflict, off.StatusCode);
+
+        using var tooLong = await client.GetAsync(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1))));
+        Assert.NotEqual(HttpStatusCode.OK, tooLong.StatusCode);
+
+        await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, h => CashFlowRoutes.Month(h, 2026, 11));
+        await AssertMinimumRoleAsync(HttpMethod.Get, h => CashFlowRoutes.Month(h, 2026, 11), HouseholdRole.Viewer);
+    }
+
+    /// <summary>
+    /// Salary of £3,000 into Current on the 25th; a £1,000 "Bills top-up" from Current into the Joint › Bills pot on
+    /// the 25th; from Joint, a £1,000 mortgage (Bills pot) on the 1st and £150 council tax on the 5th; a £50 transfer
+    /// from Joint into its own Holiday pot; and £20 a month with no account.
+    /// </summary>
+    private async Task<(HttpClient Client, Guid HouseholdId)> HouseholdAsync()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var client = CreateClient(signedInAs: ownerId);
+        (await client.PutAsJsonAsync(Url(HouseholdRoutes.Settings(householdId)), new HouseholdSettingsRequest { TransfersEnabled = true })).Dispose();
+
+        await ExecuteDbContextAsync(async db =>
+        {
+            var person = await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId).Select(p => p.Id).FirstAsync();
+            var category = await db.OutgoingCategories.IgnoreQueryFilters().Where(c => c.HouseholdId == householdId).Select(c => c.Id).FirstAsync();
+
+            var current = Account.Create(householdId, "Current", null, null);
+            var joint = Account.Create(householdId, "Joint", null, null);
+            var bills = Account.CreatePot(joint, "Bills");
+            var holiday = Account.CreatePot(joint, "Holiday");
+            db.Accounts.AddRange(current, joint, bills, holiday);
+
+            var salary = IncomeStream.Create(householdId, person, "Salary", 3000m, new DateOnly(2026, 1, 25), "Start", PaymentSchedule.Monthly);
+            salary.PayInto(current.Id);
+            db.IncomeStreams.Add(salary);
+
+            Outgoing Bill(string name, decimal amount, DateOnly first, Guid? accountId) => Outgoing.Create(
+                householdId, new OutgoingDetails { Name = name, CategoryId = category, FirstPaymentDate = first, AccountId = accountId }, amount, PaymentSchedule.Monthly, "Start");
+            db.Outgoings.AddRange(
+                Bill("Mortgage", 1000m, new DateOnly(2026, 1, 1), bills.Id),
+                Bill("Council tax", 150m, new DateOnly(2026, 1, 5), joint.Id),
+                Bill("Gym", 20m, new DateOnly(2026, 1, 10), null));
+
+            Transfer Move(string name, Guid from, Guid to, decimal amount) => Transfer.Create(
+                householdId, new TransferDetails { Name = name, FromAccountId = from, ToAccountId = to, FirstPaymentDate = new DateOnly(2026, 1, 25) }, amount, PaymentSchedule.Monthly, "Start");
+            db.Transfers.AddRange(Move("Bills top-up", current.Id, bills.Id, 1000m), Move("Holiday saving", joint.Id, holiday.Id, 50m));
+
+            await db.SaveChangesAsync();
+        });
+
+        return (client, householdId);
+    }
+
+    private static Uri Url(string path) => new(path, UriKind.Relative);
+}
