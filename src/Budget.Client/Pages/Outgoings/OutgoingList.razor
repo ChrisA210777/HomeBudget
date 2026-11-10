@@ -222,38 +222,8 @@
                     </button>
                 </h2>
                 <MudPaper Outlined="true" id="@listId" hidden="@collapsed">
-                    <ul class="plain-list">
-                        @foreach (var item in items)
-                        {
-                            <li class="@($"plain-list-item{(item.IsComingUp ? " outgoing-coming-up" : string.Empty)}")" data-testid="outgoing-item">
-                                <div class="d-flex align-start gap-2">
-                                    <div class="flex-grow-1" style="min-width: 0">
-                                        <MudLink Href="@($"/outgoings/{item.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudLink>
-                                        <div class="d-flex flex-wrap align-center gap-1 mt-1">
-                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="PriorityColour(item.Priority)" Class="ma-0" data-testid="outgoing-priority">@item.Priority</MudChip>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)@(_byPaidFrom ? $" · {item.CategoryName}{(AccountOf(item).Pot is { } pot ? $" · {pot} pot" : string.Empty)}" : string.Empty)</MudText>
-                                        </div>
-                                        <MudText Typo="Typo.caption" Class="d-block mt-1" data-testid="outgoing-paid">@Paid(item)</MudText>
-                                        @foreach (var note in item.Notes)
-                                        {
-                                            <MudText Typo="Typo.caption" Class="d-block" data-testid="outgoing-note">@note</MudText>
-                                        }
-                                        @if (item.IsComingUp && item.NextRenewal is { } renewal)
-                                        {
-                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.EventRepeat" Class="ma-0 mt-1"
-                                                     title="@OutgoingValidator.DescribeRenewal(item.Name, renewal, item.AutoRenews)" data-testid="outgoing-coming-up">
-                                                @OutgoingValidator.RenewsIn(renewal.DayNumber - Today.DayNumber)
-                                            </MudChip>
-                                        }
-                                    </div>
-                                    <div class="d-flex flex-column align-end text-right">
-                                        <MudText Typo="Typo.subtitle1" data-testid="outgoing-monthly">@Format(item.MonthlyAmount)</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="outgoing-period">@(IsYear ? "over 12 months" : "a month")</MudText>
-                                    </div>
-                                </div>
-                            </li>
-                        }
-                    </ul>
+                    @* By Paid from, an account with pots shows them as subgroups with their own subtotals (BUD-101). *@
+                    @Items(group.Key, items)
                 </MudPaper>
             </section>
         }
@@ -402,6 +372,83 @@
 
     /// <summary>Accounts with no Paid From go last, as "Not set".</summary>
     internal const string PaidFromNotSet = "Not set";
+
+    /// <summary>A group's outgoings: a plain list, or by pot when grouped by Paid from and the account has pots (BUD-101).</summary>
+    private RenderFragment Items(string groupKey, List<OutgoingMonthItem> items) => __builder =>
+    {
+        var subgroups = _byPaidFrom && items.Any(i => AccountOf(i).Pot is not null)
+            ? items
+                .GroupBy(i => AccountOf(i).Pot, StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(g => g.Key is not null)
+                .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
+                .Select(g => (Pot: g.Key, Items: g.ToList()))
+                .ToList()
+            : null;
+
+        if (subgroups is null)
+        {
+            <ul class="plain-list">
+                @foreach (var item in items)
+                {
+                    @ItemRow(item)
+                }
+            </ul>
+            return;
+        }
+
+        foreach (var (pot, potItems) in subgroups)
+        {
+            var key = $"{groupKey}|{pot?.ToLowerInvariant()}";
+            var collapsed = _collapsed.Contains(key);
+            var listId = $"pot-{key.GetHashCode():x8}";
+            <div class="pot-group" data-testid="pot-group" data-collapsed="@(collapsed ? "true" : "false")">
+                <h3 class="mud-typography mud-typography-subtitle2 ma-0 pot-heading">
+                    <button type="button" class="group-header" aria-expanded="@(collapsed ? "false" : "true")" aria-controls="@listId"
+                            @onclick="() => ToggleGroup(key)" data-testid="pot-header">
+                        <MudIcon Icon="@(collapsed ? Icons.Material.Filled.ChevronRight : Icons.Material.Filled.ExpandMore)" Size="Size.Small" aria-hidden="true" />
+                        <span data-testid="pot-name">@(pot is null ? "Not in a pot" : $"{pot} pot")</span>
+                        <span class="flex-grow-1"></span>
+                        <span class="group-total" data-testid="pot-subtotal">@Format(OutgoingTotals.Subtotal(potItems))</span>
+                    </button>
+                </h3>
+                <ul class="plain-list" id="@listId" hidden="@collapsed">
+                    @foreach (var item in potItems)
+                    {
+                        @ItemRow(item)
+                    }
+                </ul>
+            </div>
+        }
+    };
+
+    private RenderFragment ItemRow(OutgoingMonthItem item) =>
+        @<li class="@($"plain-list-item{(item.IsComingUp ? " outgoing-coming-up" : string.Empty)}")" data-testid="outgoing-item">
+            <div class="d-flex align-start gap-2">
+                <div class="flex-grow-1" style="min-width: 0">
+                    <MudLink Href="@($"/outgoings/{item.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudLink>
+                    <div class="d-flex flex-wrap align-center gap-1 mt-1">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="PriorityColour(item.Priority)" Class="ma-0" data-testid="outgoing-priority">@item.Priority</MudChip>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)@(_byPaidFrom ? $" · {item.CategoryName}" : string.Empty)</MudText>
+                    </div>
+                    <MudText Typo="Typo.caption" Class="d-block mt-1" data-testid="outgoing-paid">@Paid(item)</MudText>
+                    @foreach (var note in item.Notes)
+                    {
+                        <MudText Typo="Typo.caption" Class="d-block" data-testid="outgoing-note">@note</MudText>
+                    }
+                    @if (item.IsComingUp && item.NextRenewal is { } renewal)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.EventRepeat" Class="ma-0 mt-1"
+                                 title="@OutgoingValidator.DescribeRenewal(item.Name, renewal, item.AutoRenews)" data-testid="outgoing-coming-up">
+                            @OutgoingValidator.RenewsIn(renewal.DayNumber - Today.DayNumber)
+                        </MudChip>
+                    }
+                </div>
+                <div class="d-flex flex-column align-end text-right">
+                    <MudText Typo="Typo.subtitle1" data-testid="outgoing-monthly">@Format(item.MonthlyAmount)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="outgoing-period">@(IsYear ? "over 12 months" : "a month")</MudText>
+                </div>
+            </div>
+        </li>;
 
     /// <summary><see cref="Key"/> is the category's id, or the Paid From name in lower case.</summary>
     private sealed record ItemGroup(string Key, string Name, List<OutgoingMonthItem> Items);

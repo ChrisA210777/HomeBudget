@@ -82,3 +82,30 @@ test("an account's outgoings are one tap away from the Accounts page", async ({ 
   await expect(page.getByTestId('payment-name')).toHaveText(['Hedge trimming fund']);
   await expect(page.getByTestId('period-total')).toHaveText('£20.00');
 });
+
+test('grouped by Paid from, an account shows its pots as subgroups with subtotals', async ({ page }) => {
+  await signIn(page);
+  for (const [name, paidFrom, amount] of [['Gnome repairs', 'Garden account', '15'], ['Hedge trimming fund', 'Garden account (Hedges Pot)', '20']]) {
+    await page.goto('/outgoings/new');
+    await settled(page);
+    await typeOutgoingName(page, name);
+    await choose(page, 'category', 'Home maintenance');
+    await choose(page, 'priority', 'Optional');
+    await page.getByTestId('amount').fill(amount);
+    await page.getByTestId('toggle-details').click();
+    await page.getByTestId('paid-from').fill(paidFrom);
+    await page.getByTestId('paid-from').press('Tab');
+    await page.getByTestId('save').click();
+    await expect(page.getByTestId('outgoing-name').filter({ hasText: name })).toBeVisible();
+  }
+
+  await page.goto('/outgoings');
+  await settled(page);
+  await page.getByTestId('group-paid-from').click();
+
+  // BUD-101: the account's total, then what's not in a pot and each pot.
+  await expect(page.getByTestId('paid-from-name')).toHaveText(['Garden account']);
+  await expect(page.getByTestId('category-subtotal')).toHaveText(['£35.00']);
+  await expect(page.getByTestId('pot-name')).toHaveText(['Not in a pot', 'Hedges pot']);
+  await expect(page.getByTestId('pot-subtotal')).toHaveText(['£15.00', '£20.00']);
+});

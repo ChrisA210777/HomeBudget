@@ -281,6 +281,27 @@ public sealed class OutgoingListTests : IDisposable
 
         cut.Find("[data-testid=group-paid-from]").Click();
         Assert.Equal(new[] { "Joint Monzo" }, Texts(cut, "paid-from-name"));
+
+        // Within the account, what's not in a pot comes first, then each pot, each with a subtotal (BUD-101).
+        Assert.Equal(new[] { "£500.00" }, Texts(cut, "category-subtotal"));
+        Assert.Equal(new[] { "Not in a pot", "Holiday pot" }, Texts(cut, "pot-name"));
+        Assert.Equal(new[] { "£400.00", "£100.00" }, Texts(cut, "pot-subtotal"));
+        Assert.DoesNotContain(cut.FindAll("[data-testid=outgoing-item]"), e => e.TextContent.Contains("Holiday pot", StringComparison.Ordinal));
+
+        // A pot closes on its own.
+        cut.FindAll("[data-testid=pot-header]").ToList()[1].Click();
+        Assert.Equal(new[] { "false", "true" }, cut.FindAll("[data-testid=pot-group]").Select(e => e.GetAttribute("data-collapsed")));
+        Assert.Equal("£100.00", Texts(cut, "pot-subtotal")[1]);
+    }
+
+    [Fact]
+    public void An_account_without_pots_has_no_subgroups()
+    {
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        cut.Find("[data-testid=group-paid-from]").Click();
+
+        Assert.Empty(cut.FindAll("[data-testid=pot-group]"));
     }
 
     private sealed class AccountsWithPot(Guid account, Guid pot) : Budget.Client.Accounts.IAccountsApi
