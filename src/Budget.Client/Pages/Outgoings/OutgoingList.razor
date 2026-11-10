@@ -142,6 +142,16 @@
                                OnClick="() => SetGroupingAsync(true)" data-testid="group-paid-from">Paid from</MudButton>
                 </MudButtonGroup>
             </div>
+            @if (shown.Count > 0)
+            {
+                var allCollapsed = AllCollapsed(shown);
+                @* Collapse or expand every group at once (BUD-88). *@
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@(allCollapsed ? Icons.Material.Filled.UnfoldMore : Icons.Material.Filled.UnfoldLess)"
+                           OnClick="() => SetAllCollapsed(shown, !allCollapsed)" data-testid="toggle-all-groups">
+                    @(allCollapsed ? "Expand all" : "Collapse all")
+                </MudButton>
+            }
         </div>
 
         @if (_data.Items.Count == 0)
@@ -171,9 +181,14 @@
         @foreach (var group in Groups(shown))
         {
             var items = group.Items;
-            <section class="mt-4" data-testid="@(_byPaidFrom ? "paid-from-group" : "category-group")" aria-label="@group.Name">
-                <div class="d-flex align-baseline justify-space-between mb-1 category-heading">
-                    <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2" style="font-weight: 600">
+            var collapsed = _collapsed.Contains(group.Key);
+            var listId = $"group-{group.Key.GetHashCode():x8}";
+            <section class="mt-4" data-testid="@(_byPaidFrom ? "paid-from-group" : "category-group")" aria-label="@group.Name" data-collapsed="@(collapsed ? "true" : "false")">
+                @* The header opens and closes the group; its total stays visible when closed (BUD-88). *@
+                <h2 class="mud-typography mud-typography-subtitle1 mb-1 category-heading" style="font-weight: 600">
+                    <button type="button" class="group-header" aria-expanded="@(collapsed ? "false" : "true")" aria-controls="@listId"
+                            @onclick="() => ToggleGroup(group.Key)" data-testid="group-header">
+                        <MudIcon Icon="@(collapsed ? Icons.Material.Filled.ChevronRight : Icons.Material.Filled.ExpandMore)" Size="Size.Small" aria-hidden="true" />
                         @if (_byPaidFrom)
                         {
                             <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
@@ -184,10 +199,11 @@
                             <MudIcon Icon="@CategoryIconSvg.For(items[0].CategoryIcon)" Size="Size.Small" Color="Color.Primary" aria-hidden="true" data-testid="category-icon" data-icon="@items[0].CategoryIcon" />
                             <span data-testid="category-name">@group.Name</span>
                         }
-                    </h2>
-                    <MudText Typo="Typo.subtitle1" data-testid="category-subtotal">@Format(OutgoingTotals.Subtotal(items))</MudText>
-                </div>
-                <MudPaper Outlined="true">
+                        <span class="flex-grow-1"></span>
+                        <span class="group-total" data-testid="category-subtotal">@Format(OutgoingTotals.Subtotal(items))</span>
+                    </button>
+                </h2>
+                <MudPaper Outlined="true" id="@listId" hidden="@collapsed">
                     <ul class="plain-list">
                         @foreach (var item in items)
                         {
@@ -335,6 +351,7 @@
         if (byPaidFrom != _byPaidFrom)
         {
             _byPaidFrom = byPaidFrom;
+            _collapsed.Clear();
             await Settings.UpdateAsync(new UpdateUserSettingsRequest { OutgoingsGrouping = byPaidFrom ? OutgoingsGroupingDto.PaidFrom : OutgoingsGroupingDto.Category });
         }
     }
@@ -342,7 +359,30 @@
     /// <summary>Accounts with no Paid From go last, as "Not set".</summary>
     internal const string PaidFromNotSet = "Not set";
 
-    private sealed record ItemGroup(string Name, List<OutgoingMonthItem> Items);
+    /// <summary><see cref="Key"/> is the category's id, or the Paid From name in lower case.</summary>
+    private sealed record ItemGroup(string Key, string Name, List<OutgoingMonthItem> Items);
+
+    /// <summary>Groups closed to their header, kept for this visit (BUD-88).</summary>
+    private readonly HashSet<string> _collapsed = [];
+
+    private void ToggleGroup(string key)
+    {
+        if (!_collapsed.Remove(key))
+        {
+            _collapsed.Add(key);
+        }
+    }
+
+    private bool AllCollapsed(List<OutgoingMonthItem> shown) => Groups(shown).All(g => _collapsed.Contains(g.Key));
+
+    private void SetAllCollapsed(List<OutgoingMonthItem> shown, bool collapse)
+    {
+        _collapsed.Clear();
+        if (collapse)
+        {
+            _collapsed.UnionWith(Groups(shown).Select(g => g.Key));
+        }
+    }
 
     /// <summary>
     /// Category groups keep the server's order (the household's category order); Paid From groups are by
@@ -353,8 +393,9 @@
             .GroupBy(i => string.IsNullOrWhiteSpace(i.PaidFrom) ? null : i.PaidFrom.Trim(), StringComparer.CurrentCultureIgnoreCase)
             .OrderBy(g => g.Key is null)
             .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
-            .Select(g => new ItemGroup(g.Key ?? PaidFromNotSet, g.OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase).ToList()))
-        : items.GroupBy(i => i.CategoryId).Select(g => new ItemGroup(g.First().CategoryName, g.ToList()));
+            .Select(g => new ItemGroup(
+                g.Key?.ToLowerInvariant() ?? string.Empty, g.Key ?? PaidFromNotSet, g.OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase).ToList()))
+        : items.GroupBy(i => i.CategoryId).Select(g => new ItemGroup(g.Key.ToString(), g.First().CategoryName, g.ToList()));
 
     private async Task ToggleAllAsync(bool value)
     {

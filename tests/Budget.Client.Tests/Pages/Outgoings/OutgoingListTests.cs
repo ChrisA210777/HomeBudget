@@ -166,6 +166,50 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
+    public void A_group_closes_to_its_header_and_opens_again()
+    {
+        var cut = _context.RenderComponent<OutgoingList>();
+        var housing = Group(cut, "Housing");
+        Assert.Equal("true", housing.QuerySelector("[data-testid=group-header]")!.GetAttribute("aria-expanded"));
+
+        cut.FindAll("[data-testid=group-header]").ToList()[0].Click();
+
+        housing = Group(cut, "Housing");
+        Assert.Equal("false", housing.QuerySelector("[data-testid=group-header]")!.GetAttribute("aria-expanded"));
+        Assert.True(housing.QuerySelector(".mud-paper")!.HasAttribute("hidden"));
+        // The header still shows the total, and the other groups and the summary are unchanged.
+        Assert.Equal("£150.00", housing.QuerySelector("[data-testid=category-subtotal]")!.TextContent.Trim());
+        Assert.False(Group(cut, "Insurance").QuerySelector(".mud-paper")!.HasAttribute("hidden"));
+        Assert.Equal("£710.00", Text(cut, "month-total"));
+        Assert.Equal("Collapse all", Text(cut, "toggle-all-groups"));
+
+        cut.FindAll("[data-testid=group-header]").ToList()[0].Click();
+        Assert.False(Group(cut, "Housing").QuerySelector(".mud-paper")!.HasAttribute("hidden"));
+    }
+
+    [Fact]
+    public void Every_group_can_be_collapsed_and_expanded_at_once()
+    {
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        cut.Find("[data-testid=toggle-all-groups]").Click();
+
+        Assert.All(cut.FindAll("[data-testid=category-group]"), g => Assert.Equal("true", g.GetAttribute("data-collapsed")));
+        Assert.Equal("Expand all", Text(cut, "toggle-all-groups"));
+
+        // Still collapsed in another month; switching how they're grouped starts open again.
+        cut.Find("[data-testid=next-month]").Click();
+        cut.WaitForAssertion(() => Assert.All(cut.FindAll("[data-testid=category-group]"), g => Assert.Equal("true", g.GetAttribute("data-collapsed"))));
+        cut.Find("[data-testid=group-paid-from]").Click();
+        Assert.All(cut.FindAll("[data-testid=paid-from-group]"), g => Assert.Equal("false", g.GetAttribute("data-collapsed")));
+
+        cut.Find("[data-testid=toggle-all-groups]").Click();
+        cut.Find("[data-testid=toggle-all-groups]").Click();
+        Assert.All(cut.FindAll("[data-testid=paid-from-group]"), g => Assert.Equal("false", g.GetAttribute("data-collapsed")));
+        Assert.Equal("Collapse all", Text(cut, "toggle-all-groups"));
+    }
+
+    [Fact]
     public void Opens_in_the_view_and_grouping_chosen_last_time()
     {
         _settings.Saved = UserSettings.Defaults with { OutgoingsPeriod = ListPeriodDto.Year, OutgoingsGrouping = OutgoingsGroupingDto.PaidFrom };
@@ -236,6 +280,9 @@ public sealed class OutgoingListTests : IDisposable
 
     private static string[] Texts(IRenderedComponent<OutgoingList> cut, string testId) =>
         cut.FindAll($"[data-testid={testId}]").Select(e => e.TextContent.Trim()).ToArray();
+
+    private static AngleSharp.Dom.IElement Group(IRenderedComponent<OutgoingList> cut, string name) =>
+        cut.FindAll("[data-testid=category-group]").Single(e => e.GetAttribute("aria-label") == name);
 
     private static AngleSharp.Dom.IElement Item(IRenderedComponent<OutgoingList> cut, string name) =>
         cut.FindAll("[data-testid=outgoing-item]").Single(e => e.QuerySelector("[data-testid=outgoing-name]")!.TextContent.Trim() == name);
