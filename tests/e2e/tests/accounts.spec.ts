@@ -23,6 +23,3 @@ test('accounts and pots are added from the household menu', async ({ page }) => 
 
   await expect(page.getByTestId('account-details').first()).toContainText('Monzo');
 });
-  expect(names === null || typeof names === 'string').toBeTruthy();
-  await expect(page.getByTestId('account-details').first()).toContainText('Monzo');
-});
