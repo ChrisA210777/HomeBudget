@@ -217,8 +217,47 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     }
 
     [Fact]
+    public async Task The_renewals_calendar_covers_a_year_from_today_with_far_off_renewals_on_their_anniversary()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var insurance = await CategoryIdAsync(householdId, "Insurance");
+        var housing = await CategoryIdAsync(householdId, "Housing");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var carInsurance = Outgoing.Create(householdId, Details("Car insurance", insurance, today.AddYears(-1)) with
+        {
+            RenewalDate = today.AddDays(10),
+            AutoRenews = true,
+            PaidFrom = "Joint bills",
+        }, 480m, PaymentSchedule.Yearly, "Start");
+        var fixedRate = Outgoing.Create(householdId, Details("Mortgage", housing, today.AddYears(-1)) with
+        {
+            RenewalDate = today.AddDays(40).AddYears(2),
+            RenewalEveryMonths = 60,
+        }, 900m, PaymentSchedule.Monthly, "Start");
+        var noRenewal = Outgoing.Create(householdId, Details("Council tax", housing, today.AddYears(-1)), 150m, PaymentSchedule.Monthly, "Start");
+        await ExecuteDbContextAsync(async db =>
+        {
+            db.Outgoings.AddRange(carInsurance, fixedRate, noRenewal);
+            await db.SaveChangesAsync();
+        });
+        using var client = CreateClient(signedInAs: ownerId);
+
+        var calendar = (await client.GetFromJsonAsync<RenewalsResponse>(Url(OutgoingRoutes.Renewals(householdId))))!;
+
+        Assert.Equal((today, today.AddYears(1).AddDays(-1)), (calendar.From, calendar.To));
+        Assert.Equal(new[] { "Car insurance", "Mortgage" }, calendar.Renewals.Select(r => r.Name));
+        var car = calendar.Renewals[0];
+        Assert.Equal((today.AddDays(10), 0, 480m, PaymentUnitDto.Year, true, "Joint bills"), (car.Date, car.YearsUntil, car.Amount, car.Unit, car.AutoRenews, car.PaidFrom));
+        var mortgage = calendar.Renewals[1];
+        Assert.Equal((today.AddDays(40).AddYears(2), 2, 900m, "Housing"), (mortgage.RenewsOn, mortgage.YearsUntil, mortgage.Amount, mortgage.CategoryName));
+        Assert.Equal(mortgage.RenewsOn.AddYears(-2), mortgage.Date);
+    }
+
+    [Fact]
     public async Task Anyone_in_the_household_can_see_renewals_but_not_other_households()
     {
+        await AssertMinimumRoleAsync(HttpMethod.Get, OutgoingRoutes.Renewals, HouseholdRole.Viewer);
+        await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, OutgoingRoutes.Renewals);
         await AssertMinimumRoleAsync(HttpMethod.Get, OutgoingRoutes.ComingUp, HouseholdRole.Viewer);
         await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, OutgoingRoutes.ComingUp);
     }

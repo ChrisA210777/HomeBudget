@@ -25,6 +25,18 @@ public static class PaymentPeriods
         return (start, start.AddDays(6));
     }
 
+    /// <summary>How often a payment is made, e.g. "Monthly", "Every 4 weeks".</summary>
+    public static string Frequency(int every, Budget.Shared.Outgoings.PaymentUnitDto unit)
+    {
+        var (adjective, noun) = unit switch
+        {
+            Budget.Shared.Outgoings.PaymentUnitDto.Week => ("Weekly", "week"),
+            Budget.Shared.Outgoings.PaymentUnitDto.Month => ("Monthly", "month"),
+            _ => ("Yearly", "year"),
+        };
+        return every == 1 ? adjective : $"Every {every} {noun}s";
+    }
+
     /// <summary>The calendar month containing <paramref name="date"/>.</summary>
     public static (DateOnly From, DateOnly To) MonthOf(DateOnly date)
     {

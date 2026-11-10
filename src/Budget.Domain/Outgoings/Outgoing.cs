@@ -323,6 +323,48 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         return payments;
     }
 
+    /// <summary>
+    /// Renewals to show between <paramref name="from"/> and <paramref name="to"/> inclusive (BUD-81, ADR-013).
+    /// Each renewal date in the range is shown, following the renewal cycle, so a 6-monthly renewal can appear
+    /// twice. When the next renewal is after the range (e.g. a 3-year fix), its anniversary in the range is shown
+    /// instead: the date a whole number of years before it, with <see cref="RenewalOccurrence.YearsUntil"/> saying
+    /// how many. Nothing is shown without a renewal date, or on or after the date it ended.
+    /// </summary>
+    public IReadOnlyList<RenewalOccurrence> RenewalsBetween(DateOnly from, DateOnly to)
+    {
+        var occurrences = new List<RenewalOccurrence>();
+        if (RenewalDate is null)
+        {
+            return occurrences;
+        }
+
+        var next = NextRenewalOnOrAfter(from)!.Value;
+        for (var date = next; date <= to; date = NextRenewalOnOrAfter(date.AddDays(1))!.Value)
+        {
+            occurrences.Add(new RenewalOccurrence(date, date, 0, IsPausedOn(date)));
+        }
+
+        if (occurrences.Count == 0)
+        {
+            var years = 1;
+            while (next.AddYears(-years) > to)
+            {
+                years++;
+            }
+
+            var anniversary = next.AddYears(-years);
+            if (anniversary >= from)
+            {
+                occurrences.Add(new RenewalOccurrence(anniversary, next, years, IsPausedOn(anniversary)));
+            }
+        }
+
+        return EndsOn is { } ended ? occurrences.Where(o => o.Date < ended).ToList() : occurrences;
+    }
+
+    private bool IsPausedOn(DateOnly date) =>
+        _statusPeriods.Any(p => p.Reason == OutgoingStatusReason.Paused && p.Covers(date));
+
     /// <summary>The next renewal on or after a date, rolling the renewal date forward by the renewal cycle.</summary>
     public DateOnly? NextRenewalOnOrAfter(DateOnly date) =>
         RenewalDate is { } renewal ? Dates.NextMonthlyOnOrAfter(renewal, RenewalEveryMonths, date) : null;

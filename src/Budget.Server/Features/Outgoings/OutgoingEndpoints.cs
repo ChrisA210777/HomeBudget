@@ -24,6 +24,7 @@ public static class OutgoingEndpoints
         outgoings.MapPost("/", CreateAsync).RequireAuthorization(HouseholdPolicies.User);
         outgoings.MapGet("/paid-from", PaidFromNamesAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapGet("/payments", PaymentsAsync).RequireAuthorization(HouseholdPolicies.Viewer);
+        outgoings.MapGet("/renewals", RenewalsAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapGet("/coming-up", ComingUpAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapGet("/reference-labels", ReferenceLabelsAsync).RequireAuthorization(HouseholdPolicies.Viewer);
 
@@ -164,6 +165,49 @@ public static class OutgoingEndpoints
             .ToList();
 
         return Results.Ok(new UpcomingPaymentsResponse(start, end, currency, payments));
+    }
+
+    /// <summary>Renewals over the next 12 months from today (BUD-81, ADR-013), soonest first.</summary>
+    private static async Task<IResult> RenewalsAsync(Guid householdId, BudgetDbContext db, TimeProvider time)
+    {
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var end = today.AddYears(1).AddDays(-1);
+
+        var outgoings = await db.Outgoings
+            .Where(o => o.RenewalDate != null)
+            .Include(o => o.AmountChanges)
+            .Include(o => o.StatusPeriods)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .ToListAsync();
+        var categories = await db.OutgoingCategories.ToDictionaryAsync(c => c.Id, c => new { c.Name, c.Icon });
+        var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
+
+        var renewals = outgoings
+            .SelectMany(o => o.RenewalsBetween(today, end).Select(r =>
+            {
+                var category = categories.GetValueOrDefault(o.CategoryId);
+                var paid = o.AmountChangeOn(r.Date) ?? o.AmountChanges.MinBy(c => c.EffectiveFrom)!;
+                return new RenewalEntry(
+                    r.Date,
+                    r.RenewsOn,
+                    r.YearsUntil,
+                    o.Id,
+                    o.Name,
+                    category?.Name ?? string.Empty,
+                    category?.Icon ?? CategoryIcons.Default,
+                    paid.Amount,
+                    paid.Every,
+                    (PaymentUnitDto)paid.Unit,
+                    o.PaidFrom,
+                    o.AutoRenews,
+                    r.IsPaused);
+            }))
+            .OrderBy(r => r.Date)
+            .ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return Results.Ok(new RenewalsResponse(today, end, currency, renewals));
     }
 
     private static DateOnly ParseDate(string? text, string key, Dictionary<string, string[]> errors)

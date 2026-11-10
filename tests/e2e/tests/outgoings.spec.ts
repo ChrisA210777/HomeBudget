@@ -211,3 +211,14 @@ test('upcoming payments show what is due each day, a week or a month at a time',
   await page.getByTestId('go-to-today').click();
   await expect(page.getByTestId('payment-today')).toBeVisible();
 });
+
+test('the renewals calendar is reached from upcoming payments', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/outgoings/upcoming');
+  await settled(page);
+
+  // BUD-81: a new household has nothing with a renewal date yet.
+  await page.getByTestId('go-to-renewals').click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Renewals' })).toBeVisible();
+  await expect(page.getByTestId('renewals-empty')).toContainText('Nothing renews in the next 12 months');
+});
