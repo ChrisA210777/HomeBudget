@@ -47,6 +47,7 @@ public sealed record BudgetCategoryLine(Guid CategoryId, string Name, decimal Am
 public sealed record BudgetComparison(int Year, int Month, decimal LeftAfterEverything, decimal Difference, IReadOnlyList<BudgetChangeLine> Changes);
 
 /// <summary>Why an amount differs from the month before.</summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<BudgetChangeReasonDto>))]
 public enum BudgetChangeReasonDto
 {
     New,

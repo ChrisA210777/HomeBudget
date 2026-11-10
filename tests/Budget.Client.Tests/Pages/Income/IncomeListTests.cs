@@ -59,6 +59,20 @@ public sealed class IncomeListTests : IncomeTestContext
         Assert.Equal("Nov 2026 – Oct 2027", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal("over 12 months", cut.Find("[data-testid=income-period]").TextContent.Trim());
         Assert.Empty(cut.FindAll("[data-testid=income-usual]"));
+
+        // Remembered for next time (BUD-87).
+        Assert.Equal(Budget.Shared.Account.ListPeriodDto.Year, Assert.Single(Settings.Updates).IncomePeriod);
+    }
+
+    [Fact]
+    public void Opens_in_the_view_chosen_last_time()
+    {
+        Settings.Saved = Budget.Shared.Account.UserSettings.Defaults with { IncomePeriod = Budget.Shared.Account.ListPeriodDto.Year };
+
+        var cut = Context.RenderComponent<IncomeList>();
+
+        Assert.Equal(new[] { 12 }, Api.MonthsRequested);
+        Assert.Equal("true", cut.Find("[data-testid=show-year]").GetAttribute("aria-pressed"));
     }
 
     [Fact]

@@ -241,3 +241,35 @@ public sealed class RecordingHouseholdApi : Budget.Client.Households.IHouseholdA
 
     public Task DeleteAsync(Guid householdId) => throw new NotSupportedException();
 }
+
+/// <summary>Settings saved in memory, recording each change (BUD-87).</summary>
+public sealed class FakeUserSettingsApi : IUserSettingsApi
+{
+    public UserSettings Saved { get; set; } = UserSettings.Defaults;
+
+    public List<UpdateUserSettingsRequest> Updates { get; } = [];
+
+    /// <summary>Behave as if the server can't be reached.</summary>
+    public bool Offline { get; set; }
+
+    public Task<UserSettings> GetAsync() =>
+        Offline ? Task.FromException<UserSettings>(new HttpRequestException("Offline")) : Task.FromResult(Saved);
+
+    public Task<UserSettings> UpdateAsync(UpdateUserSettingsRequest request)
+    {
+        Updates.Add(request);
+        if (Offline)
+        {
+            return Task.FromException<UserSettings>(new HttpRequestException("Offline"));
+        }
+
+        Saved = Saved with
+        {
+            FirstDayOfWeek = request.FirstDayOfWeek ?? Saved.FirstDayOfWeek,
+            OutgoingsPeriod = request.OutgoingsPeriod ?? Saved.OutgoingsPeriod,
+            OutgoingsGrouping = request.OutgoingsGrouping ?? Saved.OutgoingsGrouping,
+            IncomePeriod = request.IncomePeriod ?? Saved.IncomePeriod,
+        };
+        return Task.FromResult(Saved);
+    }
+}

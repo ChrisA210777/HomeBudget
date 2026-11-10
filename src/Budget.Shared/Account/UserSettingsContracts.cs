@@ -1,6 +1,9 @@
+using System.Text.Json.Serialization;
+
 namespace Budget.Shared.Account;
 
 /// <summary>Whether a list shows amounts for a month or for 12 months (BUD-80).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<ListPeriodDto>))]
 public enum ListPeriodDto
 {
     Month,
@@ -8,6 +11,7 @@ public enum ListPeriodDto
 }
 
 /// <summary>How the Outgoings list is grouped (BUD-80).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<OutgoingsGroupingDto>))]
 public enum OutgoingsGroupingDto
 {
     Category,
@@ -19,7 +23,7 @@ public enum OutgoingsGroupingDto
 /// so they follow them to every device and every household.
 /// </summary>
 public sealed record UserSettings(
-    DayOfWeek FirstDayOfWeek = DayOfWeek.Sunday,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<DayOfWeek>))] DayOfWeek FirstDayOfWeek = DayOfWeek.Sunday,
     ListPeriodDto OutgoingsPeriod = ListPeriodDto.Month,
     OutgoingsGroupingDto OutgoingsGrouping = OutgoingsGroupingDto.Category,
     ListPeriodDto IncomePeriod = ListPeriodDto.Month)
@@ -31,6 +35,7 @@ public sealed record UserSettings(
 /// <summary>Changes some settings; anything left out stays as it is.</summary>
 public sealed record UpdateUserSettingsRequest
 {
+    [JsonConverter(typeof(JsonStringEnumConverter<DayOfWeek>))]
     public DayOfWeek? FirstDayOfWeek { get; init; }
 
     public ListPeriodDto? OutgoingsPeriod { get; init; }

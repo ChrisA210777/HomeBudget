@@ -1,0 +1,94 @@
+@page "/settings"
+@attribute [Authorize]
+@using Budget.Shared.Account
+@inject UserSettingsStore Store
+@inject ISnackbar Snackbar
+
+<PageTitle>Settings · Home Budget</PageTitle>
+
+@* The signed-in user's own preferences (BUD-87). They're saved with the account, so they apply on every device. *@
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <h1 class="mud-typography mud-typography-h4 mb-2">Settings</h1>
+    <MudText Typo="Typo.body2" Class="mb-4">Your own preferences. They're saved with your account, so they apply on every device you sign in on.</MudText>
+
+    @if (_settings is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudPaper Outlined="true" Class="pa-4 mb-4">
+            <h2 class="mud-typography mud-typography-subtitle1 mb-2" style="font-weight: 600">Calendar</h2>
+            <MudSelect T="DayOfWeek" Value="_settings.FirstDayOfWeek" ValueChanged="day => SaveAsync(new() { FirstDayOfWeek = day })"
+                       Label="First day of the week" HelperText="Used when payments are shown a week at a time" Variant="Variant.Outlined"
+                       Disabled="!Online" data-testid="first-day-of-week">
+                @foreach (var day in Days)
+                {
+                    <MudSelectItem T="DayOfWeek" Value="day">@day</MudSelectItem>
+                }
+            </MudSelect>
+        </MudPaper>
+
+        <MudPaper Outlined="true" Class="pa-4 mb-4">
+            <h2 class="mud-typography mud-typography-subtitle1 mb-2" style="font-weight: 600">Outgoings</h2>
+            <MudSelect T="ListPeriodDto" Value="_settings.OutgoingsPeriod" ValueChanged="period => SaveAsync(new() { OutgoingsPeriod = period })"
+                       ToStringFunc="PeriodName" Label="Show amounts for" Variant="Variant.Outlined" Class="mb-3" Disabled="!Online" data-testid="outgoings-period">
+                @foreach (var period in Enum.GetValues<ListPeriodDto>())
+                {
+                    <MudSelectItem T="ListPeriodDto" Value="period">@PeriodName(period)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="OutgoingsGroupingDto" Value="_settings.OutgoingsGrouping" ValueChanged="grouping => SaveAsync(new() { OutgoingsGrouping = grouping })"
+                       ToStringFunc="GroupingName" Label="Group by" Variant="Variant.Outlined" Disabled="!Online" data-testid="outgoings-grouping">
+                @foreach (var grouping in Enum.GetValues<OutgoingsGroupingDto>())
+                {
+                    <MudSelectItem T="OutgoingsGroupingDto" Value="grouping">@GroupingName(grouping)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudPaper>
+
+        <MudPaper Outlined="true" Class="pa-4 mb-4">
+            <h2 class="mud-typography mud-typography-subtitle1 mb-2" style="font-weight: 600">Income</h2>
+            <MudSelect T="ListPeriodDto" Value="_settings.IncomePeriod" ValueChanged="period => SaveAsync(new() { IncomePeriod = period })"
+                       ToStringFunc="PeriodName" Label="Show amounts for" Variant="Variant.Outlined" Disabled="!Online" data-testid="income-period">
+                @foreach (var period in Enum.GetValues<ListPeriodDto>())
+                {
+                    <MudSelectItem T="ListPeriodDto" Value="period">@PeriodName(period)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudPaper>
+
+        <MudText Typo="Typo.caption" Color="Color.Secondary">The Outgoings and Income pages also remember the last choice you made on them.</MudText>
+    }
+</MudContainer>
+
+@code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    private static readonly DayOfWeek[] Days =
+        [DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday];
+
+    private UserSettings? _settings;
+
+    protected override async Task OnInitializedAsync() => _settings = await Store.GetAsync();
+
+    private async Task SaveAsync(UpdateUserSettingsRequest change)
+    {
+        var saved = await Store.UpdateAsync(change);
+        _settings = Store.Current;
+        if (saved)
+        {
+            Snackbar.Add("Saved.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Couldn't save that. It applies on this device until you reload; try again when you're online.", Severity.Warning);
+        }
+    }
+
+    private static string PeriodName(ListPeriodDto period) => period == ListPeriodDto.Year ? "12 months" : "A month";
+
+    private static string GroupingName(OutgoingsGroupingDto grouping) => grouping == OutgoingsGroupingDto.PaidFrom ? "Paid from" : "Category";
+}

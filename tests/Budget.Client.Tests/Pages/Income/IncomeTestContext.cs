@@ -19,6 +19,8 @@ public abstract class IncomeTestContext : IDisposable
         Context.Services.AddSingleton<TimeProvider>(new FixedClock(new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero)));
         Context.Services.AddSingleton<IAccountApi>(new FakeAccountApi("Admin"));
         Context.Services.AddScoped<UserSession>();
+        Context.Services.AddSingleton<IUserSettingsApi>(Settings);
+        Context.Services.AddScoped<UserSettingsStore>();
         Context.JSInterop.Mode = JSRuntimeMode.Loose;
         Context.AddTestAuthorization().SetAuthorized("Chris Austin");
     }
@@ -26,6 +28,8 @@ public abstract class IncomeTestContext : IDisposable
     protected TestContext Context { get; } = new();
 
     protected FakeIncomeApi Api { get; } = new();
+
+    protected FakeUserSettingsApi Settings { get; } = new();
 
     /// <summary>Sign in with a different role; call before rendering.</summary>
     protected void UseRole(string role) => Context.Services.AddSingleton<IAccountApi>(new FakeAccountApi(role));
