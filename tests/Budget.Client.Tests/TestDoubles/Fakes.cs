@@ -198,6 +198,10 @@ public sealed class FakeRenewalApi : IRenewalApi
     public IReadOnlyList<RenewalComingUp> ComingUp { get; set; } = [];
 
     public Task<IReadOnlyList<RenewalComingUp>> ComingUpAsync(Guid householdId) => Task.FromResult(ComingUp);
+
+    public RenewalsResponse Calendar { get; set; } = new(new DateOnly(2026, 11, 5), new DateOnly(2027, 11, 4), "GBP", []);
+
+    public Task<RenewalsResponse> CalendarAsync(Guid householdId) => Task.FromResult(Calendar);
 }
 
 /// <summary>Records household switches and creations; the rest isn't used by the tests that need this.</summary>

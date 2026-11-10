@@ -104,9 +104,34 @@ public static class OutgoingRoutes
     public static string Payments(Guid householdId, DateOnly from, DateOnly to) =>
         $"{Outgoings(householdId)}/payments?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
 
+    /// <summary>GET: renewals over the next 12 months from today, soonest first (BUD-81).</summary>
+    public static string Renewals(Guid householdId) => $"{Outgoings(householdId)}/renewals";
+
     /// <summary>The longest range of payments that can be asked for at once: a month and a bit.</summary>
     public const int MaxPaymentDays = 62;
 }
+
+/// <summary>Renewals from <see cref="From"/> (today) to <see cref="To"/>, a year less a day later, soonest first (BUD-81).</summary>
+public sealed record RenewalsResponse(DateOnly From, DateOnly To, string CurrencyCode, IReadOnlyList<RenewalEntry> Renewals);
+
+/// <summary>
+/// An outgoing's renewal shown on <see cref="Date"/>. <see cref="YearsUntil"/> is 0 when it renews that day; otherwise
+/// it's the anniversary of a renewal that many years away, on <see cref="RenewsOn"/>. The amount is what's paid on the day.
+/// </summary>
+public sealed record RenewalEntry(
+    DateOnly Date,
+    DateOnly RenewsOn,
+    int YearsUntil,
+    Guid OutgoingId,
+    string Name,
+    string CategoryName,
+    string CategoryIcon,
+    decimal Amount,
+    int Every,
+    PaymentUnitDto Unit,
+    string? PaidFrom,
+    bool AutoRenews,
+    bool IsPaused);
 
 /// <summary>The payments due between <see cref="From"/> and <see cref="To"/>, in date order (BUD-82, ADR-013).</summary>
 public sealed record UpcomingPaymentsResponse(DateOnly From, DateOnly To, string CurrencyCode, IReadOnlyList<UpcomingPayment> Payments);

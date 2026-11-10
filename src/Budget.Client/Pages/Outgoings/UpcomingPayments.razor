@@ -13,7 +13,10 @@
 
 @* What's actually due each day (BUD-82, ADR-013): real amounts on their dates, not monthly averages. *@
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-2 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings" Class="mb-1">Outgoings</MudButton>
+    <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-1">
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings">Outgoings</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.EventRepeat" Href="/outgoings/renewals" data-testid="go-to-renewals">Renewals</MudButton>
+    </div>
     <h1 class="mud-typography mud-typography-h4 mb-1">Upcoming payments</h1>
     <MudText Typo="Typo.body2" Class="mb-3">
         What's due each day, at the amount actually paid. Unlike the budget, a yearly bill only shows on the day it's paid.
@@ -227,7 +230,7 @@
 
     private string Details(UpcomingPayment payment)
     {
-        var parts = new List<string> { Schedule(payment.Every, payment.Unit) };
+        var parts = new List<string> { PaymentPeriods.Frequency(payment.Every, payment.Unit) };
         if (_grouping != Grouping.Category)
         {
             parts.Add(payment.CategoryName);
@@ -244,18 +247,6 @@
         }
 
         return string.Join(" · ", parts);
-    }
-
-    /// <summary>e.g. "Monthly", "Every 4 weeks".</summary>
-    private static string Schedule(int every, PaymentUnitDto unit)
-    {
-        var name = unit switch
-        {
-            PaymentUnitDto.Week => "week",
-            PaymentUnitDto.Month => "month",
-            _ => "year",
-        };
-        return every == 1 ? $"{(unit == PaymentUnitDto.Month ? "Month" : unit == PaymentUnitDto.Week ? "Week" : "Year")}ly" : $"Every {every} {name}s";
     }
 
     private static string Count(int count) => count == 1 ? "1 payment" : $"{count} payments";

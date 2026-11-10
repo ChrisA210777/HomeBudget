@@ -465,4 +465,61 @@ public class OutgoingTests
         Assert.Empty(Payments(car, new DateOnly(2026, 11, 1), new DateOnly(2026, 12, 31)));
         Assert.Equal(new[] { "2027-01-15 250" }, Payments(car, new DateOnly(2026, 12, 1), new DateOnly(2027, 1, 31)));
     }
+
+    // ---- Renewals calendar (BUD-81, ADR-013) ----
+
+    private static Outgoing Renewing(DateOnly renewal, int everyMonths = 12)
+    {
+        var details = Details(new DateOnly(2026, 1, 1)) with { RenewalDate = renewal, RenewalEveryMonths = everyMonths };
+        return Outgoing.Create(Household, details, 480m, PaymentSchedule.Yearly, "Starting amount");
+    }
+
+    private static readonly DateOnly WindowStart = new(2026, 11, 9);
+    private static readonly DateOnly WindowEnd = new(2027, 11, 8);
+
+    private static string[] Renewals(Outgoing outgoing) =>
+        outgoing.RenewalsBetween(WindowStart, WindowEnd)
+            .Select(r => $"{r.Date:yyyy-MM-dd} renews {r.RenewsOn:yyyy-MM-dd} in {r.YearsUntil}{(r.IsPaused ? " paused" : string.Empty)}")
+            .ToArray();
+
+    [Fact]
+    public void A_yearly_renewal_shows_once_and_a_past_date_rolls_forward()
+    {
+        Assert.Equal(new[] { "2027-03-14 renews 2027-03-14 in 0" }, Renewals(Renewing(new DateOnly(2025, 3, 14))));
+    }
+
+    [Fact]
+    public void A_six_monthly_renewal_shows_twice()
+    {
+        Assert.Equal(
+            new[] { "2027-01-10 renews 2027-01-10 in 0", "2027-07-10 renews 2027-07-10 in 0" },
+            Renewals(Renewing(new DateOnly(2026, 7, 10), everyMonths: 6)));
+    }
+
+    [Fact]
+    public void A_renewal_years_away_shows_on_its_anniversary_with_the_years_to_go()
+    {
+        // Matches the story's example: today 9 Nov 2026, renewing 15 Mar 2029.
+        Assert.Equal(new[] { "2027-03-15 renews 2029-03-15 in 2" }, Renewals(Renewing(new DateOnly(2029, 3, 15))));
+        Assert.Equal(new[] { "2027-11-08 renews 2028-11-08 in 1" }, Renewals(Renewing(new DateOnly(2028, 11, 8))));
+    }
+
+    [Fact]
+    public void A_29_February_anniversary_falls_on_28_February()
+    {
+        Assert.Equal(new[] { "2027-02-28 renews 2028-02-29 in 1" }, Renewals(Renewing(new DateOnly(2028, 2, 29))));
+    }
+
+    [Fact]
+    public void Paused_outgoings_are_marked_and_ended_ones_stop()
+    {
+        var paused = Renewing(new DateOnly(2027, 3, 14));
+        paused.PauseFor(new DateOnly(2027, 1, 1), payments: 1, "Paused");
+        var ended = Renewing(new DateOnly(2027, 3, 14));
+        ended.End(new DateOnly(2027, 1, 1), "Cancelled");
+
+        Assert.Equal(new[] { "2027-03-14 renews 2027-03-14 in 0 paused" }, Renewals(paused));
+        Assert.Empty(Renewals(ended));
+        Assert.Empty(Create(480m, PaymentSchedule.Yearly).RenewalsBetween(WindowStart, WindowEnd));
+    }
 }

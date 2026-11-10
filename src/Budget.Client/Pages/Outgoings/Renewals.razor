@@ -1,0 +1,120 @@
+@page "/outgoings/renewals"
+@attribute [Authorize]
+@using System.Globalization
+@using Budget.Client.Outgoings
+@using Budget.Shared.Income
+@using Budget.Shared.Outgoings
+@inject UserSession Session
+@inject IRenewalApi RenewalApi
+
+<PageTitle>Renewals · Home Budget</PageTitle>
+
+@* Every renewal or anniversary over the next 12 months (BUD-81, ADR-013), as a list by month that suits phones. *@
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-2 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings" Class="mb-1">Outgoings</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-1">Renewals</h1>
+    <MudText Typo="Typo.body2" Class="mb-3">
+        Renewal dates for the next 12 months, so you can shop around in time. Anything renewing further ahead shows on its
+        anniversary, with how many years are left.
+    </MudText>
+
+    @if (_loaded && _household is null)
+    {
+        <MudAlert Severity="Severity.Info">You're not in a household yet.</MudAlert>
+    }
+    else if (_data is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_data.Renewals.Count == 0)
+    {
+        <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="renewals-empty">
+            <MudIcon Icon="@Icons.Material.Filled.EventRepeat" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.body1" Class="mt-2">Nothing renews in the next 12 months.</MudText>
+            <MudText Typo="Typo.body2">Add a renewal date to an outgoing, such as insurance or a phone contract, to see it here.</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        @foreach (var month in _data.Renewals.GroupBy(r => new DateOnly(r.Date.Year, r.Date.Month, 1)))
+        {
+            <section class="mt-4" data-testid="renewal-month" aria-label="@month.Key.ToString("MMMM yyyy", Display)">
+                <h2 class="mud-typography mud-typography-subtitle1 mb-1 category-heading" style="font-weight: 600" data-testid="renewal-month-name">
+                    @month.Key.ToString("MMMM yyyy", Display)
+                </h2>
+                <MudPaper Outlined="true">
+                    <ul class="plain-list">
+                        @foreach (var renewal in month)
+                        {
+                            <li class="plain-list-item" data-testid="renewal">
+                                <div class="d-flex align-start gap-3">
+                                    <div class="text-center" style="min-width: 2.75rem">
+                                        <MudText Typo="Typo.caption" Class="d-block" Color="Color.Secondary">@renewal.Date.ToString("ddd", Display)</MudText>
+                                        <MudText Typo="Typo.h6" Class="d-block" data-testid="renewal-day">@renewal.Date.Day</MudText>
+                                    </div>
+                                    <div class="flex-grow-1" style="min-width: 0">
+                                        <div class="d-flex align-center gap-2">
+                                            <MudIcon Icon="@CategoryIconSvg.For(renewal.CategoryIcon)" Size="Size.Small" Color="Color.Secondary" aria-hidden="true" />
+                                            <MudLink Href="@($"/outgoings/{renewal.OutgoingId}")" Typo="Typo.body1" data-testid="renewal-name">@renewal.Name</MudLink>
+                                        </div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="renewal-details">@Details(renewal)</MudText>
+                                        <div class="d-flex flex-wrap gap-1 mt-1">
+                                            @if (renewal.YearsUntil > 0)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info" Class="ma-0"
+                                                         title="@($"Renews on {renewal.RenewsOn.ToString("d MMMM yyyy", Display)}")" data-testid="renewal-years">
+                                                    @YearsText(renewal.YearsUntil)
+                                                </MudChip>
+                                            }
+                                            @if (renewal.IsPaused)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0" data-testid="renewal-paused">Paused</MudChip>
+                                            }
+                                        </div>
+                                    </div>
+                                    <MudText Typo="Typo.subtitle1" Class="text-right text-nowrap" data-testid="renewal-amount">@Money.Format(renewal.Amount, _data.CurrencyCode)</MudText>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </MudPaper>
+            </section>
+        }
+    }
+</MudContainer>
+
+@code {
+    private static readonly CultureInfo Display = CultureInfo.InvariantCulture;
+
+    private HouseholdMembershipSummary? _household;
+    private RenewalsResponse? _data;
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        _loaded = true;
+        if (_household is not null)
+        {
+            _data = await RenewalApi.CalendarAsync(_household.HouseholdId);
+        }
+    }
+
+    internal static string YearsText(int years) => years == 1 ? "Renews in 1 year" : $"Renews in {years} years";
+
+    private static string Details(RenewalEntry renewal)
+    {
+        var parts = new List<string>
+        {
+            PaymentPeriods.Frequency(renewal.Every, renewal.Unit),
+            renewal.CategoryName,
+        };
+        if (!string.IsNullOrWhiteSpace(renewal.PaidFrom))
+        {
+            parts.Add($"from {renewal.PaidFrom.Trim()}");
+        }
+
+        parts.Add(renewal.AutoRenews ? "Renews automatically" : "Doesn't renew automatically");
+        return string.Join(" · ", parts);
+    }
+}
