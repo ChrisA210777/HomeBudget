@@ -34,11 +34,12 @@ test('transfers between accounts are turned on, added and changed', async ({ pag
   await expect(page.getByTestId('to-account')).toHaveText('Joint bills');
 
   // The same history as an outgoing.
-  await page.getByTestId('change-amount').click();
-  await page.getByTestId('amount').fill('450');
-  await page.getByTestId('comment').fill('Bills went up');
+  // (The first transfer is today, so a pause is the simplest change to make here.)
+  await page.getByTestId('pause').click();
+  await page.getByTestId('skip-payments').fill('1');
+  await page.getByTestId('comment').fill('Paid from savings');
   await page.getByTestId('save').click();
-  await expect(page.getByTestId('amount-change')).toHaveCount(2);
+  await expect(page.getByTestId('period-description')).toContainText('skips 1 payment');
 
   await page.goto('/transfers');
   await settled(page);
