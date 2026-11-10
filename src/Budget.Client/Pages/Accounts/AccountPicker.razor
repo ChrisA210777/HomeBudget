@@ -1,0 +1,51 @@
+@using Budget.Client.Accounts
+@using Budget.Shared.Outgoings
+@inject IAccountsApi AccountsApi
+
+@* Chooses an account or pot by name, or takes a new name, which the server adds (BUD-89, BUD-90). *@
+<MudAutocomplete T="string" Value="Value" ValueChanged="ValueChanged" SearchFunc="SearchAsync" CoerceValue="true" CoerceText="false"
+                 Label="@Label" HelperText="@HelperText" MaxLength="OutgoingValidator.PaidFromMaxLength" Clearable="true"
+                 ShowProgressIndicator="false" Variant="Variant.Outlined" AdornmentAriaLabel="Show accounts" data-testid="@TestId" />
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid HouseholdId { get; set; }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "Account";
+
+    [Parameter]
+    public string? HelperText { get; set; }
+
+    [Parameter]
+    public string TestId { get; set; } = "account";
+
+    private IReadOnlyList<string> _names = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_names.Count == 0 && HouseholdId != Guid.Empty)
+        {
+            var accounts = await AccountsApi.ListAsync(HouseholdId);
+            var archived = accounts.Where(a => a.IsArchived).Select(a => a.Id).ToHashSet();
+            _names = accounts
+                .Where(a => !a.IsArchived && !(a.ParentAccountId is { } parent && archived.Contains(parent)))
+                .Select(a => a.DisplayName)
+                .ToList();
+        }
+    }
+
+    private Task<IEnumerable<string>> SearchAsync(string? text, CancellationToken cancellationToken)
+    {
+        IEnumerable<string> matches = string.IsNullOrWhiteSpace(text)
+            ? _names
+            : _names.Where(n => n.Contains(text.Trim(), StringComparison.CurrentCultureIgnoreCase));
+        return Task.FromResult(matches);
+    }
+}

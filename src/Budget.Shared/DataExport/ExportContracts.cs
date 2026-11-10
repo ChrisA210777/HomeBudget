@@ -156,6 +156,9 @@ public sealed record ExportedIncome : ExportedAudited
 
     public Guid PersonId { get; init; }
 
+    /// <summary>The account, or "Account › Pot", it's paid into (version 3, BUD-90).</summary>
+    public string? PaidInto { get; init; }
+
     public IReadOnlyList<ExportedAmountChange> AmountChanges { get; init; } = [];
 
     public IReadOnlyList<ExportedIncomeStatusPeriod> StatusPeriods { get; init; } = [];

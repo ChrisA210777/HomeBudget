@@ -65,6 +65,25 @@ public sealed class IncomeListTests : IncomeTestContext
     }
 
     [Fact]
+    public void Income_can_be_grouped_by_the_account_it_is_paid_into()
+    {
+        Api.Month = new IncomeMonthResponse(2026, 11,
+        [
+            new(Guid.NewGuid(), "Chris – salary", Guid.NewGuid(), "Chris Austin", 3000m, 3000m, 3000m, 1, PaymentUnitDto.Month, [], new DateOnly(2026, 1, 1), null, "Chris current"),
+            new(Guid.NewGuid(), "Child Benefit", Guid.NewGuid(), "Chris Austin", 110m, 110m, 110m, 1, PaymentUnitDto.Month, [], new DateOnly(2026, 1, 1), null, "Joint Monzo › Bills"),
+            new(Guid.NewGuid(), "Jane – salary", Guid.NewGuid(), "Jane", 2000m, 2000m, 2000m, 1, PaymentUnitDto.Month, [], new DateOnly(2026, 1, 1), null),
+        ], 5110m, "GBP");
+        var cut = Context.RenderComponent<IncomeList>();
+        Assert.Equal("Chris Austin · into Chris current", cut.FindAll("[data-testid=income-person]").First().TextContent.Trim());
+
+        cut.Find("[data-testid=group-paid-into]").Click();
+
+        Assert.Equal(new[] { "Chris current", "Joint Monzo › Bills", "Not set" }, cut.FindAll("[data-testid=paid-into-name]").Select(e => e.TextContent.Trim()));
+        Assert.Equal(new[] { "£3,000.00", "£110.00", "£2,000.00" }, cut.FindAll("[data-testid=paid-into-total]").Select(e => e.TextContent.Trim()));
+        Assert.Equal("Chris Austin", cut.FindAll("[data-testid=income-person]").First().TextContent.Trim());
+    }
+
+    [Fact]
     public void Opens_in_the_view_chosen_last_time()
     {
         Settings.Saved = Budget.Shared.Account.UserSettings.Defaults with { IncomePeriod = Budget.Shared.Account.ListPeriodDto.Year };

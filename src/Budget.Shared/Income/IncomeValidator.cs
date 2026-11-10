@@ -26,6 +26,7 @@ public static class IncomeValidator
         Amount(errors, nameof(request.Amount), request.Amount, required: true);
         Schedule(errors, nameof(request.Every), request.Every, request.Unit);
         Date(errors, nameof(request.StartsOn), request.StartsOn, "Choose the date of the first payment.");
+        PaidInto(errors, nameof(request.PaidInto), request.PaidInto);
         if (request.Comment?.Trim().Length > CommentMaxLength)
         {
             errors.Add(nameof(request.Comment), $"The comment can be at most {CommentMaxLength} characters.");
@@ -41,7 +42,17 @@ public static class IncomeValidator
         var errors = new Errors();
         Name(errors, nameof(request.Name), request.Name);
         Person(errors, nameof(request.PersonId), request.PersonId);
+        PaidInto(errors, nameof(request.PaidInto), request.PaidInto);
         return errors.ToDictionary();
+    }
+
+    /// <summary>An account name, or "Account › Pot" (BUD-90).</summary>
+    private static void PaidInto(Errors errors, string key, string? paidInto)
+    {
+        if (paidInto?.Trim().Length > Outgoings.OutgoingValidator.PaidFromMaxLength)
+        {
+            errors.Add(key, $"The account can be at most {Outgoings.OutgoingValidator.PaidFromMaxLength} characters.");
+        }
     }
 
     public static IReadOnlyDictionary<string, string[]> Validate(SaveAmountChangeRequest request, bool isCorrection)

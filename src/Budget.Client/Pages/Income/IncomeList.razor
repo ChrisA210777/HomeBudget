@@ -59,7 +59,19 @@
     }
     else
     {
-        <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show income that hasn't started or has ended" />
+        <div class="d-flex align-center flex-wrap gap-x-4 gap-y-1">
+            <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show income that hasn't started or has ended" />
+            @* By the account it's paid into, as Outgoings can be grouped by Paid from (BUD-90). *@
+            <div class="d-flex align-center gap-2">
+                <MudText Typo="Typo.body2" id="income-group-by-label">Group by</MudText>
+                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-labelledby="income-group-by-label" data-testid="group-toggle">
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byAccount ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_byAccount ? "false" : "true")"
+                               OnClick="() => _byAccount = false" data-testid="group-none">None</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byAccount ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_byAccount ? "true" : "false")"
+                               OnClick="() => _byAccount = true" data-testid="group-paid-into">Paid into</MudButton>
+                </MudButtonGroup>
+            </div>
+        </div>
 
         @if (_data.Items.Count == 0)
         {
@@ -72,14 +84,25 @@
             </MudPaper>
         }
 
-        @foreach (var item in _data.Items)
+        @foreach (var group in Groups(_data.Items))
+        {
+            @if (group.Name is not null)
+            {
+                <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2 mt-4 mb-0 category-heading" style="font-weight: 600" data-testid="paid-into-group">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
+                    <span data-testid="paid-into-name">@group.Name</span>
+                    <span class="flex-grow-1"></span>
+                    <span style="font-weight: 400" data-testid="paid-into-total">@Money.Format(group.Items.Sum(i => i.AmountForMonth), _data.CurrencyCode)</span>
+                </h2>
+            }
+        @foreach (var item in group.Items)
         {
             <MudCard Class="mt-3" Outlined="true" data-testid="income-item">
                 <MudCardContent>
                     <div class="d-flex align-start gap-2">
                         <div class="flex-grow-1" style="min-width: 0">
                             <MudLink Href="@($"/income/{item.Id}")" Typo="Typo.h6" data-testid="income-name">@item.Name</MudLink>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@item.PersonName</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="income-person">@item.PersonName@(item.PaidInto is { } account && !_byAccount ? $" · into {account}" : string.Empty)</MudText>
                             @if (item.ReceivedAmount is { } received && !(item.Every == 1 && item.Unit == PaymentUnitDto.Month))
                             {
                                 <MudText Typo="Typo.caption" Class="d-block" data-testid="income-received">
@@ -106,6 +129,7 @@
                 </MudCardContent>
             </MudCard>
         }
+        }
     }
 </MudContainer>
 
@@ -122,6 +146,17 @@
     private int _months = 1;
 
     private bool IsYear => _months == 12;
+
+    private bool _byAccount;
+
+    /// <summary>One unnamed group, or one per account by name with "Not set" last (BUD-90).</summary>
+    private IEnumerable<(string? Name, List<IncomeMonthItem> Items)> Groups(IReadOnlyList<IncomeMonthItem> items) => _byAccount
+        ? items
+            .GroupBy(i => i.PaidInto, StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(g => g.Key is null)
+            .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
+            .Select(g => ((string?)(g.Key ?? "Not set"), g.ToList()))
+        : [(null, items.ToList())];
 
     private string PeriodName => IsYear
         ? $"{ShortMonth(new DateOnly(_year, _month, 1))} – {ShortMonth(new DateOnly(_year, _month, 1).AddMonths(11))}"

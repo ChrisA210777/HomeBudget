@@ -149,6 +149,7 @@ public static class ExportValidator
         {
             var income = export.Incomes[i];
             var path = $"incomes[{i}]";
+            Text($"{path}.paidInto", export.Incomes[i].PaidInto, OutgoingValidator.PaidFromMaxLength, required: false);
             Text($"{path}.name", income.Name, IncomeStream.NameMaxLength);
             if (!peopleIds.Contains(income.PersonId))
             {

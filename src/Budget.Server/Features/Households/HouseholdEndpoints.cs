@@ -101,9 +101,9 @@ public static class HouseholdEndpoints
                 .Where(u => u.LastActiveHouseholdId == householdId)
                 .ExecuteUpdateAsync(u => u.SetProperty(x => x.LastActiveHouseholdId, (Guid?)null));
             await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId).ExecuteDeleteAsync();
+            await db.IncomeStreams.IgnoreQueryFilters().Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.ParentAccountId != null).ExecuteDeleteAsync();
             await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.IncomeStreams.IgnoreQueryFilters().Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.OutgoingCategories.IgnoreQueryFilters().Where(c => c.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.HouseholdMembers.Where(m => m.HouseholdId == householdId).ExecuteDeleteAsync();

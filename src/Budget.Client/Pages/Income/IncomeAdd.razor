@@ -1,6 +1,7 @@
 @page "/income/new"
 @attribute [Authorize]
 @using Budget.Client.Income
+@using Budget.Client.Pages.Accounts
 @using Budget.Client.People
 @using Budget.Shared.Income
 @using Budget.Shared.Outgoings
@@ -74,6 +75,9 @@
                                Error="Has(nameof(CreateIncomeStreamRequest.StartsOn))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.StartsOn))"
                                Variant="Variant.Outlined" data-testid="starts-on" />
 
+                <AccountPicker HouseholdId="@(_household?.HouseholdId ?? Guid.Empty)" @bind-Value="_paidInto" Label="Paid into (optional)"
+                               HelperText="The account or pot it lands in, e.g. “Chris current”" TestId="paid-into" />
+
                 <div class="d-flex justify-end gap-2 mt-2">
                     <MudButton Variant="Variant.Text" Href="/income">Cancel</MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">Add income</MudButton>
@@ -92,6 +96,7 @@
 
     private HouseholdMembershipSummary? _household;
     private IReadOnlyList<PersonSummary> _people = [];
+    private string? _paidInto;
     private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
     private bool _loaded;
     private bool _canEdit;
@@ -126,6 +131,7 @@
         {
             Name = _name ?? string.Empty,
             PersonId = _personId,
+            PaidInto = _paidInto,
             Amount = _amount,
             Every = _every,
             Unit = _unit,

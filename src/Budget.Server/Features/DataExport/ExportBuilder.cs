@@ -107,6 +107,7 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                     Id = i.Id,
                     Name = i.Name,
                     PersonId = i.PersonId,
+                    PaidInto = AccountName(i.AccountId),
                     AmountChanges = CurrentAndFuture(i.AmountChanges, c => c.EffectiveFrom, today, options)
                         .Select(c => Audit(AmountChange(c.Id, c.EffectiveFrom, c.Amount, c.Every, c.Unit, c.Comment), c)).ToList(),
                     StatusPeriods = i.StatusPeriods

@@ -15,7 +15,7 @@
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
     <h1 class="mud-typography mud-typography-h4 mb-1">Accounts</h1>
     <MudText Typo="Typo.body2" Class="mb-4">
-        The bank accounts, and pots within them, that money is paid from. Choose one for each outgoing, or type a new name there to add it.
+        The bank accounts, and pots within them, that money is paid from and into. Choose one for each outgoing or income, or type a new name there to add it.
     </MudText>
 
     @if (_error is not null)
@@ -188,7 +188,7 @@
             else if (_mergingId == account.Id)
             {
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    Move everything paid from @account.DisplayName into another account or pot, then archive it.
+                    Move everything paid from or into @account.DisplayName to another account or pot, then archive it.
                     @(isPot ? string.Empty : "Its pots move too, joining any with the same name.")
                 </MudText>
                 <MudSelect T="Guid?" @bind-Value="_mergeInto" ToStringFunc="MergeName" Label="Merge into" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="merge-into">
@@ -250,6 +250,10 @@
         }
 
         parts.Add(account.OutgoingCount == 1 ? "1 outgoing" : $"{account.OutgoingCount} outgoings");
+        if (account.IncomeCount > 0)
+        {
+            parts.Add(account.IncomeCount == 1 ? "1 income" : $"{account.IncomeCount} incomes");
+        }
         return string.Join(" · ", parts);
     }
 

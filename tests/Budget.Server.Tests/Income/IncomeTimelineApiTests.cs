@@ -278,6 +278,35 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
     }
 
     [Fact]
+    public async Task Income_can_be_paid_into_an_account_or_pot_which_a_new_name_adds()
+    {
+        var (client, householdId, chrisId) = await OwnerAsync("Chris");
+
+        var created = await SendAsync<IncomeStreamDetails>(client, HttpMethod.Post, IncomeRoutes.IncomeStreams(householdId), new CreateIncomeStreamRequest
+        {
+            Name = "Child Benefit", PersonId = chrisId, Amount = 110m, StartsOn = January, PaidInto = "Joint Monzo (Bills Pot)",
+        });
+        var month = (await client.GetFromJsonAsync<IncomeMonthResponse>(Url(IncomeRoutes.ForMonth(householdId, 2026, 11))))!;
+
+        Assert.Equal("Joint Monzo › Bills", created.PaidInto);
+        Assert.Equal("Joint Monzo › Bills", Assert.Single(month.Items).PaidInto);
+        var accounts = (await client.GetFromJsonAsync<List<Budget.Shared.Accounts.AccountSummary>>(Url(Budget.Shared.Accounts.HouseholdAccountRoutes.Accounts(householdId))))!;
+        Assert.Equal(1, accounts.Single(a => a.DisplayName == "Joint Monzo › Bills").IncomeCount);
+
+        // Editing the details can move it to another account, or clear it.
+        var moved = await SendAsync<IncomeStreamDetails>(client, HttpMethod.Put, IncomeRoutes.IncomeStream(householdId, created.Id), new UpdateIncomeStreamRequest
+        {
+            Name = "Child Benefit", PersonId = chrisId, PaidInto = "joint monzo", Version = created.Version,
+        });
+        Assert.Equal("Joint Monzo", moved.PaidInto);
+        var cleared = await SendAsync<IncomeStreamDetails>(client, HttpMethod.Put, IncomeRoutes.IncomeStream(householdId, created.Id), new UpdateIncomeStreamRequest
+        {
+            Name = "Child Benefit", PersonId = chrisId, PaidInto = " ", Version = moved.Version,
+        });
+        Assert.Null(cleared.PaidInto);
+    }
+
+    [Fact]
     public async Task Income_must_belong_to_someone_in_this_household()
     {
         var (otherClient, otherHousehold, otherPerson) = await OwnerAsync("Other");

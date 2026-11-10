@@ -277,3 +277,27 @@ public sealed class FakeUserSettingsApi : IUserSettingsApi
         return Task.FromResult(Saved);
     }
 }
+
+/// <summary>A household with two accounts and a pot (BUD-89), for pages that offer accounts to choose from.</summary>
+public sealed class StaticAccountsApi : Budget.Client.Accounts.IAccountsApi
+{
+    public Task<IReadOnlyList<Budget.Shared.Accounts.AccountSummary>> ListAsync(Guid householdId)
+    {
+        var monzo = Guid.NewGuid();
+        return Task.FromResult<IReadOnlyList<Budget.Shared.Accounts.AccountSummary>>(
+        [
+            new(Guid.NewGuid(), "Chris current", null, null, null, null, false, "Chris current", 0),
+            new(monzo, "Joint Monzo", "Monzo", null, null, null, false, "Joint Monzo", 0),
+            new(Guid.NewGuid(), "Bills", null, null, null, monzo, false, "Joint Monzo › Bills", 0),
+        ]);
+    }
+
+    public Task<Budget.Client.Accounts.AccountsResult> AddAsync(Guid householdId, Budget.Shared.Accounts.SaveAccountRequest request) => throw new NotSupportedException();
+
+    public Task<Budget.Client.Accounts.AccountsResult> UpdateAsync(Guid householdId, Guid accountId, Budget.Shared.Accounts.SaveAccountRequest request) =>
+        throw new NotSupportedException();
+
+    public Task<Budget.Client.Accounts.AccountsResult> SetArchivedAsync(Guid householdId, Guid accountId, bool archived) => throw new NotSupportedException();
+
+    public Task<Budget.Client.Accounts.AccountsResult> MergeAsync(Guid householdId, Guid accountId, Guid intoAccountId) => throw new NotSupportedException();
+}

@@ -1,0 +1,118 @@
+{
+  "format": "home-budget-export",
+  "schemaVersion": 3,
+  "exportedAt": "2026-11-06T17:30:00+00:00",
+  "appVersion": "1.0.0",
+  "options": {
+    "includeHistory": true,
+    "includeAudit": true
+  },
+  "household": {
+    "name": "The Austins",
+    "currencyCode": "GBP"
+  },
+  "members": [
+    { "displayName": "Chris Austin", "email": "chris@example.com", "role": "Admin", "isOwner": true },
+    { "displayName": "Jane Austin", "email": "jane@example.com", "role": "User", "isOwner": false }
+  ],
+  "people": [
+    { "id": "0192f0a0-0000-7000-8000-000000000001", "displayName": "Chris", "linkedMemberEmail": "chris@example.com", "recordedBy": "Chris Austin", "recordedAt": "2026-01-02T09:00:00+00:00", "changedBy": "Chris Austin", "changedAt": "2026-01-02T09:00:00+00:00" },
+    { "id": "0192f0a0-0000-7000-8000-000000000002", "displayName": "Jane", "linkedMemberEmail": "jane@example.com", "recordedBy": "Chris Austin", "recordedAt": "2026-01-02T09:05:00+00:00", "changedBy": "Chris Austin", "changedAt": "2026-01-02T09:05:00+00:00" },
+    { "id": "0192f0a0-0000-7000-8000-000000000003", "displayName": "Sam", "recordedBy": "Jane Austin", "recordedAt": "2026-01-03T18:00:00+00:00", "changedBy": "Jane Austin", "changedAt": "2026-01-03T18:00:00+00:00" }
+  ],
+  "categories": [
+    { "id": "0192f0a0-0000-7000-8000-000000000101", "name": "Housing", "sortOrder": 10, "isHidden": false, "icon": "home", "recordedAt": "2026-01-02T09:00:00+00:00", "changedAt": "2026-01-02T09:00:00+00:00" },
+    { "id": "0192f0a0-0000-7000-8000-000000000102", "name": "Insurance", "sortOrder": 40, "isHidden": false, "icon": "shield", "recordedAt": "2026-01-02T09:00:00+00:00", "changedAt": "2026-01-02T09:00:00+00:00" },
+    { "id": "0192f0a0-0000-7000-8000-000000000103", "name": "Hobbies", "sortOrder": 170, "isHidden": true, "icon": "music", "recordedBy": "Jane Austin", "recordedAt": "2026-02-01T10:00:00+00:00", "changedBy": "Jane Austin", "changedAt": "2026-06-01T10:00:00+00:00" }
+  ],
+  "accounts": [
+    { "name": "Joint account", "provider": "Example Bank", "pots": [ { "name": "Holiday" }, { "name": "Old car fund", "archived": true } ] },
+    { "name": "Chris current", "ownerPersonId": "0192f0a0-0000-7000-8000-000000000001" }
+  ],
+  "incomes": [
+    {
+      "id": "0192f0a0-0000-7000-8000-000000000201",
+      "name": "Salary",
+      "personId": "0192f0a0-0000-7000-8000-000000000001",
+      "paidInto": "Chris current",
+      "amountChanges": [
+        { "id": "0192f0a0-0000-7000-8000-000000000211", "effectiveFrom": "2026-01-01", "amount": 2800.00, "every": 1, "unit": "Month", "comment": "Starting amount", "recordedBy": "Chris Austin", "recordedAt": "2026-01-02T09:10:00+00:00", "changedBy": "Chris Austin", "changedAt": "2026-01-02T09:10:00+00:00" },
+        { "id": "0192f0a0-0000-7000-8000-000000000212", "effectiveFrom": "2026-04-01", "amount": 2950.00, "every": 1, "unit": "Month", "comment": "Pay rise", "recordedBy": "Chris Austin", "recordedAt": "2026-04-03T09:10:00+00:00", "changedBy": "Chris Austin", "changedAt": "2026-04-05T09:10:00+00:00" }
+      ],
+      "statusPeriods": [
+        { "id": "0192f0a0-0000-7000-8000-000000000221", "reason": "UnpaidLeave", "startDate": "2026-08-10", "endDate": "2026-08-21", "comment": "Two weeks unpaid", "recordedBy": "Chris Austin", "recordedAt": "2026-07-01T09:00:00+00:00", "changedBy": "Chris Austin", "changedAt": "2026-07-01T09:00:00+00:00" }
+      ],
+      "corrections": [
+        { "entryType": "AmountChange", "entryId": "0192f0a0-0000-7000-8000-000000000212", "action": "Edited", "before": "£2,900.00 a month from 1 Apr 2026: Pay rise", "after": "£2,950.00 a month from 1 Apr 2026: Pay rise", "reason": "Typed the wrong amount", "recordedBy": "Chris Austin", "recordedAt": "2026-04-05T09:10:00+00:00", "changedBy": "Chris Austin", "changedAt": "2026-04-05T09:10:00+00:00" }
+      ],
+      "recordedBy": "Chris Austin",
+      "recordedAt": "2026-01-02T09:10:00+00:00",
+      "changedBy": "Chris Austin",
+      "changedAt": "2026-04-05T09:10:00+00:00"
+    },
+    {
+      "id": "0192f0a0-0000-7000-8000-000000000202",
+      "name": "Child Benefit",
+      "personId": "0192f0a0-0000-7000-8000-000000000002",
+      "amountChanges": [
+        { "id": "0192f0a0-0000-7000-8000-000000000231", "effectiveFrom": "2026-01-05", "amount": 102.20, "every": 4, "unit": "Week", "comment": "Starting amount" }
+      ],
+      "statusPeriods": [],
+      "corrections": []
+    }
+  ],
+  "outgoings": [
+    {
+      "id": "0192f0a0-0000-7000-8000-000000000301",
+      "name": "Mortgage",
+      "kind": "Bill",
+      "priority": "Essential",
+      "categoryId": "0192f0a0-0000-7000-8000-000000000101",
+      "firstPaymentDate": "2026-01-01",
+      "details": { "recipient": "Example Building Society", "paymentMethod": "DirectDebit", "paidFrom": "Joint account", "referenceLabel": "Mortgage account number", "referenceValue": "M-12345", "website": "https://example.com", "contactPhone": "0800 000 000", "notes": "Fixed until March 2027" },
+      "amountChanges": [
+        { "id": "0192f0a0-0000-7000-8000-000000000311", "effectiveFrom": "2026-01-01", "amount": 900.00, "every": 1, "unit": "Month", "comment": "Starting amount" },
+        { "id": "0192f0a0-0000-7000-8000-000000000312", "effectiveFrom": "2027-03-01", "amount": 1050.00, "every": 1, "unit": "Month", "comment": "New fixed rate" }
+      ],
+      "statusPeriods": [
+        { "id": "0192f0a0-0000-7000-8000-000000000321", "reason": "Paused", "startDate": "2026-12-01", "resumesOn": "2027-02-01", "comment": "Payment holiday" }
+      ],
+      "corrections": [
+        { "entryType": "StatusPeriod", "entryId": "0192f0a0-0000-7000-8000-000000000322", "action": "Deleted", "before": "Paused from 1 Oct 2026, resumes 1 Nov 2026: Holiday", "reason": "Added by mistake" }
+      ]
+    },
+    {
+      "id": "0192f0a0-0000-7000-8000-000000000302",
+      "name": "Car insurance",
+      "kind": "Bill",
+      "priority": "Essential",
+      "categoryId": "0192f0a0-0000-7000-8000-000000000102",
+      "personId": "0192f0a0-0000-7000-8000-000000000001",
+      "firstPaymentDate": "2026-03-14",
+      "renewal": { "date": "2027-03-14", "everyMonths": 12, "autoRenews": true, "alertPeriod": "OneMonth" },
+      "details": { "paymentMethod": "DirectDebit", "referenceLabel": "Policy number", "referenceValue": "POL-99" },
+      "amountChanges": [
+        { "id": "0192f0a0-0000-7000-8000-000000000331", "effectiveFrom": "2026-03-14", "amount": 480.00, "every": 1, "unit": "Year", "comment": "Starting amount" }
+      ],
+      "statusPeriods": [],
+      "corrections": []
+    },
+    {
+      "id": "0192f0a0-0000-7000-8000-000000000303",
+      "name": "Guitar lessons",
+      "kind": "Allowance",
+      "priority": "Optional",
+      "categoryId": "0192f0a0-0000-7000-8000-000000000103",
+      "personId": "0192f0a0-0000-7000-8000-000000000003",
+      "firstPaymentDate": "2026-02-07",
+      "details": {},
+      "amountChanges": [
+        { "id": "0192f0a0-0000-7000-8000-000000000341", "effectiveFrom": "2026-02-07", "amount": 25.00, "every": 1, "unit": "Week", "comment": "Starting amount" }
+      ],
+      "statusPeriods": [
+        { "id": "0192f0a0-0000-7000-8000-000000000351", "reason": "Ended", "startDate": "2026-06-01", "comment": "Stopped lessons" }
+      ],
+      "corrections": []
+    }
+  ]
+}

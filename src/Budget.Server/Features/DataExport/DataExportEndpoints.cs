@@ -220,9 +220,9 @@ public static class DataExportEndpoints
             await using var transaction = await db.Database.BeginTransactionAsync();
 
             await db.Outgoings.Where(o => o.HouseholdId == householdId).ExecuteDeleteAsync();
+            await db.IncomeStreams.Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.Accounts.Where(a => a.HouseholdId == householdId && a.ParentAccountId != null).ExecuteDeleteAsync();
             await db.Accounts.Where(a => a.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.IncomeStreams.Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.OutgoingCategories.Where(c => c.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId == null).ExecuteDeleteAsync();
 

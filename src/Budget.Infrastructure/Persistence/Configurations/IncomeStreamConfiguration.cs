@@ -1,3 +1,4 @@
+using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Income;
 using Budget.Domain.People;
@@ -35,6 +36,12 @@ public sealed class IncomeStreamConfiguration : IEntityTypeConfiguration<IncomeS
         builder.HasOne<Person>()
             .WithMany()
             .HasForeignKey(s => s.PersonId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Accounts are archived, never deleted (ADR-014).
+        builder.HasOne<Account>()
+            .WithMany()
+            .HasForeignKey(s => s.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(s => s.AmountChanges).WithOne().HasForeignKey(c => c.IncomeStreamId).OnDelete(DeleteBehavior.Cascade);
