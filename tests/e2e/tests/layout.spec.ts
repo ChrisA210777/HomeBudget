@@ -50,7 +50,7 @@ test('the outgoings title, actions and (on larger screens) summary stay at the t
   }
 });
 
-test('on a phone the outgoings actions shrink to icons and the filters fit on one line', async ({ page }, testInfo) => {
+test('on a phone the outgoings actions shrink to icons and the filters fit two to a line', async ({ page }, testInfo) => {
   test.skip(!isPhone(testInfo), 'Phone layout only');
   await page.setViewportSize({ width: 360, height: 740 });
   await signIn(page);
@@ -68,9 +68,13 @@ test('on a phone the outgoings actions shrink to icons and the filters fit on on
     expect(middle, `${testId} should be on the title's line`).toBeLessThan(heading.y + heading.height);
   }
 
-  const filters = await Promise.all(['filter-kind', 'filter-priority', 'filter-person'].map(id => box(page.locator('.list-filter').filter({ has: page.getByTestId(id) }))));
+  // Four filters, two to a line (BUD-79, BUD-95).
+  const filters = await Promise.all(['filter-kind', 'filter-priority', 'filter-person', 'filter-account'].map(id => box(page.locator('.list-filter').filter({ has: page.getByTestId(id) }))));
+  for (const [first, second] of [[filters[0], filters[1]], [filters[2], filters[3]]]) {
+    expect(Math.abs(second.y - first.y), 'filters should be two to a line').toBeLessThanOrEqual(1);
+  }
+  expect(filters[2].y, 'there should be two lines').toBeGreaterThan(filters[0].y);
   for (const filter of filters) {
-    expect(Math.abs(filter.y - filters[0].y), 'filters should share one line').toBeLessThanOrEqual(1);
     expect(filter.x + filter.width).toBeLessThanOrEqual(360);
   }
 });
