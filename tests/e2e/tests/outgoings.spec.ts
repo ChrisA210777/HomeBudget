@@ -139,3 +139,22 @@ test('amounts, their period and the category subtotal line up on the right', asy
   expect(Math.abs((await right(item.getByTestId('outgoing-period'))) - amount)).toBeLessThanOrEqual(1);
   expect(Math.abs((await right(page.getByTestId('category-subtotal').first())) - amount)).toBeLessThanOrEqual(1);
 });
+
+test('outgoings can be shown for 12 months and grouped by the account they are paid from', async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Window cleaner', 'Home maintenance', '20');
+  await page.goto('/outgoings');
+  await settled(page);
+
+  const item = page.getByTestId('outgoing-item').filter({ hasText: 'Window cleaner' });
+  await expect(item.getByTestId('outgoing-monthly')).toHaveText('£20.00');
+
+  // BUD-80: a year adds up the 12 monthly budget amounts, starting with the shown month.
+  await page.getByTestId('show-year').click();
+  await expect(page.getByTestId('month-name')).toContainText('–');
+  await expect(item.getByTestId('outgoing-monthly')).toHaveText('£240.00');
+  await expect(item.getByTestId('outgoing-period')).toHaveText('over 12 months');
+
+  await page.getByTestId('group-paid-from').click();
+  await expect(page.getByTestId('paid-from-name')).toHaveText(['Not set']);
+});

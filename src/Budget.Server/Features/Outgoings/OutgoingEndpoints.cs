@@ -34,8 +34,14 @@ public static class OutgoingEndpoints
 
     // ---- Reading ----
 
-    private static async Task<IResult> GetMonthAsync(Guid householdId, string? month, bool? all, BudgetDbContext db, TimeProvider time)
+    private static async Task<IResult> GetMonthAsync(Guid householdId, string? month, bool? all, int? months, BudgetDbContext db, TimeProvider time)
     {
+        if (months is not (null or 1 or 12))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["months"] = ["Ask for 1 month or 12."] });
+        }
+
+        var count = months ?? 1;
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
         int year, monthNumber;
         if (string.IsNullOrEmpty(month))
@@ -52,7 +58,8 @@ public static class OutgoingEndpoints
         }
 
         var first = new DateOnly(year, monthNumber, 1);
-        var last = first.AddMonths(1).AddDays(-1);
+        var last = first.AddMonths(count).AddDays(-1);
+        var monthsCovered = Enumerable.Range(0, count).Select(i => first.AddMonths(i)).ToList();
 
         var outgoings = await db.Outgoings
             .Include(o => o.AmountChanges)
@@ -70,7 +77,8 @@ public static class OutgoingEndpoints
             {
                 var category = categories.GetValueOrDefault(o.CategoryId);
                 var paid = o.AmountChangeOn(last) ?? o.AmountChanges.MinBy(c => c.EffectiveFrom)!;
-                var exact = o.MonthlyEquivalentForMonth(year, monthNumber);
+                // A year is the sum of its 12 monthly budget amounts (ADR-013).
+                var exact = monthsCovered.Sum(m => o.MonthlyEquivalentForMonth(m.Year, m.Month));
                 return new OutgoingMonthItem(
                     o.Id,
                     o.Name,
@@ -92,14 +100,15 @@ public static class OutgoingEndpoints
                     o.NextRenewalOnOrAfter(today),
                     o.IsComingUp(today),
                     o.AutoRenews,
-                    category?.Icon ?? CategoryIcons.Default);
+                    category?.Icon ?? CategoryIcons.Default,
+                    o.PaidFrom);
             })
             .OrderBy(i => i.CategorySortOrder)
             .ThenBy(i => i.CategoryName, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        return Results.Ok(new OutgoingMonthResponse(year, monthNumber, items, currency));
+        return Results.Ok(new OutgoingMonthResponse(year, monthNumber, items, currency, count));
     }
 
     /// <summary>Why this month differs from usual: starting, price changes, pauses and ending.</summary>

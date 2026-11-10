@@ -20,8 +20,9 @@ public static class IncomeRoutes
     /// <summary>GET: income for a month (<c>?month=2026-11</c>, optional <c>&amp;all=true</c>). POST: add an income.</summary>
     public static string IncomeStreams(Guid householdId) => $"/api/households/{householdId}/income-streams";
 
-    public static string ForMonth(Guid householdId, int year, int month, bool all = false) =>
-        $"{IncomeStreams(householdId)}?month={year:D4}-{month:D2}{(all ? "&all=true" : string.Empty)}";
+    /// <summary>GET: the income for a month, or with <paramref name="months"/> = 12 for the 12 months starting with it (BUD-80).</summary>
+    public static string ForMonth(Guid householdId, int year, int month, bool all = false, int months = 1) =>
+        $"{IncomeStreams(householdId)}?month={year:D4}-{month:D2}{(all ? "&all=true" : string.Empty)}{(months == 1 ? string.Empty : $"&months={months}")}";
 
     /// <summary>GET: details and history. PUT: rename or change person. DELETE: delete the income.</summary>
     public static string IncomeStream(Guid householdId, Guid incomeStreamId) => $"{IncomeStreams(householdId)}/{incomeStreamId}";
@@ -119,7 +120,11 @@ public sealed record DeleteEntryRequest
 // Responses. Money is rounded to pennies.
 
 /// <summary>Household income for one month.</summary>
-public sealed record IncomeMonthResponse(int Year, int Month, IReadOnlyList<IncomeMonthItem> Items, decimal Total, string CurrencyCode);
+/// <summary>
+/// The income for <see cref="Months"/> months starting with <see cref="Year"/>-<see cref="Month"/>: 1 for a month,
+/// or 12 for a year (BUD-80), when each item's amount and the total cover all 12 months.
+/// </summary>
+public sealed record IncomeMonthResponse(int Year, int Month, IReadOnlyList<IncomeMonthItem> Items, decimal Total, string CurrencyCode, int Months = 1);
 
 /// <summary>
 /// One income in a month. <see cref="Notes"/> explain why the month differs from the usual amount,

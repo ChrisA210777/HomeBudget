@@ -350,7 +350,7 @@ public sealed class OutgoingAddTests : IDisposable
         public Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId) =>
             Task.FromResult<IReadOnlyList<string>>(["Joint account"]);
 
-        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) =>
+        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1) =>
             Task.FromResult(new OutgoingMonthResponse(year, month, [], "GBP"));
 
         public OutgoingDetailsResponse? Existing { get; set; }

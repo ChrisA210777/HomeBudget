@@ -105,6 +105,23 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
         Assert.Equal(3300m, november.UsualAmount);
         Assert.Equal(new[] { "Changes to £3,300.00 a month from 16 Nov 2026" }, november.Notes);
         Assert.Equal(3300m, Assert.Single((await MonthAsync(client, householdId, 2026, 12)).Items).AmountForMonth);
+
+        // A year from November adds up its 12 months (BUD-80): £3,150 in November, then 11 × £3,300.
+        var year = (await client.GetFromJsonAsync<IncomeMonthResponse>(Url(IncomeRoutes.ForMonth(householdId, 2026, 11, months: 12))))!;
+        Assert.Equal((2026, 11, 12), (year.Year, year.Month, year.Months));
+        Assert.Equal(39450m, Assert.Single(year.Items).AmountForMonth);
+        Assert.Equal(39450m, year.Total);
+        Assert.Equal(new[] { "Changes to £3,300.00 a month from 16 Nov 2026" }, year.Items[0].Notes);
+    }
+
+    [Fact]
+    public async Task Only_a_month_or_a_year_can_be_asked_for()
+    {
+        var (client, householdId, _) = await OwnerAsync("Chris");
+
+        using var response = await client.GetAsync(Url(IncomeRoutes.ForMonth(householdId, 2026, 11, months: 6)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

@@ -7,7 +7,7 @@ namespace Budget.Client.Outgoings;
 
 public interface IOutgoingApi
 {
-    Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all);
+    Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1);
 
     Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request);
 
@@ -39,8 +39,8 @@ public interface IOutgoingApi
 
 public sealed class OutgoingApi(HttpClient http) : IOutgoingApi
 {
-    public async Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) =>
-        (await http.GetFromJsonAsync<OutgoingMonthResponse>(Relative(OutgoingRoutes.ForMonth(householdId, year, month, all))))!;
+    public async Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1) =>
+        (await http.GetFromJsonAsync<OutgoingMonthResponse>(Relative(OutgoingRoutes.ForMonth(householdId, year, month, all, months))))!;
 
     public Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request) =>
         SendAsync<OutgoingCreatedResponse>(HttpMethod.Post, OutgoingRoutes.Outgoings(householdId), request);
