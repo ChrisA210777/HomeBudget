@@ -23,3 +23,22 @@ test('accounts and pots are added from the household menu', async ({ page }) => 
 
   await expect(page.getByTestId('account-details').first()).toContainText('Monzo');
 });
+
+test('income can be paid into an account, and grouped by it', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/income/new');
+  await settled(page);
+
+  // BUD-90: typing a new account name adds it.
+  await page.getByTestId('name').fill('Child Benefit');
+  await page.getByTestId('amount').fill('110');
+  await page.getByTestId('paid-into').fill('Joint Monzo (Bills Pot)');
+  await page.getByTestId('paid-into').press('Tab');
+  await page.getByTestId('save').click();
+  await expect(page.getByTestId('income-dates')).toContainText('Paid into Joint Monzo › Bills');
+
+  await page.goto('/income');
+  await settled(page);
+  await page.getByTestId('group-paid-into').click();
+  await expect(page.getByTestId('paid-into-name')).toHaveText(['Joint Monzo › Bills']);
+});
