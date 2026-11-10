@@ -1,0 +1,95 @@
+@page "/transfers"
+@attribute [Authorize]
+@using Budget.Client.Income
+@using Budget.Client.Transfers
+@using Budget.Shared.Income
+@using Budget.Shared.Outgoings
+@using Budget.Shared.Transfers
+@inject UserSession Session
+@inject ITransferApi TransferApi
+
+<PageTitle>Transfers · Home Budget</PageTitle>
+
+@* Money moved between accounts and pots (BUD-91, ADR-014), grouped by the account it goes into. *@
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/accounts" Class="mb-2">Accounts</MudButton>
+    <div class="d-flex align-center flex-wrap gap-2 mb-1">
+        <h1 class="mud-typography mud-typography-h4 flex-grow-1">Transfers</h1>
+        @if (_canEdit)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/transfers/new" data-testid="add-transfer">Add a transfer</MudButton>
+        }
+    </div>
+    <MudText Typo="Typo.body2" Class="mb-4">Money moved between your accounts and pots. Transfers aren't spending, so they don't change the budget.</MudText>
+
+    @if (_household is not null && !_household.TransfersEnabled)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" data-testid="transfers-off">
+            Transfers are turned off for this household. An Admin can turn them on from the <MudLink Href="/accounts">Accounts</MudLink> page.
+        </MudAlert>
+    }
+
+    @if (_data is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_data.Transfers.Count == 0)
+    {
+        <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="transfers-empty">
+            <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.body1" Class="mt-2">No transfers yet.</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        @foreach (var group in _data.Transfers.GroupBy(t => t.ToTopAccountId))
+        {
+            var name = group.First().ToTopAccountName;
+            <section class="mb-4" data-testid="transfer-group" aria-label="@($"Into {name}")">
+                <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2 mb-1" style="font-weight: 600">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
+                    <span class="flex-grow-1" data-testid="transfer-group-name">Into @name</span>
+                    <span style="font-weight: 400" data-testid="transfer-group-total">@Format(group.Where(t => t.Status is null).Sum(t => t.MonthlyAmount)) a month</span>
+                </h2>
+                <MudPaper Outlined="true">
+                    <MudList T="string" Dense="true" Padding="false">
+                        @foreach (var transfer in group)
+                        {
+                            <MudListItem T="string" Href="@($"/transfers/{transfer.Id}")" data-testid="transfer">
+                                <div class="d-flex align-start gap-2">
+                                    <div class="flex-grow-1" style="min-width: 0">
+                                        <MudText Typo="Typo.body1" data-testid="transfer-name">@TransferScheduleBackend.Title(transfer.Name, transfer.FromName, transfer.ToName)</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="transfer-details">@Details(transfer)</MudText>
+                                    </div>
+                                    <MudText Typo="Typo.body1" Class="text-right" data-testid="transfer-amount">@Format(transfer.Amount) @OutgoingValidator.DescribeSchedule(transfer.Every, transfer.Unit)</MudText>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudPaper>
+            </section>
+        }
+    }
+</MudContainer>
+
+@code {
+    private HouseholdMembershipSummary? _household;
+    private TransfersResponse? _data;
+    private bool _canEdit;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        _canEdit = _household is { TransfersEnabled: true } && _household.Role != "Viewer";
+        _data = _household is null ? new TransfersResponse([], "GBP") : await TransferApi.ListAsync(_household.HouseholdId);
+    }
+
+    private string Format(decimal amount) => Money.Format(amount, _data?.CurrencyCode ?? "GBP");
+
+    /// <summary>e.g. "Chris current → Joint · next 25 Nov 2026". The accounts are in the title when it has no name.</summary>
+    private static string Details(TransferSummary transfer)
+    {
+        var when = transfer.Status ?? (transfer.NextPayment is { } next ? $"next {IncomeDates.Format(next)}" : "none due");
+        return transfer.Name is null ? when : $"{transfer.FromName} → {transfer.ToName} · {when}";
+    }
+}

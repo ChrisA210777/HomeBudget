@@ -1,0 +1,231 @@
+@page "/transfers/new"
+@page "/transfers/{TransferId:guid}/edit"
+@attribute [Authorize]
+@using Budget.Client.Accounts
+@using Budget.Client.Income
+@using Budget.Client.Transfers
+@using Budget.Shared.Accounts
+@using Budget.Shared.Outgoings
+@using Budget.Shared.Transfers
+@inject UserSession Session
+@inject ITransferApi TransferApi
+@inject IAccountsApi AccountsApi
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+
+<PageTitle>@(IsNew ? "Add a transfer" : "Edit transfer") · Home Budget</PageTitle>
+
+@* Adds a transfer, or changes one's details; amounts and pauses are changed on its own page (BUD-91). *@
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2">@(IsNew ? "Transfers" : "Transfer")</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-4">@(IsNew ? "Add a transfer" : "Edit transfer")</h1>
+
+    @if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!_canEdit)
+    {
+        <MudAlert Severity="Severity.Info" data-testid="read-only">
+            @(_household?.TransfersEnabled == true ? "Viewers can see transfers but not change them." : "Transfers are turned off for this household.")
+        </MudAlert>
+    }
+    else if (!IsNew && _version is null)
+    {
+        <MudAlert Severity="Severity.Warning" data-testid="not-found">This transfer doesn't exist any more.</MudAlert>
+    }
+    else
+    {
+        @if (_conflict)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="conflict">Someone else changed this transfer while you were working. Reload to see their changes.</MudAlert>
+        }
+
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudStack Spacing="3">
+                <MudSelect T="Guid?" @bind-Value="_from" ToStringFunc="AccountName" Label="From" Variant="Variant.Outlined"
+                           Error="Has(nameof(CreateTransferRequest.FromAccountId))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.FromAccountId))" data-testid="from-account">
+                    @foreach (var account in Choices(_originalFrom))
+                    {
+                        <MudSelectItem T="Guid?" Value="account.Id">@account.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="Guid?" @bind-Value="_to" ToStringFunc="AccountName" Label="Into" Variant="Variant.Outlined"
+                           Error="Has(nameof(CreateTransferRequest.ToAccountId))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.ToAccountId))" data-testid="to-account">
+                    @foreach (var account in Choices(_originalTo).Where(a => a.Id != _from))
+                    {
+                        <MudSelectItem T="Guid?" Value="account.Id">@account.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudText Typo="Typo.caption">An account or pot missing? <MudLink Href="/accounts">Add it on the Accounts page</MudLink>.</MudText>
+
+                @if (IsNew)
+                {
+                    <div class="d-flex gap-2 flex-wrap align-start">
+                        <MudNumericField T="decimal?" @bind-Value="_amount" Format="F2" Label="Amount" Immediate="true" Adornment="Adornment.Start" AdornmentText="£"
+                                         InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem"
+                                         Error="Has(nameof(CreateTransferRequest.Amount))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.Amount))" data-testid="amount" />
+                        <div class="d-flex gap-2">
+                            <div style="width: 5.5rem">
+                                <MudNumericField T="int" @bind-Value="_every" Class="every-field" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                                 InputMode="InputMode.numeric" HideSpinButtons="true" Variant="Variant.Outlined"
+                                                 Error="Has(nameof(CreateTransferRequest.Every))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.Every))" data-testid="every" />
+                            </div>
+                            <div style="width: 8rem">
+                                <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Period" Variant="Variant.Outlined" data-testid="unit">
+                                    @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
+                                    {
+                                        <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </div>
+                        </div>
+                    </div>
+                    <MudDatePicker @bind-Date="_first" Label="First transfer" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
+                                   Error="Has(nameof(CreateTransferRequest.FirstPaymentDate))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.FirstPaymentDate))" data-testid="first-payment" />
+                }
+
+                <MudTextField @bind-Value="_name" Label="Name (optional)" HelperText="For example, “Bills top-up”. Without one, it's shown as From → Into."
+                              MaxLength="TransferValidator.NameMaxLength" Variant="Variant.Outlined" Immediate="true"
+                              Error="Has(nameof(CreateTransferRequest.Name))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.Name))" data-testid="name" />
+                <MudTextField @bind-Value="_notes" Label="Notes (optional)" Lines="3" Sizing="InputSizing.Auto" MaxLength="TransferValidator.NotesMaxLength" Variant="Variant.Outlined"
+                              Error="Has(nameof(CreateTransferRequest.Notes))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.Notes))" data-testid="notes" />
+
+                <div class="d-flex justify-end gap-2 mt-2">
+                    <MudButton Variant="Variant.Text" Href="@BackHref">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">@(IsNew ? "Add transfer" : "Save")</MudButton>
+                </div>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    [Parameter]
+    public Guid? TransferId { get; set; }
+
+    private bool IsNew => TransferId is null;
+
+    private string BackHref => IsNew ? "/transfers" : $"/transfers/{TransferId}";
+
+    private HouseholdMembershipSummary? _household;
+    private IReadOnlyList<AccountSummary> _accounts = [];
+    private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
+    private bool _loaded;
+    private bool _canEdit;
+    private bool _saving;
+    private bool _conflict;
+
+    private string? _version;
+    private Guid? _originalFrom;
+    private Guid? _originalTo;
+    private Guid? _from;
+    private Guid? _to;
+    private decimal? _amount;
+    private int _every = 1;
+    private PaymentUnitDto _unit = PaymentUnitDto.Month;
+    private DateTime? _first;
+    private string? _name;
+    private string? _notes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = Clock.GetLocalNow();
+        _first = new DateTime(today.Year, today.Month, today.Day, 0, 0, 0, DateTimeKind.Unspecified);
+
+        _household = await Session.GetActiveHouseholdAsync();
+        _canEdit = _household is { TransfersEnabled: true } && _household.Role != "Viewer";
+        if (_household is not null && _canEdit)
+        {
+            _accounts = await AccountsApi.ListAsync(_household.HouseholdId);
+            if (TransferId is { } id && await TransferApi.GetAsync(_household.HouseholdId, id) is { } transfer)
+            {
+                _version = transfer.Version;
+                _originalFrom = _from = transfer.FromAccountId;
+                _originalTo = _to = transfer.ToAccountId;
+                _name = transfer.Name;
+                _notes = transfer.Notes;
+            }
+        }
+
+        _loaded = true;
+    }
+
+    /// <summary>Accounts and pots that aren't archived, plus the one already chosen.</summary>
+    private IEnumerable<AccountSummary> Choices(Guid? current)
+    {
+        var archived = _accounts.Where(a => a.IsArchived).Select(a => a.Id).ToHashSet();
+        return _accounts.Where(a => a.Id == current || (!a.IsArchived && !(a.ParentAccountId is { } parent && archived.Contains(parent))));
+    }
+
+    private string AccountName(Guid? id) => _accounts.FirstOrDefault(a => a.Id == id)?.DisplayName ?? string.Empty;
+
+    private string UnitName(PaymentUnitDto unit)
+    {
+        var word = unit.ToString().ToLowerInvariant();
+        return _every == 1 ? word : word + "s";
+    }
+
+    private async Task SaveAsync()
+    {
+        var householdId = _household!.HouseholdId;
+        Func<Task<ApiResult<TransferDetailsResponse>>> send;
+        if (IsNew)
+        {
+            var request = new CreateTransferRequest
+            {
+                Name = _name,
+                FromAccountId = _from,
+                ToAccountId = _to,
+                Amount = _amount,
+                Every = _every,
+                Unit = _unit,
+                FirstPaymentDate = IncomeDates.ToDateOnly(_first),
+                Notes = _notes,
+            };
+            _errors = TransferValidator.Validate(request);
+            send = () => TransferApi.CreateAsync(householdId, request);
+        }
+        else
+        {
+            var request = new UpdateTransferRequest { Name = _name, FromAccountId = _from, ToAccountId = _to, Notes = _notes, Version = _version };
+            _errors = TransferValidator.Validate(request);
+            send = () => TransferApi.UpdateAsync(householdId, TransferId!.Value, request);
+        }
+
+        if (_errors.Count > 0)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await send();
+            if (result.Succeeded)
+            {
+                Navigation.NavigateTo($"/transfers/{result.Value!.Id}");
+            }
+            else if (result.Conflict)
+            {
+                _conflict = true;
+            }
+            else
+            {
+                _errors = result.Errors;
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private bool Has(string field) => _errors.ContainsKey(field);
+
+    private string? ErrorFor(string field) => _errors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
+}

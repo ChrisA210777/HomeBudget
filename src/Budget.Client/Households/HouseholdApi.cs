@@ -34,6 +34,9 @@ public interface IHouseholdApi
 
     Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request);
 
+    /// <summary>Saves the household's settings (Admins only), e.g. "Accounts and transfers" (BUD-91).</summary>
+    Task<HouseholdResponse> SaveSettingsAsync(Guid householdId, HouseholdSettingsRequest request);
+
     /// <returns>The household's members, owner first, then by name.</returns>
     Task<IReadOnlyList<HouseholdMemberSummary>> GetMembersAsync(Guid householdId);
 
@@ -67,6 +70,13 @@ public sealed class HouseholdApi(HttpClient http) : IHouseholdApi
 
         response.EnsureSuccessStatusCode();
         return new CreateHouseholdResult(await response.Content.ReadFromJsonAsync<HouseholdResponse>(), new Dictionary<string, string[]>());
+    }
+
+    public async Task<HouseholdResponse> SaveSettingsAsync(Guid householdId, HouseholdSettingsRequest request)
+    {
+        using var response = await http.PutAsJsonAsync(new Uri(HouseholdRoutes.Settings(householdId), UriKind.Relative), request);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<HouseholdResponse>())!;
     }
 
     public async Task<bool> SwitchToAsync(Guid householdId)

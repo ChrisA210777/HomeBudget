@@ -1,0 +1,540 @@
+@* The actions, amount history, pauses, ending and corrections of an outgoing or transfer (BUD-51, BUD-91). *@
+@typeparam TDetails where TDetails : class
+@using Budget.Client.Income
+@using Budget.Client.Outgoings
+@using Budget.Shared.Income
+@using Budget.Shared.Outgoings
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject TimeProvider Clock
+
+@if (_details is { } d)
+{
+    @if (_conflict)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="conflict">
+            Someone else changed this @Noun while you were working. We've loaded their changes – please check and try again.
+        </MudAlert>
+    }
+
+    @if (_canEdit && _mode == Mode.None)
+    {
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TrendingUp" OnClick="StartChangeAmount" data-testid="change-amount">Change amount</MudButton>
+            @if (d.EndsOn is null && d.UpcomingPayments.Count > 0)
+            {
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PauseCircle" OnClick="StartPause" data-testid="pause">Pause</MudButton>
+            }
+            @if (d.EndsOn is null)
+            {
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Stop" OnClick="() => Start(Mode.End)" data-testid="@($"end-{Noun}")">End</MudButton>
+            }
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Edit" Href="@EditHref" data-testid="edit-details">Edit details</MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="() => Start(Mode.DeleteItem)" data-testid="@($"delete-{Noun}")">Delete</MudButton>
+        </div>
+    }
+
+    @if (_mode != Mode.None)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2" data-testid="editor">
+            <MudText Typo="Typo.h6" Class="mb-2">@EditorTitle</MudText>
+            <MudStack Spacing="3">
+                @switch (_mode)
+                {
+                    case Mode.ChangeAmount:
+                    case Mode.CorrectAmount:
+                        <div class="d-flex gap-2 flex-wrap align-start">
+                            <MudNumericField T="decimal?" @bind-Value="_amount" Format="F2" Label="Amount" Immediate="true" Adornment="Adornment.Start" AdornmentText="£"
+                                             InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 9rem"
+                                             Error="Has(nameof(SaveOutgoingAmountRequest.Amount))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.Amount))" data-testid="amount" />
+                            <div class="d-flex gap-2">
+                                <div style="width: 5.5rem">
+                                    <MudNumericField T="int" @bind-Value="_every" Class="every-field" Label="Every" Immediate="true" Min="1" Max="OutgoingValidator.MaxEvery"
+                                                     InputMode="InputMode.numeric" HideSpinButtons="true" Variant="Variant.Outlined"
+                                                     Error="Has(nameof(SaveOutgoingAmountRequest.Every))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.Every))" data-testid="every" />
+                                </div>
+                                <div style="width: 8rem">
+                                    <MudSelect T="PaymentUnitDto" @bind-Value="_unit" ToStringFunc="UnitName" Label="Period" Variant="Variant.Outlined" data-testid="unit">
+                                        @foreach (var unit in Enum.GetValues<PaymentUnitDto>())
+                                        {
+                                            <MudSelectItem T="PaymentUnitDto" Value="unit">@UnitName(unit)</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </div>
+                            </div>
+                        </div>
+                        @if (OutgoingValidator.DescribeMonthlyEquivalent(_amount, _every, _unit) is { } equivalent)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Primary" aria-live="polite" data-testid="monthly-equivalent">@equivalent</MudText>
+                        }
+                        <MudDatePicker @bind-Date="_date" Label="Applies from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
+                                       HelperText="The first payment at the new amount. Can be in the future once you know about it."
+                                       Error="Has(nameof(SaveOutgoingAmountRequest.EffectiveFrom))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.EffectiveFrom))" data-testid="date" />
+                        <MudTextField @bind-Value="_comment" Label="Why is the amount changing?" HelperText="Shown in the history" Placeholder="@AmountPlaceholder" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                      Error="Has(nameof(SaveOutgoingAmountRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.Comment))" data-testid="comment" />
+                        break;
+
+                    case Mode.Pause:
+                    case Mode.CorrectPause:
+                        <MudText Typo="Typo.body2">A pause skips whole payments, starting with the one you choose. @PauseNote</MudText>
+                        <MudSelect T="DateOnly?" @bind-Value="_pauseStart" ToStringFunc="FormatDate" Label="First payment to skip" Variant="Variant.Outlined"
+                                   Error="Has(nameof(SaveOutgoingStatusRequest.StartDate))" ErrorText="@ErrorFor(nameof(SaveOutgoingStatusRequest.StartDate))" data-testid="pause-start">
+                            @foreach (var payment in PauseStartChoices)
+                            {
+                                <MudSelectItem T="DateOnly?" Value="payment">@IncomeDates.Format(payment)</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSwitch T="bool" @bind-Value="_untilFurtherNotice" Color="Color.Primary" Label="Until further notice" data-testid="until-further-notice" />
+                        @if (!_untilFurtherNotice)
+                        {
+                            <MudNumericField T="int?" @bind-Value="_skipPayments" Label="Payments to skip" Immediate="true" Min="1" Max="OutgoingValidator.MaxSkipPayments"
+                                             InputMode="InputMode.numeric" HideSpinButtons="true" Variant="Variant.Outlined"
+                                             Error="Has(nameof(SaveOutgoingStatusRequest.SkipPayments))" ErrorText="@ErrorFor(nameof(SaveOutgoingStatusRequest.SkipPayments))" data-testid="skip-payments" />
+                            @if (ResumesPreview is { } resumes)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Primary" aria-live="polite" data-testid="resumes-preview">Payments resume on @IncomeDates.Format(resumes).</MudText>
+                            }
+                        }
+                        <MudTextField @bind-Value="_comment" Label="Why is it paused?" HelperText="Shown in the history" Placeholder="@PausePlaceholder" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                      Error="Has(nameof(SaveOutgoingStatusRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveOutgoingStatusRequest.Comment))" data-testid="comment" />
+                        break;
+
+                    case Mode.End:
+                    case Mode.CorrectEnd:
+                        <MudText Typo="Typo.body2">No payments are due from this date. It stays in the history for earlier months.</MudText>
+                        <MudDatePicker @bind-Date="_date" Label="Ends from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
+                                       Error="Has(nameof(SaveOutgoingStatusRequest.StartDate))" ErrorText="@ErrorFor(nameof(SaveOutgoingStatusRequest.StartDate))" data-testid="date" />
+                        <MudTextField @bind-Value="_comment" Label="Why is it stopping?" HelperText="Shown in the history" Placeholder="e.g. Cancelled" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                      Error="Has(nameof(SaveOutgoingStatusRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveOutgoingStatusRequest.Comment))" data-testid="comment" />
+                        break;
+
+                    case Mode.DeleteAmount:
+                    case Mode.DeleteStatus:
+                        <MudText Typo="Typo.body2" data-testid="delete-summary">@_deleteSummary</MudText>
+                        <MudTextField @bind-Value="_correctionReason" Label="Why are you deleting this?" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                      Error="Has(nameof(DeleteOutgoingEntryRequest.Reason))" ErrorText="@ErrorFor(nameof(DeleteOutgoingEntryRequest.Reason))" data-testid="correction-reason" />
+                        break;
+
+                    case Mode.DeleteItem:
+                        <MudText Typo="Typo.body2" data-testid="delete-summary">
+                            This removes @d.Name and all of its history. If it has stopped, use “End” instead so earlier months stay correct.
+                        </MudText>
+                        break;
+                }
+
+                @if (_mode is Mode.CorrectAmount or Mode.CorrectPause or Mode.CorrectEnd)
+                {
+                    <MudTextField @bind-Value="_correctionReason" Label="Why are you correcting this?" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
+                                  HelperText="The original stays in the history."
+                                  Error="Has(nameof(SaveOutgoingAmountRequest.CorrectionReason))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.CorrectionReason))" data-testid="correction-reason" />
+                }
+
+                <div class="d-flex justify-end gap-2">
+                    <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="cancel">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="@(IsDelete ? Color.Error : Color.Primary)" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">
+                        @(IsDelete ? "Delete" : "Save")
+                    </MudButton>
+                </div>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <h2 class="mud-typography mud-typography-h6 mt-4 mb-2">Amount history</h2>
+    @foreach (var change in d.AmountChanges)
+    {
+        <MudCard Outlined="true" Class="mb-2" data-testid="amount-change">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-start gap-2">
+                    <div class="flex-grow-1" style="min-width: 0">
+                        <MudText Typo="Typo.subtitle1">
+                            <b data-testid="entry-amount">@Format(change.Amount) @OutgoingValidator.DescribeSchedule(change.Every, change.Unit)</b> from @IncomeDates.Format(change.EffectiveFrom)
+                            @if (change.IsUpcoming)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info" data-testid="upcoming">Upcoming</MudChip>
+                            }
+                        </MudText>
+                        <MudText Typo="Typo.body2" data-testid="entry-comment">@change.Comment</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@Recorded(change.RecordedBy, change.RecordedAt)</MudText>
+                    </div>
+                    @if (_canEdit && _mode == Mode.None)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Correct this amount" OnClick="() => StartCorrectAmount(change)" data-testid="correct-entry" />
+                        @if (!change.IsFirst)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Delete this amount" OnClick="() => StartDeleteAmount(change)" data-testid="delete-entry" />
+                        }
+                    }
+                </div>
+            </MudCardContent>
+        </MudCard>
+    }
+
+    <h2 class="mud-typography mud-typography-h6 mt-4 mb-2">Pauses and ending</h2>
+    @if (d.StatusPeriods.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="no-periods">None recorded.</MudText>
+    }
+    @foreach (var period in d.StatusPeriods)
+    {
+        <MudCard Outlined="true" Class="mb-2" data-testid="status-period">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-start gap-2">
+                    <div class="flex-grow-1" style="min-width: 0">
+                        <MudText Typo="Typo.subtitle1">
+                            <b data-testid="period-description">@DescribePeriod(period)</b>
+                            @if (period.IsUpcoming)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info">Upcoming</MudChip>
+                            }
+                        </MudText>
+                        <MudText Typo="Typo.body2">@period.Comment</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@Recorded(period.RecordedBy, period.RecordedAt)</MudText>
+                    </div>
+                    @if (_canEdit && _mode == Mode.None)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Correct this pause or ending" OnClick="() => StartCorrectPeriod(period)" data-testid="correct-period" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Delete this pause or ending" OnClick="() => StartDeletePeriod(period)" data-testid="delete-period" />
+                    }
+                </div>
+            </MudCardContent>
+        </MudCard>
+    }
+
+    @if (d.Corrections.Count > 0)
+    {
+        <h2 class="mud-typography mud-typography-h6 mt-4 mb-2">Corrections</h2>
+        @foreach (var correction in d.Corrections)
+        {
+            <MudPaper Outlined="true" Class="pa-3 mb-2" data-testid="correction">
+                <MudText Typo="Typo.body2"><b>@(correction.Action == "Deleted" ? "Deleted" : "Corrected"):</b> @correction.Before</MudText>
+                @if (correction.After is { } after)
+                {
+                    <MudText Typo="Typo.body2"><b>Now:</b> @after</MudText>
+                }
+                <MudText Typo="Typo.body2"><b>Why:</b> @correction.Reason</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@Recorded(correction.CorrectedBy, correction.CorrectedAt)</MudText>
+            </MudPaper>
+        }
+    }
+}
+
+@code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    /// <summary>The outgoing's or transfer's details. Updated (through <see cref="DetailsChanged"/>) after each change.</summary>
+    [Parameter, EditorRequired]
+    public TDetails Details { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<TDetails> DetailsChanged { get; set; }
+
+    [Parameter, EditorRequired]
+    public Func<TDetails, ScheduleView> View { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IScheduleBackend<TDetails> Backend { get; set; } = default!;
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    /// <summary>"outgoing" or "transfer", for messages and test ids.</summary>
+    [Parameter]
+    public string Noun { get; set; } = "outgoing";
+
+    [Parameter, EditorRequired]
+    public string EditHref { get; set; } = string.Empty;
+
+    /// <summary>Where to go once it's deleted.</summary>
+    [Parameter, EditorRequired]
+    public string ListHref { get; set; } = string.Empty;
+
+    [Parameter]
+    public string AmountPlaceholder { get; set; } = "e.g. Annual price rise";
+
+    [Parameter]
+    public string PausePlaceholder { get; set; } = "e.g. Mortgage payment holiday";
+
+    [Parameter]
+    public string PauseNote { get; set; } = "Nothing counts towards the budget for those payments.";
+
+    private enum Mode { None, ChangeAmount, CorrectAmount, DeleteAmount, Pause, CorrectPause, End, CorrectEnd, DeleteStatus, DeleteItem }
+
+    private ScheduleView? _details;
+    private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
+    private bool _canEdit => CanEdit;
+    private bool _saving;
+    private bool _conflict;
+
+    private Mode _mode;
+    private Guid _entryId;
+    private decimal? _amount;
+    private int _every = 1;
+    private PaymentUnitDto _unit = PaymentUnitDto.Month;
+    private DateTime? _date;
+    private DateOnly? _pauseStart;
+    private bool _untilFurtherNotice;
+    private int? _skipPayments = 1;
+    private string? _comment;
+    private string? _correctionReason;
+    private string? _deleteSummary;
+
+    private bool IsDelete => _mode is Mode.DeleteAmount or Mode.DeleteStatus or Mode.DeleteItem;
+
+    private string EditorTitle => _mode switch
+    {
+        Mode.ChangeAmount => "Change the amount",
+        Mode.CorrectAmount => "Correct an amount",
+        Mode.DeleteAmount => "Delete an amount change",
+        Mode.Pause => "Pause payments",
+        Mode.CorrectPause => "Correct a pause",
+        Mode.End => $"End this {Noun}",
+        Mode.CorrectEnd => "Correct the ending",
+        Mode.DeleteStatus => "Delete a pause or ending",
+        Mode.DeleteItem => $"Delete {_details?.Name}?",
+        _ => string.Empty,
+    };
+
+    /// <summary>Payment dates a pause can start on: upcoming ones, plus the existing start when correcting.</summary>
+    private IEnumerable<DateOnly> PauseStartChoices =>
+        (_mode == Mode.CorrectPause && _pauseStart is { } current ? _details!.UpcomingPayments.Append(current) : _details!.UpcomingPayments)
+            .Distinct()
+            .Order();
+
+    /// <summary>When payments resume, worked out from the upcoming dates when they reach that far (the server has the final say).</summary>
+    private DateOnly? ResumesPreview
+    {
+        get
+        {
+            var payments = _details!.UpcomingPayments;
+            var index = _pauseStart is { } start ? payments.ToList().IndexOf(start) : -1;
+            return index >= 0 && _skipPayments is { } skip && skip >= 1 && index + skip < payments.Count ? payments[index + skip] : null;
+        }
+    }
+
+    protected override void OnParametersSet() => _details = View(Details);
+
+    private DateTime Today
+    {
+        get
+        {
+            var now = Clock.GetLocalNow();
+            return new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Unspecified);
+        }
+    }
+
+    private void Start(Mode mode)
+    {
+        _mode = mode;
+        _errors = new Dictionary<string, string[]>();
+        _conflict = false;
+        _amount = null;
+        _every = _details!.Every;
+        _unit = _details.Unit;
+        _date = Today;
+        _comment = null;
+        _correctionReason = null;
+    }
+
+    private void StartChangeAmount()
+    {
+        Start(Mode.ChangeAmount);
+
+        // A new price usually starts with the next payment.
+        _date = IncomeDates.ToDateTime(_details!.NextPayment) ?? Today;
+    }
+
+    private void StartPause()
+    {
+        Start(Mode.Pause);
+        _pauseStart = _details!.UpcomingPayments.FirstOrDefault();
+        _untilFurtherNotice = false;
+        _skipPayments = 1;
+    }
+
+    private void StartCorrectAmount(OutgoingAmountEntry change)
+    {
+        Start(Mode.CorrectAmount);
+        _entryId = change.Id;
+        _amount = change.Amount;
+        _every = change.Every;
+        _unit = change.Unit;
+        _date = IncomeDates.ToDateTime(change.EffectiveFrom);
+        _comment = change.Comment;
+    }
+
+    private void StartDeleteAmount(OutgoingAmountEntry change)
+    {
+        Start(Mode.DeleteAmount);
+        _entryId = change.Id;
+        _deleteSummary = $"{Format(change.Amount)} {OutgoingValidator.DescribeSchedule(change.Every, change.Unit)} from {IncomeDates.Format(change.EffectiveFrom)} ({change.Comment})";
+    }
+
+    private void StartCorrectPeriod(OutgoingStatusEntry period)
+    {
+        Start(period.Reason == OutgoingStatusReasonDto.Ended ? Mode.CorrectEnd : Mode.CorrectPause);
+        _entryId = period.Id;
+        _date = IncomeDates.ToDateTime(period.StartDate);
+        _pauseStart = period.StartDate;
+        _untilFurtherNotice = period.ResumesOn is null;
+        _skipPayments = period.SkippedPayments ?? 1;
+        _comment = period.Comment;
+    }
+
+    private void StartDeletePeriod(OutgoingStatusEntry period)
+    {
+        Start(Mode.DeleteStatus);
+        _entryId = period.Id;
+        _deleteSummary = $"{DescribePeriod(period)} ({period.Comment})";
+    }
+
+    private void Cancel()
+    {
+        _mode = Mode.None;
+        _errors = new Dictionary<string, string[]>();
+    }
+
+    private async Task SaveAsync()
+    {
+        var version = _details!.Version;
+
+        if (_mode == Mode.DeleteItem)
+        {
+            _saving = true;
+            await Backend.DeleteAsync();
+            Snackbar.Add($"{_details.Name} was deleted.", Severity.Success);
+            Navigation.NavigateTo(ListHref);
+            return;
+        }
+
+        Func<Task<ApiResult<TDetails>>> send;
+        var entryId = _entryId;
+        switch (_mode)
+        {
+            case Mode.ChangeAmount:
+            case Mode.CorrectAmount:
+            {
+                var isCorrection = _mode == Mode.CorrectAmount;
+                var request = new SaveOutgoingAmountRequest
+                {
+                    Amount = _amount,
+                    Every = _every,
+                    Unit = _unit,
+                    EffectiveFrom = IncomeDates.ToDateOnly(_date),
+                    Comment = _comment ?? string.Empty,
+                    CorrectionReason = isCorrection ? _correctionReason : null,
+                    Version = version,
+                };
+                _errors = OutgoingValidator.Validate(request, isCorrection);
+                send = isCorrection
+                    ? () => Backend.CorrectAmountChangeAsync(entryId, request)
+                    : () => Backend.AddAmountChangeAsync(request);
+                break;
+            }
+
+            case Mode.Pause:
+            case Mode.CorrectPause:
+            case Mode.End:
+            case Mode.CorrectEnd:
+            {
+                var isCorrection = _mode is Mode.CorrectPause or Mode.CorrectEnd;
+                var isPause = _mode is Mode.Pause or Mode.CorrectPause;
+                var request = new SaveOutgoingStatusRequest
+                {
+                    Reason = isPause ? OutgoingStatusReasonDto.Paused : OutgoingStatusReasonDto.Ended,
+                    StartDate = isPause ? _pauseStart : IncomeDates.ToDateOnly(_date),
+                    SkipPayments = isPause && !_untilFurtherNotice ? _skipPayments ?? 0 : null,
+                    Comment = _comment ?? string.Empty,
+                    CorrectionReason = isCorrection ? _correctionReason : null,
+                    Version = version,
+                };
+                _errors = OutgoingValidator.Validate(request, isCorrection);
+                send = isCorrection
+                    ? () => Backend.CorrectStatusPeriodAsync(entryId, request)
+                    : () => Backend.AddStatusPeriodAsync(request);
+                break;
+            }
+
+            case Mode.DeleteAmount:
+            case Mode.DeleteStatus:
+            {
+                var request = new DeleteOutgoingEntryRequest { Reason = _correctionReason ?? string.Empty, Version = version };
+                _errors = OutgoingValidator.Validate(request);
+                send = _mode == Mode.DeleteAmount
+                    ? () => Backend.DeleteAmountChangeAsync(entryId, request)
+                    : () => Backend.DeleteStatusPeriodAsync(entryId, request);
+                break;
+            }
+
+            default:
+                return;
+        }
+
+        if (_errors.Count > 0)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = await send();
+            if (result.Succeeded)
+            {
+                await ShowAsync(result.Value!);
+                _mode = Mode.None;
+            }
+            else if (result.Conflict)
+            {
+                if (await Backend.GetAsync() is { } latest)
+                {
+                    await ShowAsync(latest);
+                }
+
+                _conflict = true;
+                _mode = Mode.None;
+            }
+            else
+            {
+                _errors = result.Errors;
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ShowAsync(TDetails details)
+    {
+        Details = details;
+        _details = View(details);
+        await DetailsChanged.InvokeAsync(details);
+    }
+
+    private string Format(decimal amount) => Money.Format(amount, _details?.CurrencyCode ?? "GBP");
+
+    private static string FormatDate(DateOnly? date) => date is { } value ? IncomeDates.Format(value) : string.Empty;
+
+    private string UnitName(PaymentUnitDto unit)
+    {
+        var word = unit.ToString().ToLowerInvariant();
+        return _every == 1 ? word : word + "s";
+    }
+
+    private static string DescribePeriod(OutgoingStatusEntry period) => period switch
+    {
+        { Reason: OutgoingStatusReasonDto.Ended } => $"Ended from {IncomeDates.Format(period.StartDate)}",
+        { ResumesOn: { } resumes } =>
+            $"Paused from {IncomeDates.Format(period.StartDate)}: skips {period.SkippedPayments} payment{(period.SkippedPayments == 1 ? string.Empty : "s")}, resumes {IncomeDates.Format(resumes)}",
+        _ => $"Paused from {IncomeDates.Format(period.StartDate)} until further notice",
+    };
+
+    private static string Recorded(string? by, DateTimeOffset at) =>
+        $"Recorded {(by is null ? string.Empty : $"by {by} ")}on {IncomeDates.Format(DateOnly.FromDateTime(at.LocalDateTime))}";
+
+    private bool Has(string field) => _errors.ContainsKey(field);
+
+    private string? ErrorFor(string field) => _errors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
+}

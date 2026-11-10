@@ -18,12 +18,14 @@ public sealed class AccountsPageTests : IDisposable
 
     private readonly TestContext _context = new();
     private readonly FakeAccountsApi _api = new();
+    private readonly SettingsHouseholdApi _households = new();
 
     public AccountsPageTests()
     {
         _context.Services.AddMudServices();
         _context.Services.AddSingleton<IAccountsApi>(_api);
         _context.Services.AddSingleton<IPeopleApi>(new StaticPeopleApi());
+        _context.Services.AddSingleton<Budget.Client.Households.IHouseholdApi>(_households);
         _context.Services.AddScoped<UserSession>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
@@ -96,9 +98,32 @@ public sealed class AccountsPageTests : IDisposable
 
     public void Dispose() => _context.Dispose();
 
-    private IRenderedComponent<AccountsPage> Render(string role)
+    [Fact]
+    public void Admins_turn_on_transfers_and_then_get_a_link_to_them()
     {
-        _context.Services.AddSingleton<IAccountApi>(new FakeAccountApi(role, isOwner: false));
+        var cut = Render("Admin");
+        Assert.Empty(cut.FindAll("[data-testid=go-to-transfers]"));
+
+        cut.FindComponent<MudBlazor.MudSwitch<bool>>().Find("input").Change(true);
+
+        cut.WaitForAssertion(() => Assert.Equal("/transfers", cut.Find("[data-testid=go-to-transfers]").GetAttribute("href")));
+        Assert.True(Assert.Single(_households.Saved).TransfersEnabled);
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public void Others_only_see_transfers_once_they_are_on(bool enabled, int links)
+    {
+        var cut = Render("User", transfersEnabled: enabled);
+
+        Assert.Empty(cut.FindAll("[data-testid=transfers-enabled]"));
+        Assert.Equal(links, cut.FindAll("[data-testid=go-to-transfers]").Count);
+    }
+
+    private IRenderedComponent<AccountsPage> Render(string role, bool transfersEnabled = false)
+    {
+        _context.Services.AddSingleton<IAccountApi>(new FakeAccountApi(role, isOwner: false, transfersEnabled));
         return _context.RenderComponent<AccountsPage>();
     }
 

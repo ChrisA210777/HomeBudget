@@ -47,6 +47,21 @@ public sealed class UserSession(IAccountApi accountApi)
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Updates the cached "Accounts and transfers" setting (BUD-91), so menus show or hide transfers.</summary>
+    public async Task SetTransfersEnabledAsync(Guid householdId, bool enabled)
+    {
+        if (await GetCurrentUserAsync() is not { } user)
+        {
+            return;
+        }
+
+        var households = user.Households
+            .Select(h => h.HouseholdId == householdId ? h with { TransfersEnabled = enabled } : h)
+            .ToList();
+        _currentUser = Task.FromResult<CurrentUserResponse?>(user with { Households = households });
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>Updates the cached household name after a rename, so every page shows the new name.</summary>
     public async Task SetHouseholdNameAsync(Guid householdId, string name)
     {

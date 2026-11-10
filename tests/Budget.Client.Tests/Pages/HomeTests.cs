@@ -345,6 +345,8 @@ public sealed class HomeTests : IDisposable
 
         public Task<bool> SwitchToAsync(Guid householdId) => throw new NotSupportedException();
 
+        public Task<HouseholdResponse> SaveSettingsAsync(Guid householdId, HouseholdSettingsRequest request) => throw new NotSupportedException();
+
         public Task<RenameHouseholdResult> RenameAsync(Guid householdId, RenameHouseholdRequest request)
         {
             Renames.Add((householdId, request));

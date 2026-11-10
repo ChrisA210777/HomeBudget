@@ -12,7 +12,7 @@ using Budget.Shared.People;
 namespace Budget.Client.Tests.TestDoubles;
 
 /// <summary>An account API whose signed-in user is a member of one household with the given role.</summary>
-public sealed class FakeAccountApi(string role = "Admin", bool isOwner = true) : IAccountApi
+public sealed class FakeAccountApi(string role = "Admin", bool isOwner = true, bool transfersEnabled = false) : IAccountApi
 {
     public static readonly Guid HouseholdId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     public static readonly Guid UserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -25,7 +25,7 @@ public sealed class FakeAccountApi(string role = "Admin", bool isOwner = true) :
             UserId,
             "Chris Austin",
             "chris@outlook.com",
-            [new HouseholdMembershipSummary(HouseholdId, "My Household", role, isOwner)],
+            [new HouseholdMembershipSummary(HouseholdId, "My Household", role, isOwner, TransfersEnabled: transfersEnabled)],
             HouseholdId));
 
     public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -223,6 +223,9 @@ public sealed class RecordingHouseholdApi : Budget.Client.Households.IHouseholdA
                 new Dictionary<string, string[]>()));
     }
 
+    public Task<Budget.Shared.Households.HouseholdResponse> SaveSettingsAsync(Guid householdId, Budget.Shared.Households.HouseholdSettingsRequest request) =>
+        throw new NotSupportedException();
+
     public Task<Budget.Shared.Households.HouseholdSetupResponse> GetSetupAsync(Guid householdId) => throw new NotSupportedException();
 
     public Task<bool> SwitchToAsync(Guid householdId)
@@ -300,4 +303,34 @@ public sealed class StaticAccountsApi : Budget.Client.Accounts.IAccountsApi
     public Task<Budget.Client.Accounts.AccountsResult> SetArchivedAsync(Guid householdId, Guid accountId, bool archived) => throw new NotSupportedException();
 
     public Task<Budget.Client.Accounts.AccountsResult> MergeAsync(Guid householdId, Guid accountId, Guid intoAccountId) => throw new NotSupportedException();
+}
+
+/// <summary>Records the household settings saved (BUD-91); nothing else is used by the pages under test.</summary>
+public sealed class SettingsHouseholdApi : Budget.Client.Households.IHouseholdApi
+{
+    public List<Budget.Shared.Households.HouseholdSettingsRequest> Saved { get; } = [];
+
+    public Task<Budget.Shared.Households.HouseholdResponse> SaveSettingsAsync(Guid householdId, Budget.Shared.Households.HouseholdSettingsRequest request)
+    {
+        Saved.Add(request);
+        return Task.FromResult(new Budget.Shared.Households.HouseholdResponse(householdId, "My Household", "GBP", "Admin", true, 1, request.TransfersEnabled));
+    }
+
+    public Task<Budget.Client.Households.CreateHouseholdResult> CreateAsync(Budget.Shared.Households.CreateHouseholdRequest request) => throw new NotSupportedException();
+
+    public Task<bool> SwitchToAsync(Guid householdId) => throw new NotSupportedException();
+
+    public Task<Budget.Client.Households.RenameHouseholdResult> RenameAsync(Guid householdId, Budget.Shared.Households.RenameHouseholdRequest request) => throw new NotSupportedException();
+
+    public Task<IReadOnlyList<Budget.Shared.Households.HouseholdMemberSummary>> GetMembersAsync(Guid householdId) => throw new NotSupportedException();
+
+    public Task<Budget.Shared.Households.HouseholdSetupResponse> GetSetupAsync(Guid householdId) => throw new NotSupportedException();
+
+    public Task<string?> ChangeRoleAsync(Guid householdId, Guid userId, string role) => throw new NotSupportedException();
+
+    public Task<string?> RemoveMemberAsync(Guid householdId, Guid userId) => throw new NotSupportedException();
+
+    public Task DeleteAsync(Guid householdId) => throw new NotSupportedException();
+
+    public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
 }
