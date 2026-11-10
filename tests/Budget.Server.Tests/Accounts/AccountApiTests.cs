@@ -163,6 +163,8 @@ public class AccountApiTests(BudgetApiFactory factory) : IntegrationTestBase(fac
         return id;
     }
 
+    private static Uri Url(string path) => new(path, UriKind.Relative);
+
     private static CreateOutgoingRequest Outgoing(Guid categoryId, string name, string paidFrom) => new()
     {
         Name = name,
