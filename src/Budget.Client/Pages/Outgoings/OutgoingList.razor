@@ -3,6 +3,7 @@
 @using Budget.Client.Income
 @using Budget.Client.Outgoings
 @using Budget.Client.People
+@using Budget.Shared.Account
 @using Budget.Shared.Income
 @using Budget.Shared.Outgoings
 @using Budget.Shared.People
@@ -10,6 +11,7 @@
 @inject IOutgoingApi OutgoingApi
 @inject IPeopleApi PeopleApi
 @inject TimeProvider Clock
+@inject UserSettingsStore Settings
 
 <PageTitle>Outgoings · Home Budget</PageTitle>
 
@@ -135,9 +137,9 @@
                 <MudText Typo="Typo.body2" id="group-by-label">Group by</MudText>
                 <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-labelledby="group-by-label" data-testid="group-toggle">
                     <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byPaidFrom ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_byPaidFrom ? "false" : "true")"
-                               OnClick="() => _byPaidFrom = false" data-testid="group-category">Category</MudButton>
+                               OnClick="() => SetGroupingAsync(false)" data-testid="group-category">Category</MudButton>
                     <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byPaidFrom ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_byPaidFrom ? "true" : "false")"
-                               OnClick="() => _byPaidFrom = true" data-testid="group-paid-from">Paid from</MudButton>
+                               OnClick="() => SetGroupingAsync(true)" data-testid="group-paid-from">Paid from</MudButton>
                 </MudButtonGroup>
             </div>
         </div>
@@ -279,6 +281,11 @@
 
         _category = CategoryQuery;
 
+        // The view and grouping chosen last time, on any device (BUD-87).
+        var settings = await Settings.GetAsync();
+        _months = settings.OutgoingsPeriod == ListPeriodDto.Year ? 12 : 1;
+        _byPaidFrom = settings.OutgoingsGrouping == OutgoingsGroupingDto.PaidFrom;
+
         _household = await Session.GetActiveHouseholdAsync();
         _canEdit = _household is not null && _household.Role != "Viewer";
         _loaded = true;
@@ -319,6 +326,16 @@
         {
             _months = months;
             await LoadAsync();
+            await Settings.UpdateAsync(new UpdateUserSettingsRequest { OutgoingsPeriod = IsYear ? ListPeriodDto.Year : ListPeriodDto.Month });
+        }
+    }
+
+    private async Task SetGroupingAsync(bool byPaidFrom)
+    {
+        if (byPaidFrom != _byPaidFrom)
+        {
+            _byPaidFrom = byPaidFrom;
+            await Settings.UpdateAsync(new UpdateUserSettingsRequest { OutgoingsGrouping = byPaidFrom ? OutgoingsGroupingDto.PaidFrom : OutgoingsGroupingDto.Category });
         }
     }
 

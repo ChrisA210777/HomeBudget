@@ -18,6 +18,8 @@ public static class AccountEndpoints
         app.MapGet(AccountRoutes.ExternalCallback, ExternalCallbackAsync).AllowAnonymous();
         app.MapGet(AccountRoutes.CurrentUser, GetCurrentUserAsync).RequireAuthorization();
         app.MapPut(AccountRoutes.ActiveHousehold, SetActiveHouseholdAsync).RequireAuthorization();
+        app.MapGet(AccountRoutes.Settings, GetSettingsAsync).RequireAuthorization();
+        app.MapPut(AccountRoutes.Settings, UpdateSettingsAsync).RequireAuthorization();
 
         // Anonymous so that signing out always succeeds, even if the session has already expired.
         app.MapPost(AccountRoutes.Logout, LogoutAsync).AllowAnonymous();
@@ -48,6 +50,44 @@ public static class AccountEndpoints
         var updated = await users.UpdateAsync(user);
         return updated.Succeeded ? Results.NoContent() : Results.Problem("Couldn't switch household.");
     }
+
+    /// <summary>The signed-in user's own settings (BUD-87). There's no way to ask for anyone else's.</summary>
+    private static async Task<IResult> GetSettingsAsync(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+    {
+        var user = await users.GetUserAsync(principal);
+        return user is null ? Results.Unauthorized() : Results.Ok(SettingsOf(user));
+    }
+
+    /// <summary>Changes the settings given; the rest stay as they are.</summary>
+    private static async Task<IResult> UpdateSettingsAsync(
+        UpdateUserSettingsRequest request, ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+    {
+        var errors = request.Validate();
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var user = await users.GetUserAsync(principal);
+        if (user is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        user.FirstDayOfWeek = request.FirstDayOfWeek ?? user.FirstDayOfWeek;
+        user.OutgoingsPeriod = request.OutgoingsPeriod is { } outgoingsPeriod ? (ListPeriod)outgoingsPeriod : user.OutgoingsPeriod;
+        user.OutgoingsGrouping = request.OutgoingsGrouping is { } grouping ? (OutgoingsGrouping)grouping : user.OutgoingsGrouping;
+        user.IncomePeriod = request.IncomePeriod is { } incomePeriod ? (ListPeriod)incomePeriod : user.IncomePeriod;
+
+        var updated = await users.UpdateAsync(user);
+        return updated.Succeeded ? Results.Ok(SettingsOf(user)) : Results.Problem("Couldn't save your settings.");
+    }
+
+    private static UserSettings SettingsOf(ApplicationUser user) => new(
+        user.FirstDayOfWeek,
+        (ListPeriodDto)user.OutgoingsPeriod,
+        (OutgoingsGroupingDto)user.OutgoingsGrouping,
+        (ListPeriodDto)user.IncomePeriod);
 
     private static async Task<IReadOnlyList<AuthProvider>> GetProvidersAsync(SignInManager<ApplicationUser> signInManager)
     {

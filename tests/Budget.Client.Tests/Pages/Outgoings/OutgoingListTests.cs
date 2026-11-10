@@ -4,6 +4,7 @@ using Budget.Client.Outgoings;
 using Budget.Client.Pages.Outgoings;
 using Budget.Client.People;
 using Budget.Client.Tests.TestDoubles;
+using Budget.Shared.Account;
 using Budget.Shared.Outgoings;
 using Bunit.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@ public sealed class OutgoingListTests : IDisposable
 
     private readonly TestContext _context = new();
     private readonly FakeOutgoingApi _api = new();
+    private readonly FakeUserSettingsApi _settings = new();
 
     public OutgoingListTests()
     {
@@ -28,6 +30,8 @@ public sealed class OutgoingListTests : IDisposable
         _context.Services.AddSingleton<IPeopleApi>(new StaticPeopleApi());
         _context.Services.AddSingleton<TimeProvider>(new FixedClock(new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero)));
         _context.Services.AddScoped<UserSession>();
+        _context.Services.AddSingleton<IUserSettingsApi>(_settings);
+        _context.Services.AddScoped<UserSettingsStore>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
         UseRole("Admin");
@@ -153,6 +157,35 @@ public sealed class OutgoingListTests : IDisposable
         Assert.Equal("£710.00", Text(cut, "month-total"));
 
         cut.Find("[data-testid=group-category]").Click();
+        Assert.Equal(new[] { "Housing", "Insurance", "Food & household" }, Texts(cut, "category-name"));
+
+        // Each choice is remembered for next time (BUD-87).
+        Assert.Equal(
+            new OutgoingsGroupingDto?[] { OutgoingsGroupingDto.PaidFrom, OutgoingsGroupingDto.Category },
+            _settings.Updates.Select(u => u.OutgoingsGrouping));
+    }
+
+    [Fact]
+    public void Opens_in_the_view_and_grouping_chosen_last_time()
+    {
+        _settings.Saved = UserSettings.Defaults with { OutgoingsPeriod = ListPeriodDto.Year, OutgoingsGrouping = OutgoingsGroupingDto.PaidFrom };
+
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        Assert.Equal(new[] { 12 }, _api.MonthsRequested);
+        Assert.Equal("Nov 2026 – Oct 2027", Text(cut, "month-name"));
+        Assert.Equal(new[] { "Chris current", "Joint bills", "Not set" }, Texts(cut, "paid-from-name"));
+        Assert.Empty(_settings.Updates);
+    }
+
+    [Fact]
+    public void Works_with_the_usual_view_when_settings_cant_be_loaded()
+    {
+        _settings.Offline = true;
+
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        Assert.Equal(new[] { 1 }, _api.MonthsRequested);
         Assert.Equal(new[] { "Housing", "Insurance", "Food & household" }, Texts(cut, "category-name"));
     }
 

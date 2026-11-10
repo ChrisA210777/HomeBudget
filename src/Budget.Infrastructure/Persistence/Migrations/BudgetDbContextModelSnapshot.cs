@@ -737,6 +737,12 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<int>("FirstDayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IncomePeriod")
+                        .HasColumnType("int");
+
                     b.Property<Guid?>("LastActiveHouseholdId")
                         .HasColumnType("uniqueidentifier");
 
@@ -753,6 +759,12 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("OutgoingsGrouping")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OutgoingsPeriod")
+                        .HasColumnType("int");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
