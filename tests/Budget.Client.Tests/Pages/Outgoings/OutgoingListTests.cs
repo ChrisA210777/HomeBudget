@@ -107,19 +107,30 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
-    public async Task Moving_between_months_and_show_all_reload()
+    public void Moving_between_months_and_showing_ones_not_started_or_ended_reload()
     {
+        _api.Inactive = 2;
         var cut = _context.RenderComponent<OutgoingList>();
 
         cut.Find("[data-testid=next-month]").Click();
         cut.Find("[data-testid=previous-month]").Click();
         cut.Find("[data-testid=previous-month]").Click();
-        await cut.InvokeAsync(() => cut.FindComponent<MudSwitch<bool>>().Instance.ValueChanged.InvokeAsync(true));
+        Assert.Contains("2 outgoings haven't started yet or have ended.", cut.Find("[data-testid=inactive]").TextContent, StringComparison.Ordinal);
+        cut.Find("[data-testid=show-all]").Click();
 
         cut.WaitForAssertion(() => Assert.Equal(
             new[] { (2026, 11, false), (2026, 12, false), (2026, 11, false), (2026, 10, false), (2026, 10, true) },
             _api.Requests));
         Assert.Equal("October 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
+        Assert.Equal("Hide", cut.Find("[data-testid=show-all]").TextContent.Trim());
+    }
+
+    [Fact]
+    public void Says_nothing_about_ones_not_started_or_ended_when_there_are_none()
+    {
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        Assert.Empty(cut.FindAll("[data-testid=inactive]"));
     }
 
     [Fact]
@@ -365,6 +376,9 @@ public sealed class OutgoingListTests : IDisposable
 
         public bool Empty { get; set; }
 
+        /// <summary>How many the response says are left out as not started or ended (BUD-99).</summary>
+        public int Inactive { get; set; }
+
         /// <summary>When set, returned instead of the usual outgoings.</summary>
         public IReadOnlyList<OutgoingMonthItem>? Items { get; set; }
 
@@ -380,7 +394,7 @@ public sealed class OutgoingListTests : IDisposable
                     personId: StaticPeopleApi.ChrisId, personName: "Chris Austin", comingUp: true, paidFrom: "Chris current"),
                 Outgoing("Food shopping", FoodId, "Food & household", 90, OutgoingPriorityDto.Preferred, 120m, PaymentUnitDto.Week, 520m, kind: OutgoingKindDto.Allowance),
             ]);
-            return Task.FromResult(new OutgoingMonthResponse(year, month, items, "GBP", months));
+            return Task.FromResult(new OutgoingMonthResponse(year, month, items, "GBP", months, Inactive));
         }
 
         public Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request) => throw new NotSupportedException();
