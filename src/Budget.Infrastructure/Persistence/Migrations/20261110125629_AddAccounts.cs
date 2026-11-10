@@ -91,6 +91,7 @@ namespace Budget.Infrastructure.Persistence.Migrations
             // Each household's "Paid from" names become accounts (ADR-014, BUD-89), ignoring case and spaces at
             // either end, and "Y (X Pot)" becomes pot X in account Y (the last bracket, as AccountNames.Parse reads it).
             // SELECT INTO keeps the column's collation, so the comparisons ignore case like the rest of the database.
+            // Where spellings differ only in case, the binary minimum keeps the one with capitals, e.g. "Joint bills".
             migrationBuilder.Sql("""
                 SELECT DISTINCT o.HouseholdId, LTRIM(RTRIM(o.PaidFrom)) AS Name
                 INTO #Names
@@ -105,12 +106,12 @@ namespace Budget.Infrastructure.Persistence.Migrations
                 CROSS APPLY (SELECT LEN(n.Name) - CHARINDEX(N'(', REVERSE(n.Name)) + 1 AS Position) b;
 
                 INSERT INTO Accounts (Id, HouseholdId, Name, Provider, OwnerPersonId, ParentAccountId, IsArchived, CreatedAt, CreatedBy, ModifiedAt, ModifiedBy)
-                SELECT NEWID(), HouseholdId, MIN(AccountName), NULL, NULL, NULL, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
+                SELECT NEWID(), HouseholdId, MIN(AccountName COLLATE Latin1_General_BIN2), NULL, NULL, NULL, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
                 FROM #PaidFrom
                 GROUP BY HouseholdId, AccountName;
 
                 INSERT INTO Accounts (Id, HouseholdId, Name, Provider, OwnerPersonId, ParentAccountId, IsArchived, CreatedAt, CreatedBy, ModifiedAt, ModifiedBy)
-                SELECT NEWID(), p.HouseholdId, MIN(p.PotName), NULL, NULL, a.Id, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
+                SELECT NEWID(), p.HouseholdId, MIN(p.PotName COLLATE Latin1_General_BIN2), NULL, NULL, a.Id, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
                 FROM #PaidFrom p
                 JOIN Accounts a ON a.HouseholdId = p.HouseholdId AND a.ParentAccountId IS NULL AND a.Name = p.AccountName
                 WHERE p.PotName IS NOT NULL AND p.PotName <> N''

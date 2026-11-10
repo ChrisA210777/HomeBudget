@@ -134,9 +134,16 @@ public class AccountApiTests(BudgetApiFactory factory) : IntegrationTestBase(fac
     {
         await AssertMinimumRoleAsync(HttpMethod.Get, HouseholdAccountRoutes.Accounts, HouseholdRole.Viewer);
         await AssertMinimumRoleAsync(HttpMethod.Post, HouseholdAccountRoutes.Accounts, HouseholdRole.User, () => new SaveAccountRequest { Name = $"Account {Guid.NewGuid():N}" });
-        await AssertMinimumRoleAsync(HttpMethod.Post, hh => HouseholdAccountRoutes.Merge(hh, Guid.NewGuid()), HouseholdRole.Admin, () => new MergeAccountRequest { IntoAccountId = Guid.NewGuid() });
         await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, HouseholdAccountRoutes.Accounts);
         await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Post, HouseholdAccountRoutes.Accounts, new SaveAccountRequest { Name = "Theirs" });
+
+        // Merging is for Admins only.
+        var (owner, householdId) = await OwnerAsync();
+        var from = await AddAsync(owner, householdId, new SaveAccountRequest { Name = "From" });
+        var into = await AddAsync(owner, householdId, new SaveAccountRequest { Name = "Into" });
+        using var user = CreateClient(signedInAs: await AddMemberAsync(householdId, HouseholdRole.User));
+        using var refused = await user.PostAsJsonAsync(Url(HouseholdAccountRoutes.Merge(householdId, from.Id)), new MergeAccountRequest { IntoAccountId = into.Id });
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
     }
 
     private async Task<(HttpClient Client, Guid HouseholdId)> OwnerAsync()
