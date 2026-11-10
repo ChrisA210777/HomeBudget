@@ -118,6 +118,45 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
+    public void The_year_view_asks_for_12_months_from_the_shown_month_and_says_so()
+    {
+        var cut = _context.RenderComponent<OutgoingList>();
+        Assert.Equal("true", cut.Find("[data-testid=show-month]").GetAttribute("aria-pressed"));
+
+        cut.Find("[data-testid=show-year]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(new[] { 1, 12 }, _api.MonthsRequested));
+        Assert.Equal((2026, 11, false), _api.Requests[^1]);
+        Assert.Equal("true", cut.Find("[data-testid=show-year]").GetAttribute("aria-pressed"));
+        Assert.Equal("Nov 2026 – Oct 2027", Text(cut, "month-name"));
+        Assert.All(Texts(cut, "outgoing-period"), text => Assert.Equal("over 12 months", text));
+        Assert.Equal("Start a month later", cut.Find("[data-testid=next-month]").GetAttribute("aria-label"));
+
+        // The arrows move the start month a month at a time.
+        cut.Find("[data-testid=next-month]").Click();
+        cut.WaitForAssertion(() => Assert.Equal("Dec 2026 – Nov 2027", Text(cut, "month-name")));
+        Assert.Equal(((2026, 12, false), 12), (_api.Requests[^1], _api.MonthsRequested[^1]));
+    }
+
+    [Fact]
+    public void Outgoings_can_be_grouped_by_the_account_they_are_paid_from()
+    {
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        cut.Find("[data-testid=group-paid-from]").Click();
+
+        // By name, ignoring case and spaces, with "Not set" last.
+        Assert.Equal(new[] { "Chris current", "Joint bills", "Not set" }, Texts(cut, "paid-from-name"));
+        Assert.Empty(cut.FindAll("[data-testid=category-group]"));
+        Assert.Equal(new[] { "£40.00", "£150.00", "£520.00" }, Texts(cut, "category-subtotal"));
+        Assert.Equal(new[] { "Car insurance", "Council tax", "Mortgage", "Food shopping" }, Texts(cut, "outgoing-name"));
+        Assert.Equal("£710.00", Text(cut, "month-total"));
+
+        cut.Find("[data-testid=group-category]").Click();
+        Assert.Equal(new[] { "Housing", "Insurance", "Food & household" }, Texts(cut, "category-name"));
+    }
+
+    [Fact]
     public void A_month_and_category_can_come_from_the_link()
     {
         _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo($"/outgoings?month=2027-01&category={HousingId}");
@@ -172,28 +211,31 @@ public sealed class OutgoingListTests : IDisposable
 
     private static OutgoingMonthItem Outgoing(
         string name, Guid categoryId, string category, int sortOrder, OutgoingPriorityDto priority, decimal amount, PaymentUnitDto unit, decimal monthly,
-        OutgoingKindDto kind = OutgoingKindDto.Bill, Guid? personId = null, string? personName = null, string[]? notes = null, bool comingUp = false) =>
+        OutgoingKindDto kind = OutgoingKindDto.Bill, Guid? personId = null, string? personName = null, string[]? notes = null, bool comingUp = false, string? paidFrom = null) =>
         new(Guid.NewGuid(), name, kind, priority, categoryId, category, sortOrder, personId, personName, amount, 1, unit, monthly, monthly,
-            notes ?? [], new DateOnly(2026, 1, 1), null, comingUp ? new DateOnly(2026, 11, 15) : null, comingUp);
+            notes ?? [], new DateOnly(2026, 1, 1), null, comingUp ? new DateOnly(2026, 11, 15) : null, comingUp, PaidFrom: paidFrom);
 
     private sealed class FakeOutgoingApi : IOutgoingApi
     {
         public List<(int Year, int Month, bool All)> Requests { get; } = [];
 
+        public List<int> MonthsRequested { get; } = [];
+
         public bool Empty { get; set; }
 
-        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all)
+        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1)
         {
             Requests.Add((year, month, all));
+            MonthsRequested.Add(months);
             IReadOnlyList<OutgoingMonthItem> items = Empty ? [] :
             [
-                Outgoing("Council tax", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 180m, PaymentUnitDto.Month, 150m, notes: ["Rises to £180.00 a month from 16 Nov 2026"]),
-                Outgoing("Mortgage", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 900m, PaymentUnitDto.Month, 0m, notes: ["Paused from 1 Nov 2026 until 1 Dec 2026"]),
+                Outgoing("Council tax", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 180m, PaymentUnitDto.Month, 150m, notes: ["Rises to £180.00 a month from 16 Nov 2026"], paidFrom: "Joint bills"),
+                Outgoing("Mortgage", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 900m, PaymentUnitDto.Month, 0m, notes: ["Paused from 1 Nov 2026 until 1 Dec 2026"], paidFrom: " joint BILLS "),
                 Outgoing("Car insurance", InsuranceId, "Insurance", 40, OutgoingPriorityDto.Essential, 480m, PaymentUnitDto.Year, 40m,
-                    personId: StaticPeopleApi.ChrisId, personName: "Chris Austin", comingUp: true),
+                    personId: StaticPeopleApi.ChrisId, personName: "Chris Austin", comingUp: true, paidFrom: "Chris current"),
                 Outgoing("Food shopping", FoodId, "Food & household", 90, OutgoingPriorityDto.Preferred, 120m, PaymentUnitDto.Week, 520m, kind: OutgoingKindDto.Allowance),
             ];
-            return Task.FromResult(new OutgoingMonthResponse(year, month, items, "GBP"));
+            return Task.FromResult(new OutgoingMonthResponse(year, month, items, "GBP", months));
         }
 
         public Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request) => throw new NotSupportedException();

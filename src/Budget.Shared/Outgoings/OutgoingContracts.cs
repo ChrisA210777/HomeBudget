@@ -69,8 +69,12 @@ public static class OutgoingRoutes
     public static string Outgoings(Guid householdId) => $"/api/households/{householdId}/outgoings";
 
     /// <summary>GET: the outgoings for a month. <paramref name="all"/> includes ones not started or already ended.</summary>
-    public static string ForMonth(Guid householdId, int year, int month, bool all = false) =>
-        $"{Outgoings(householdId)}?month={year:D4}-{month:D2}{(all ? "&all=true" : string.Empty)}";
+    /// <summary>
+    /// GET: the outgoings for a month, or with <paramref name="months"/> = 12 for the 12 months starting
+    /// with it (BUD-80, ADR-013).
+    /// </summary>
+    public static string ForMonth(Guid householdId, int year, int month, bool all = false, int months = 1) =>
+        $"{Outgoings(householdId)}?month={year:D4}-{month:D2}{(all ? "&all=true" : string.Empty)}{(months == 1 ? string.Empty : $"&months={months}")}";
 
     /// <summary>GET: details and history. PUT: edit details. DELETE: delete the outgoing.</summary>
     public static string Outgoing(Guid householdId, Guid outgoingId) => $"{Outgoings(householdId)}/{outgoingId}";
@@ -321,7 +325,11 @@ public sealed record OutgoingCreatedResponse(Guid Id, string Name, decimal Month
 /// The household's outgoings for one month (BUD-50). Totals aren't included because the page
 /// filters the items and works the totals out with <see cref="OutgoingTotals"/>.
 /// </summary>
-public sealed record OutgoingMonthResponse(int Year, int Month, IReadOnlyList<OutgoingMonthItem> Items, string CurrencyCode);
+/// <summary>
+/// The outgoings for <see cref="Months"/> months starting with <see cref="Year"/>-<see cref="Month"/>: 1 for a
+/// month, or 12 for a year (BUD-80). Each item's amounts are then the total budget for those months.
+/// </summary>
+public sealed record OutgoingMonthResponse(int Year, int Month, IReadOnlyList<OutgoingMonthItem> Items, string CurrencyCode, int Months = 1);
 
 /// <summary>
 /// One outgoing in a month.
@@ -330,6 +338,9 @@ public sealed record OutgoingMonthResponse(int Year, int Month, IReadOnlyList<Ou
 /// <para><see cref="Amount"/>, <see cref="Every"/> and <see cref="Unit"/> are what's actually paid, as at the end of the month
 /// (or the first amount, if it hasn't started).</para>
 /// <para><see cref="Notes"/> explain why the month differs, e.g. "Paused 1 Nov – 14 Nov".</para>
+/// <para>For a year (<see cref="OutgoingMonthResponse.Months"/> = 12), <see cref="MonthlyAmount"/> and
+/// <see cref="ExactMonthlyAmount"/> are the sum of the 12 monthly budget amounts (ADR-013), and the
+/// paid amount is as at the end of the year.</para>
 /// </summary>
 public sealed record OutgoingMonthItem(
     Guid Id,
@@ -352,7 +363,8 @@ public sealed record OutgoingMonthItem(
     DateOnly? NextRenewal,
     bool IsComingUp,
     bool AutoRenews = false,
-    string CategoryIcon = CategoryIcons.Default);
+    string CategoryIcon = CategoryIcons.Default,
+    string? PaidFrom = null);
 
 /// <summary>Totals for a set of outgoings, each rounded once from the exact amounts.</summary>
 public sealed record OutgoingTotals(decimal Total, decimal Essential, decimal Preferred, decimal Optional)

@@ -69,6 +69,8 @@ public sealed class FakeIncomeApi : IIncomeApi
 
     public List<(int Year, int Month, bool All)> MonthCalls { get; } = [];
 
+    public List<int> MonthsRequested { get; } = [];
+
     /// <summary>Each change as (operation, entry id, request).</summary>
     public List<(string Operation, Guid? EntryId, object Request)> Calls { get; } = [];
 
@@ -76,10 +78,11 @@ public sealed class FakeIncomeApi : IIncomeApi
 
     public int GetCalls { get; private set; }
 
-    public Task<IncomeMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all)
+    public Task<IncomeMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1)
     {
         MonthCalls.Add((year, month, all));
-        return Task.FromResult(Month with { Year = year, Month = month });
+        MonthsRequested.Add(months);
+        return Task.FromResult(Month with { Year = year, Month = month, Months = months });
     }
 
     public Task<IncomeStreamDetails?> GetAsync(Guid householdId, Guid incomeStreamId)

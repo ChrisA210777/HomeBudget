@@ -17,7 +17,7 @@ public sealed record ApiResult<T>(T? Value, IReadOnlyDictionary<string, string[]
 
 public interface IIncomeApi
 {
-    Task<IncomeMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all);
+    Task<IncomeMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1);
 
     /// <returns>The income, or <c>null</c> if it doesn't exist (any more).</returns>
     Task<IncomeStreamDetails?> GetAsync(Guid householdId, Guid incomeStreamId);
@@ -43,8 +43,8 @@ public interface IIncomeApi
 
 public sealed class IncomeApi(HttpClient http) : IIncomeApi
 {
-    public async Task<IncomeMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) =>
-        (await http.GetFromJsonAsync<IncomeMonthResponse>(Relative(IncomeRoutes.ForMonth(householdId, year, month, all))))!;
+    public async Task<IncomeMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1) =>
+        (await http.GetFromJsonAsync<IncomeMonthResponse>(Relative(IncomeRoutes.ForMonth(householdId, year, month, all, months))))!;
 
     public async Task<IncomeStreamDetails?> GetAsync(Guid householdId, Guid incomeStreamId)
     {

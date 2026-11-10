@@ -37,15 +37,24 @@
         </div>
 
         <div class="d-flex align-center justify-space-between mb-2">
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
-            <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@(IsYear ? "Start a month earlier" : "Previous month")" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
+            <MudText Typo="Typo.h6" data-testid="month-name">@PeriodName</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@(IsYear ? "Start a month later" : "Next month")" OnClick="() => MoveAsync(1)" data-testid="next-month" />
         </div>
 
         @if (_data is not null)
         {
             <MudPaper Class="pa-4 mb-3" Elevation="1">
-                <MudText Typo="Typo.overline">@(IsFiltered ? "Matching outgoings this month" : "Outgoings this month")</MudText>
+                <div class="d-flex align-center justify-space-between gap-2">
+                    <MudText Typo="Typo.overline">@(IsFiltered ? "Matching outgoings" : "Outgoings") @(IsYear ? "over 12 months" : "this month")</MudText>
+                    @* Month or year (BUD-80): a year is the 12 monthly budget amounts added up (ADR-013). *@
+                    <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show amounts for" data-testid="period-toggle">
+                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(IsYear ? Variant.Outlined : Variant.Filled)" aria-pressed="@(IsYear ? "false" : "true")"
+                                   OnClick="() => SetMonthsAsync(1)" data-testid="show-month">Month</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(IsYear ? Variant.Filled : Variant.Outlined)" aria-pressed="@(IsYear ? "true" : "false")"
+                                   OnClick="() => SetMonthsAsync(12)" data-testid="show-year">Year</MudButton>
+                    </MudButtonGroup>
+                </div>
                 <MudText Typo="Typo.h4" data-testid="month-total">@Format(totals.Total)</MudText>
                 <div class="d-flex flex-wrap gap-4 mt-2">
                     <div>
@@ -120,17 +129,28 @@
     }
     else
     {
-        <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show all, including ones not started or ended" data-testid="show-all" />
+        <div class="d-flex align-center flex-wrap gap-x-4 gap-y-1">
+            <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show all, including ones not started or ended" data-testid="show-all" />
+            <div class="d-flex align-center gap-2">
+                <MudText Typo="Typo.body2" id="group-by-label">Group by</MudText>
+                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-labelledby="group-by-label" data-testid="group-toggle">
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byPaidFrom ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_byPaidFrom ? "false" : "true")"
+                               OnClick="() => _byPaidFrom = false" data-testid="group-category">Category</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byPaidFrom ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_byPaidFrom ? "true" : "false")"
+                               OnClick="() => _byPaidFrom = true" data-testid="group-paid-from">Paid from</MudButton>
+                </MudButtonGroup>
+            </div>
+        </div>
 
         @if (_data.Items.Count == 0)
         {
             <MudPaper Class="pa-6 mt-2 text-center" Elevation="0" Outlined="true" data-testid="outgoings-empty">
                 <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Large" Color="Color.Secondary" />
-                <MudText Typo="Typo.h6" Class="mt-2">No outgoings this month</MudText>
+                <MudText Typo="Typo.h6" Class="mt-2">No outgoings @(IsYear ? "in these 12 months" : "this month")</MudText>
                 <MudText Typo="Typo.body2">
                     @(_canEdit
                         ? "Add your bills, savings and spending allowances, such as council tax, a holiday fund or food shopping, to see where the money goes."
-                        : "Nobody has added any outgoings for this month.")
+                        : IsYear ? "Nobody has added any outgoings for these 12 months." : "Nobody has added any outgoings for this month.")
                 </MudText>
                 @if (_canEdit)
                 {
@@ -146,14 +166,22 @@
             </MudPaper>
         }
 
-        @foreach (var group in shown.GroupBy(i => i.CategoryId))
+        @foreach (var group in Groups(shown))
         {
-            var items = group.ToList();
-            <section class="mt-4" data-testid="category-group" aria-label="@items[0].CategoryName">
+            var items = group.Items;
+            <section class="mt-4" data-testid="@(_byPaidFrom ? "paid-from-group" : "category-group")" aria-label="@group.Name">
                 <div class="d-flex align-baseline justify-space-between mb-1 category-heading">
                     <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2" style="font-weight: 600">
-                        <MudIcon Icon="@CategoryIconSvg.For(items[0].CategoryIcon)" Size="Size.Small" Color="Color.Primary" aria-hidden="true" data-testid="category-icon" data-icon="@items[0].CategoryIcon" />
-                        <span data-testid="category-name">@items[0].CategoryName</span>
+                        @if (_byPaidFrom)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
+                            <span data-testid="paid-from-name">@group.Name</span>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@CategoryIconSvg.For(items[0].CategoryIcon)" Size="Size.Small" Color="Color.Primary" aria-hidden="true" data-testid="category-icon" data-icon="@items[0].CategoryIcon" />
+                            <span data-testid="category-name">@group.Name</span>
+                        }
                     </h2>
                     <MudText Typo="Typo.subtitle1" data-testid="category-subtotal">@Format(OutgoingTotals.Subtotal(items))</MudText>
                 </div>
@@ -167,7 +195,7 @@
                                         <MudLink Href="@($"/outgoings/{item.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudLink>
                                         <div class="d-flex flex-wrap align-center gap-1 mt-1">
                                             <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="PriorityColour(item.Priority)" Class="ma-0" data-testid="outgoing-priority">@item.Priority</MudChip>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)@(_byPaidFrom ? $" · {item.CategoryName}" : string.Empty)</MudText>
                                         </div>
                                         <MudText Typo="Typo.caption" Class="d-block mt-1" data-testid="outgoing-paid">@Paid(item)</MudText>
                                         @foreach (var note in item.Notes)
@@ -184,7 +212,7 @@
                                     </div>
                                     <div class="d-flex flex-column align-end text-right">
                                         <MudText Typo="Typo.subtitle1" data-testid="outgoing-monthly">@Format(item.MonthlyAmount)</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="outgoing-period">a month</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="outgoing-period">@(IsYear ? "over 12 months" : "a month")</MudText>
                                     </div>
                                 </div>
                             </li>
@@ -216,6 +244,20 @@
     private bool _loaded;
     private int _year;
     private int _month;
+
+    /// <summary>1 for a month, 12 for the 12 months starting with it (BUD-80).</summary>
+    private int _months = 1;
+    private bool _byPaidFrom;
+
+    private bool IsYear => _months == 12;
+
+    private string PeriodName => IsYear
+        ? $"{ShortMonth(_year, _month)} – {ShortMonth(new DateOnly(_year, _month, 1).AddMonths(11))}"
+        : IncomeDates.MonthName(_year, _month);
+
+    private static string ShortMonth(int year, int month) => ShortMonth(new DateOnly(year, month, 1));
+
+    private static string ShortMonth(DateOnly date) => date.ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
     private Guid? _category;
     private OutgoingKindDto? _kind;
@@ -252,7 +294,7 @@
     {
         if (_household is not null)
         {
-            _data = await OutgoingApi.GetMonthAsync(_household.HouseholdId, _year, _month, _all);
+            _data = await OutgoingApi.GetMonthAsync(_household.HouseholdId, _year, _month, _all, _months);
         }
     }
 
@@ -270,6 +312,32 @@
         (_year, _month) = (next.Year, next.Month);
         await LoadAsync();
     }
+
+    private async Task SetMonthsAsync(int months)
+    {
+        if (months != _months)
+        {
+            _months = months;
+            await LoadAsync();
+        }
+    }
+
+    /// <summary>Accounts with no Paid From go last, as "Not set".</summary>
+    internal const string PaidFromNotSet = "Not set";
+
+    private sealed record ItemGroup(string Name, List<OutgoingMonthItem> Items);
+
+    /// <summary>
+    /// Category groups keep the server's order (the household's category order); Paid From groups are by
+    /// name, ignoring case and spaces at either end, with "Not set" last.
+    /// </summary>
+    private IEnumerable<ItemGroup> Groups(List<OutgoingMonthItem> items) => _byPaidFrom
+        ? items
+            .GroupBy(i => string.IsNullOrWhiteSpace(i.PaidFrom) ? null : i.PaidFrom.Trim(), StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(g => g.Key is null)
+            .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
+            .Select(g => new ItemGroup(g.Key ?? PaidFromNotSet, g.OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase).ToList()))
+        : items.GroupBy(i => i.CategoryId).Select(g => new ItemGroup(g.First().CategoryName, g.ToList()));
 
     private async Task ToggleAllAsync(bool value)
     {

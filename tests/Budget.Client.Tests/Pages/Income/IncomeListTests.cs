@@ -45,6 +45,23 @@ public sealed class IncomeListTests : IncomeTestContext
     }
 
     [Fact]
+    public void The_year_view_asks_for_12_months_and_shows_no_usual_amount()
+    {
+        Api.Month = new IncomeMonthResponse(2026, 11,
+        [
+            new(Guid.NewGuid(), "Chris – salary", Guid.NewGuid(), "Chris Austin", 39450m, 3300m, 3300m, 1, PaymentUnitDto.Month, [], new DateOnly(2026, 1, 1), null),
+        ], 39450m, "GBP");
+        var cut = Context.RenderComponent<IncomeList>();
+
+        cut.Find("[data-testid=show-year]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(new[] { 1, 12 }, Api.MonthsRequested));
+        Assert.Equal("Nov 2026 – Oct 2027", cut.Find("[data-testid=month-name]").TextContent.Trim());
+        Assert.Equal("over 12 months", cut.Find("[data-testid=income-period]").TextContent.Trim());
+        Assert.Empty(cut.FindAll("[data-testid=income-usual]"));
+    }
+
+    [Fact]
     public void Moving_between_months_loads_that_month()
     {
         var cut = Context.RenderComponent<IncomeList>();

@@ -330,7 +330,7 @@ public sealed class OutgoingDetailTests : IDisposable
 
         public Task<ApiResult<OutgoingDetailsResponse>> UpdateAsync(Guid householdId, Guid outgoingId, UpdateOutgoingRequest request) => throw new NotSupportedException();
 
-        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all) => throw new NotSupportedException();
+        public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1) => throw new NotSupportedException();
 
         public Task<ApiResult<OutgoingCreatedResponse>> CreateAsync(Guid householdId, CreateOutgoingRequest request) => throw new NotSupportedException();
 

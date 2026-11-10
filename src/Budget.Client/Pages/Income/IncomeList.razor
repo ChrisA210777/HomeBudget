@@ -24,15 +24,24 @@
         </div>
 
         <div class="d-flex align-center justify-space-between mb-2">
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
-            <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@(IsYear ? "Start a month earlier" : "Previous month")" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
+            <MudText Typo="Typo.h6" data-testid="month-name">@PeriodName</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@(IsYear ? "Start a month later" : "Next month")" OnClick="() => MoveAsync(1)" data-testid="next-month" />
         </div>
 
         @if (_data is not null)
         {
             <MudPaper Class="pa-4 mb-3" Elevation="1">
-                <MudText Typo="Typo.overline">Take-home income this month</MudText>
+                <div class="d-flex align-center justify-space-between gap-2">
+                    <MudText Typo="Typo.overline">Take-home income @(IsYear ? "over 12 months" : "this month")</MudText>
+                    @* Month or year, as on Outgoings (BUD-80). *@
+                    <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show amounts for" data-testid="period-toggle">
+                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(IsYear ? Variant.Outlined : Variant.Filled)" aria-pressed="@(IsYear ? "false" : "true")"
+                                   OnClick="() => SetMonthsAsync(1)" data-testid="show-month">Month</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(IsYear ? Variant.Filled : Variant.Outlined)" aria-pressed="@(IsYear ? "true" : "false")"
+                                   OnClick="() => SetMonthsAsync(12)" data-testid="show-year">Year</MudButton>
+                    </MudButtonGroup>
+                </div>
                 <MudText Typo="Typo.h4" data-testid="month-total">@Money.Format(_data.Total, _data.CurrencyCode)</MudText>
             </MudPaper>
         }
@@ -78,7 +87,11 @@
                         </div>
                         <div class="text-right">
                             <MudText Typo="Typo.h6" data-testid="income-amount">@Money.Format(item.AmountForMonth, _data.CurrencyCode)</MudText>
-                            @if (item.UsualAmount is { } usual && usual != item.AmountForMonth)
+                            @if (IsYear)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="income-period">over 12 months</MudText>
+                            }
+                            else if (item.UsualAmount is { } usual && usual != item.AmountForMonth)
                             {
                                 <MudText Typo="Typo.caption" data-testid="income-usual">usually @Money.Format(usual, _data.CurrencyCode)</MudText>
                             }
@@ -103,6 +116,17 @@
     private int _year;
     private int _month;
 
+    /// <summary>1 for a month, 12 for the 12 months starting with it (BUD-80).</summary>
+    private int _months = 1;
+
+    private bool IsYear => _months == 12;
+
+    private string PeriodName => IsYear
+        ? $"{ShortMonth(new DateOnly(_year, _month, 1))} – {ShortMonth(new DateOnly(_year, _month, 1).AddMonths(11))}"
+        : IncomeDates.MonthName(_year, _month);
+
+    private static string ShortMonth(DateOnly date) => date.ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
     protected override async Task OnInitializedAsync()
     {
         var today = Clock.GetLocalNow();
@@ -118,7 +142,7 @@
     {
         if (_household is not null)
         {
-            _data = await IncomeApi.GetMonthAsync(_household.HouseholdId, _year, _month, _all);
+            _data = await IncomeApi.GetMonthAsync(_household.HouseholdId, _year, _month, _all, _months);
         }
     }
 
@@ -127,6 +151,15 @@
         var next = new DateOnly(_year, _month, 1).AddMonths(months);
         (_year, _month) = (next.Year, next.Month);
         await LoadAsync();
+    }
+
+    private async Task SetMonthsAsync(int months)
+    {
+        if (months != _months)
+        {
+            _months = months;
+            await LoadAsync();
+        }
     }
 
     private async Task ToggleAllAsync(bool value)

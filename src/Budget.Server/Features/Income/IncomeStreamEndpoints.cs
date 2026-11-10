@@ -43,8 +43,14 @@ public static class IncomeStreamEndpoints
 
     // ---- Reading ----
 
-    private static async Task<IResult> GetMonthAsync(Guid householdId, string? month, bool? all, BudgetDbContext db, TimeProvider time)
+    private static async Task<IResult> GetMonthAsync(Guid householdId, string? month, bool? all, int? months, BudgetDbContext db, TimeProvider time)
     {
+        if (months is not (null or 1 or 12))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["months"] = ["Ask for 1 month or 12."] });
+        }
+
+        var count = months ?? 1;
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
         int year, monthNumber;
         if (string.IsNullOrEmpty(month))
@@ -61,7 +67,8 @@ public static class IncomeStreamEndpoints
         }
 
         var first = new DateOnly(year, monthNumber, 1);
-        var last = first.AddMonths(1).AddDays(-1);
+        var last = first.AddMonths(count).AddDays(-1);
+        var monthsCovered = Enumerable.Range(0, count).Select(i => first.AddMonths(i)).ToList();
 
         var streams = await LoadStreams(db, includeCorrections: false).AsNoTracking().ToListAsync();
         var people = await db.People.ToDictionaryAsync(p => p.Id, p => p.DisplayName);
@@ -69,7 +76,7 @@ public static class IncomeStreamEndpoints
 
         var shown = streams
             .Where(s => all == true || (s.StartsOn <= last && !(s.EndsOn <= first)))
-            .Select(s => new { Stream = s, Amount = s.AmountForMonth(year, monthNumber) })
+            .Select(s => new { Stream = s, Amount = monthsCovered.Sum(m => s.AmountForMonth(m.Year, m.Month)) })
             .OrderBy(x => people.GetValueOrDefault(x.Stream.PersonId), StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(x => x.Stream.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
@@ -91,7 +98,7 @@ public static class IncomeStreamEndpoints
 
         // Rounded once, from the unrounded amounts.
         var total = IncomeTimeline.RoundForDisplay(shown.Sum(x => x.Amount));
-        return Results.Ok(new IncomeMonthResponse(year, monthNumber, items, total, currency));
+        return Results.Ok(new IncomeMonthResponse(year, monthNumber, items, total, currency, count));
     }
 
     private static async Task<IResult> GetDetailsAsync(Guid householdId, Guid incomeStreamId, BudgetDbContext db, TimeProvider time)

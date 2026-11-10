@@ -354,6 +354,52 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     }
 
     [Fact]
+    public async Task A_year_adds_up_the_12_monthly_budget_amounts_and_includes_paid_from()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var housing = await CategoryIdAsync(householdId, "Housing");
+        var leisure = await CategoryIdAsync(householdId, "Leisure & memberships");
+
+        var mortgage = Outgoing.Create(householdId, Details("Mortgage", housing, new DateOnly(2026, 1, 1)) with { PaidFrom = "Joint bills" }, 900m, PaymentSchedule.Monthly, "Start");
+        mortgage.PauseFor(new DateOnly(2026, 11, 1), payments: 1, "Payment holiday");
+        var councilTax = Outgoing.Create(householdId, Details("Council tax", housing, new DateOnly(2026, 4, 1)), 150m, PaymentSchedule.Monthly, "Start");
+        councilTax.ChangeAmount(new DateOnly(2026, 12, 1), 180m, PaymentSchedule.Monthly, "New band");
+        var gym = Outgoing.Create(householdId, Details("Gym", leisure, new DateOnly(2027, 1, 1)), 30m, PaymentSchedule.Monthly, "Start");
+        var ended = Outgoing.Create(householdId, Details("Old phone", leisure, new DateOnly(2025, 1, 1)), 20m, PaymentSchedule.Monthly, "Start");
+        ended.End(new DateOnly(2026, 6, 1), "Cancelled");
+        await ExecuteDbContextAsync(async db =>
+        {
+            db.Outgoings.AddRange(mortgage, councilTax, gym, ended);
+            await db.SaveChangesAsync();
+        });
+        using var client = CreateClient(signedInAs: ownerId);
+
+        var year = (await client.GetFromJsonAsync<OutgoingMonthResponse>(Url(OutgoingRoutes.ForMonth(householdId, 2026, 11, months: 12))))!;
+
+        Assert.Equal((2026, 11, 12), (year.Year, year.Month, year.Months));
+        Assert.Equal(new[] { "Council tax", "Mortgage", "Gym" }, year.Items.Select(i => i.Name));
+        // November at £150, then 11 months at £180.
+        Assert.Equal((2130m, 180m), (year.Items[0].MonthlyAmount, year.Items[0].Amount));
+        Assert.Equal(new[] { "Rises to £180.00 a month from 1 Dec 2026" }, year.Items[0].Notes);
+        // November's payment is skipped, then 11 months.
+        Assert.Equal((9900m, "Joint bills"), (year.Items[1].MonthlyAmount, year.Items[1].PaidFrom));
+        // Starts in January, so 10 months.
+        Assert.Equal((300m, (string?)null), (year.Items[2].MonthlyAmount, year.Items[2].PaidFrom));
+        Assert.Equal(12330m, OutgoingTotals.For(year.Items).Total);
+    }
+
+    [Fact]
+    public async Task Only_a_month_or_a_year_can_be_asked_for()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        using var client = CreateClient(signedInAs: ownerId);
+
+        using var response = await client.GetAsync(Url(OutgoingRoutes.ForMonth(householdId, 2026, 11, months: 6)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task A_bad_month_is_rejected()
     {
         var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
