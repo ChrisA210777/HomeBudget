@@ -151,7 +151,8 @@ public sealed record UpcomingPayment(
     int CategorySortOrder,
     string CategoryIcon,
     string? PaidFrom,
-    string? PersonName);
+    string? PersonName,
+    Guid? AccountId = null);
 
 public sealed record CreateOutgoingRequest
 {

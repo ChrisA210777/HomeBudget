@@ -390,22 +390,7 @@
     /// The account an outgoing is paid from, at account level: a pot counts as its account, as budgeting is done by
     /// account and pots just keep money apart (BUD-95). Falls back to the name if the account isn't in the list.
     /// </summary>
-    private (Guid? Id, string? Name, string? Pot) AccountOf(OutgoingMonthItem item)
-    {
-        if (item.AccountId is { } id && _accounts.FirstOrDefault(a => a.Id == id) is { } account)
-        {
-            var parent = account.ParentAccountId is { } parentId ? _accounts.FirstOrDefault(a => a.Id == parentId) : null;
-            return parent is null ? (account.Id, account.Name, null) : (parent.Id, parent.Name, account.Name);
-        }
-
-        if (string.IsNullOrWhiteSpace(item.PaidFrom))
-        {
-            return (null, null, null);
-        }
-
-        var parts = item.PaidFrom.Split('›', 2);
-        return (item.AccountId, parts[0].Trim(), parts.Length > 1 ? parts[1].Trim() : null);
-    }
+    private (Guid? Id, string? Name, string? Pot) AccountOf(OutgoingMonthItem item) => AccountLevel.Of(item.AccountId, item.PaidFrom, _accounts);
 
     /// <summary>Accounts with no Paid From go last, as "Not set".</summary>
     internal const string PaidFromNotSet = "Not set";
