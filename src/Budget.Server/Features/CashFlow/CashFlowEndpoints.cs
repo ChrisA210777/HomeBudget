@@ -76,6 +76,11 @@ public static class CashFlowEndpoints
             {
                 var (account, pot) = data.Level(outgoing.AccountId);
                 entries.Add((account, pot, new CashFlowEntry(CashFlowKindDto.Outgoing, outgoing.Id, outgoing.Name, pot, Values.RoundForDisplay(amount)), amount));
+                if (outgoing.SavingsAccountId is { } savedInto)
+                {
+                    var (intoAccount, intoPot) = data.Level(savedInto);
+                    entries.Add((intoAccount, intoPot, new CashFlowEntry(CashFlowKindDto.SavingsIn, outgoing.Id, outgoing.Name, intoPot, Values.RoundForDisplay(amount)), amount));
+                }
             }
         }
 
@@ -125,8 +130,13 @@ public static class CashFlowEndpoints
         foreach (var outgoing in data.Outgoings)
         {
             var (account, pot) = data.Level(outgoing.AccountId);
-            entries.AddRange(outgoing.PaymentsBetween(start, end)
-                .Select(p => (account, pot, new CashFlowEntry(CashFlowKindDto.Outgoing, outgoing.Id, outgoing.Name, pot, p.Amount), p.Date)));
+            var payments = outgoing.PaymentsBetween(start, end);
+            entries.AddRange(payments.Select(p => (account, pot, new CashFlowEntry(CashFlowKindDto.Outgoing, outgoing.Id, outgoing.Name, pot, p.Amount), p.Date)));
+            if (outgoing.SavingsAccountId is { } savedInto)
+            {
+                var (intoAccount, intoPot) = data.Level(savedInto);
+                entries.AddRange(payments.Select(p => (intoAccount, intoPot, new CashFlowEntry(CashFlowKindDto.SavingsIn, outgoing.Id, outgoing.Name, intoPot, p.Amount), p.Date)));
+            }
         }
 
         foreach (var transfer in data.Transfers)

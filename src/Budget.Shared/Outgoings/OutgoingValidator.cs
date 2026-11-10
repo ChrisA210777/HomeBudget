@@ -377,7 +377,7 @@ public static partial class OutgoingValidator
 
     public static string RecipientHelp(OutgoingKindDto kind) => kind switch
     {
-        OutgoingKindDto.Savings => "Where the money is put aside, e.g. \"Holiday ISA\"",
+        OutgoingKindDto.Savings => "The account or pot it goes into. Type a new name to add it.",
         _ => "The company or person, e.g. \"British Gas\"",
     };
 

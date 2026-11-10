@@ -252,6 +252,7 @@ public static class ImportPlanner
                 Recipient = details.Recipient,
                 PaymentMethod = details.PaymentMethod is { } method ? Enum.Parse<PaymentMethod>(method) : null,
                 AccountId = accounts.Resolve(details.PaidFrom, restoreArchived: false)?.Id,
+                SavingsAccountId = source.Kind == nameof(OutgoingKind.Savings) ? accounts.Resolve(details.Recipient, restoreArchived: false)?.Id : null,
                 ReferenceLabel = details.ReferenceLabel,
                 ReferenceValue = details.ReferenceValue,
                 Website = details.Website,

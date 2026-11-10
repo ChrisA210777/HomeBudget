@@ -182,7 +182,14 @@
 
                 @if (_showDetails)
                 {
-                    @if (_kind != OutgoingKindDto.Allowance)
+                    @if (_kind == OutgoingKindDto.Savings)
+                    {
+                        @* Savings go into one of your accounts or pots, picked like "Paid from" (BUD-100). *@
+                        <MudAutocomplete T="string" @bind-Value="_recipient" SearchFunc="SearchPaidFromAsync" CoerceValue="true" CoerceText="false"
+                                         Label="@OutgoingValidator.RecipientLabel(_kind)" HelperText="@OutgoingValidator.RecipientHelp(_kind)" MaxLength="OutgoingValidator.PaidFromMaxLength"
+                                         ShowProgressIndicator="false" Variant="Variant.Outlined" AdornmentAriaLabel="Show suggested accounts" data-testid="recipient" />
+                    }
+                    else if (_kind != OutgoingKindDto.Allowance)
                     {
                         <MudTextField @bind-Value="_recipient" Label="@OutgoingValidator.RecipientLabel(_kind)" HelperText="@OutgoingValidator.RecipientHelp(_kind)"
                                       MaxLength="OutgoingValidator.RecipientMaxLength" Variant="Variant.Outlined" data-testid="recipient" />

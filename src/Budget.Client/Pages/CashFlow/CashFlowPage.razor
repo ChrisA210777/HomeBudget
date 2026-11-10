@@ -266,7 +266,7 @@
     private static string Link(CashFlowEntry entry) => entry.Kind switch
     {
         CashFlowKindDto.Income => $"/income/{entry.Id}",
-        CashFlowKindDto.Outgoing => $"/outgoings/{entry.Id}",
+        CashFlowKindDto.Outgoing or CashFlowKindDto.SavingsIn => $"/outgoings/{entry.Id}",
         _ => $"/transfers/{entry.Id}",
     };
 

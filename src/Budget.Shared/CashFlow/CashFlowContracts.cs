@@ -23,6 +23,9 @@ public enum CashFlowKindDto
     Outgoing,
     TransferIn,
     TransferOut,
+
+    /// <summary>A savings outgoing arriving in the account it's saved into (BUD-100).</summary>
+    SavingsIn,
 }
 
 /// <summary>One amount in or out of an account.</summary>
@@ -32,7 +35,7 @@ public enum CashFlowKindDto
 /// <param name="Amount">Always positive; <see cref="Kind"/> says which way it goes.</param>
 public sealed record CashFlowEntry(CashFlowKindDto Kind, Guid Id, string Name, string? Pot, decimal Amount)
 {
-    public bool IsIn => Kind is CashFlowKindDto.Income or CashFlowKindDto.TransferIn;
+    public bool IsIn => Kind is CashFlowKindDto.Income or CashFlowKindDto.TransferIn or CashFlowKindDto.SavingsIn;
 }
 
 /// <summary>

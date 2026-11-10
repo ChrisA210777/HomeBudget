@@ -199,6 +199,7 @@ public static class AccountEndpoints
             {
                 await db.Outgoings.Where(o => o.AccountId == from).ExecuteUpdateAsync(s => s.SetProperty(o => o.AccountId, to));
                 await db.IncomeStreams.Where(i => i.AccountId == from).ExecuteUpdateAsync(s => s.SetProperty(i => i.AccountId, to));
+                await db.Outgoings.Where(o => o.SavingsAccountId == from).ExecuteUpdateAsync(s => s.SetProperty(o => o.SavingsAccountId, to));
                 await db.Transfers.Where(t => t.FromAccountId == from).ExecuteUpdateAsync(s => s.SetProperty(t => t.FromAccountId, to));
                 await db.Transfers.Where(t => t.ToAccountId == from).ExecuteUpdateAsync(s => s.SetProperty(t => t.ToAccountId, to));
             }

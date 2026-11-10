@@ -490,6 +490,9 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<Guid?>("SavingsAccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Website")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
@@ -503,6 +506,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.HasIndex("HouseholdId");
 
                     b.HasIndex("PersonId");
+
+                    b.HasIndex("SavingsAccountId");
 
                     b.ToTable("Outgoings", (string)null);
                 });
@@ -1260,6 +1265,11 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.HasOne("Budget.Domain.People.Person", null)
                         .WithMany()
                         .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Budget.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("SavingsAccountId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 

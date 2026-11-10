@@ -70,6 +70,12 @@ public sealed class OutgoingConfiguration : IEntityTypeConfiguration<Outgoing>
             .HasForeignKey(o => o.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Where savings go (BUD-100). Accounts are archived, never deleted.
+        builder.HasOne<Account>()
+            .WithMany()
+            .HasForeignKey(o => o.SavingsAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // A category in use can't be deleted (BUD-47).
         builder.HasOne<OutgoingCategory>()
             .WithMany()
