@@ -166,3 +166,26 @@ test('outgoings can be shown for 12 months and grouped by the account they are p
   await page.getByTestId('group-paid-from').click();
   await expect(page.getByTestId('paid-from-name')).toHaveText(['Not set']);
 });
+
+test('groups close to their header, one at a time or all at once', async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Hedge trimming fund', 'Home maintenance', '20');
+  await page.goto('/outgoings');
+  await settled(page);
+
+  // BUD-88: the header opens and closes its group, and keeps showing the total.
+  const group = page.getByTestId('category-group').filter({ hasText: 'Home maintenance' });
+  const header = group.getByTestId('group-header');
+  await header.click();
+  await expect(header).toHaveAttribute('aria-expanded', 'false');
+  await expect(group.getByTestId('outgoing-name')).toBeHidden();
+  await expect(group.getByTestId('category-subtotal')).toHaveText('£20.00');
+
+  await page.getByTestId('toggle-all-groups').click();
+  await expect(page.getByTestId('toggle-all-groups')).toHaveText('Collapse all');
+  await expect(group.getByTestId('outgoing-name')).toBeVisible();
+
+  await page.getByTestId('toggle-all-groups').click();
+  await expect(group.getByTestId('outgoing-name')).toBeHidden();
+  await expect(page.getByTestId('toggle-all-groups')).toHaveText('Expand all');
+});
