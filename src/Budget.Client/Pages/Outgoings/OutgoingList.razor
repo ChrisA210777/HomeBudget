@@ -3,7 +3,9 @@
 @using Budget.Client.Income
 @using Budget.Client.Outgoings
 @using Budget.Client.People
+@using Budget.Client.Accounts
 @using Budget.Shared.Account
+@using Budget.Shared.Accounts
 @using Budget.Shared.Income
 @using Budget.Shared.Outgoings
 @using Budget.Shared.People
@@ -12,6 +14,7 @@
 @inject IPeopleApi PeopleApi
 @inject TimeProvider Clock
 @inject UserSettingsStore Settings
+@inject IAccountsApi AccountsApi
 
 <PageTitle>Outgoings · Home Budget</PageTitle>
 
@@ -108,6 +111,18 @@
                         @foreach (var person in _people)
                         {
                             <MudSelectItem T="string" Value="@person.Id.ToString()">@person.DisplayName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                @* By the account it's paid from, including its pots (BUD-95). *@
+                <div class="list-filter" style="width: 13rem">
+                    <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="AccountFilterName" Label="Paid from" Margin="Margin.Dense"
+                               Variant="Variant.Outlined" data-testid="filter-account">
+                        <MudSelectItem T="Guid?" Value="null">@AccountFilterName(null)</MudSelectItem>
+                        <MudSelectItem T="Guid?" Value="Guid.Empty">@AccountFilterName(Guid.Empty)</MudSelectItem>
+                        @foreach (var account in _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)))
+                        {
+                            <MudSelectItem T="Guid?" Value="account.Id">@account.DisplayName</MudSelectItem>
                         }
                     </MudSelect>
                 </div>
@@ -217,7 +232,7 @@
                                         <MudLink Href="@($"/outgoings/{item.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudLink>
                                         <div class="d-flex flex-wrap align-center gap-1 mt-1">
                                             <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="PriorityColour(item.Priority)" Class="ma-0" data-testid="outgoing-priority">@item.Priority</MudChip>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)@(_byPaidFrom ? $" · {item.CategoryName}" : string.Empty)</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)@(_byPaidFrom ? $" · {item.CategoryName}{(AccountOf(item).Pot is { } pot ? $" · {pot} pot" : string.Empty)}" : string.Empty)</MudText>
                                         </div>
                                         <MudText Typo="Typo.caption" Class="d-block mt-1" data-testid="outgoing-paid">@Paid(item)</MudText>
                                         @foreach (var note in item.Notes)
@@ -255,6 +270,10 @@
     [SupplyParameterFromQuery(Name = "category")]
     public Guid? CategoryQuery { get; set; }
 
+    /// <summary>Show only outgoings paid from this account or pot, e.g. from the Accounts page (BUD-95).</summary>
+    [SupplyParameterFromQuery(Name = "account")]
+    public Guid? AccountQuery { get; set; }
+
     private const string EveryoneKey = "";
     private const string HouseholdKey = "household";
 
@@ -282,13 +301,17 @@
     private static string ShortMonth(DateOnly date) => date.ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
     private Guid? _category;
+
+    /// <summary>An account or pot, <see cref="Guid.Empty"/> for none recorded, or <c>null</c> for any (BUD-95).</summary>
+    private Guid? _account;
+    private IReadOnlyList<AccountSummary> _accounts = [];
     private OutgoingKindDto? _kind;
     private OutgoingPriorityDto? _priority;
     private string _person = EveryoneKey;
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
-    private bool IsFiltered => _category is not null || _kind is not null || _priority is not null || _person != EveryoneKey;
+    private bool IsFiltered => _category is not null || _account is not null || _kind is not null || _priority is not null || _person != EveryoneKey;
 
     protected override async Task OnInitializedAsync()
     {
@@ -300,6 +323,7 @@
         }
 
         _category = CategoryQuery;
+        _account = AccountQuery;
 
         // The view and grouping chosen last time, on any device (BUD-87).
         var settings = await Settings.GetAsync();
@@ -312,6 +336,7 @@
         if (_household is not null)
         {
             _people = await PeopleApi.ListAsync(_household.HouseholdId);
+            _accounts = await AccountsApi.ListAsync(_household.HouseholdId);
         }
 
         await LoadAsync();
@@ -328,6 +353,7 @@
     private IEnumerable<OutgoingMonthItem> Filtered() =>
         _data!.Items.Where(i =>
             (_category is null || i.CategoryId == _category)
+            && (_account is null || (AccountOf(i).Id ?? Guid.Empty) == _account)
             && (_kind is null || i.Kind == _kind)
             && (_priority is null || i.Priority == _priority)
             && (_person == EveryoneKey
@@ -358,6 +384,27 @@
             _collapsed.Clear();
             await Settings.UpdateAsync(new UpdateUserSettingsRequest { OutgoingsGrouping = byPaidFrom ? OutgoingsGroupingDto.PaidFrom : OutgoingsGroupingDto.Category });
         }
+    }
+
+    /// <summary>
+    /// The account an outgoing is paid from, at account level: a pot counts as its account, as budgeting is done by
+    /// account and pots just keep money apart (BUD-95). Falls back to the name if the account isn't in the list.
+    /// </summary>
+    private (Guid? Id, string? Name, string? Pot) AccountOf(OutgoingMonthItem item)
+    {
+        if (item.AccountId is { } id && _accounts.FirstOrDefault(a => a.Id == id) is { } account)
+        {
+            var parent = account.ParentAccountId is { } parentId ? _accounts.FirstOrDefault(a => a.Id == parentId) : null;
+            return parent is null ? (account.Id, account.Name, null) : (parent.Id, parent.Name, account.Name);
+        }
+
+        if (string.IsNullOrWhiteSpace(item.PaidFrom))
+        {
+            return (null, null, null);
+        }
+
+        var parts = item.PaidFrom.Split('›', 2);
+        return (item.AccountId, parts[0].Trim(), parts.Length > 1 ? parts[1].Trim() : null);
     }
 
     /// <summary>Accounts with no Paid From go last, as "Not set".</summary>
@@ -394,7 +441,7 @@
     /// </summary>
     private IEnumerable<ItemGroup> Groups(List<OutgoingMonthItem> items) => _byPaidFrom
         ? items
-            .GroupBy(i => string.IsNullOrWhiteSpace(i.PaidFrom) ? null : i.PaidFrom.Trim(), StringComparer.CurrentCultureIgnoreCase)
+            .GroupBy(i => AccountOf(i).Name, StringComparer.CurrentCultureIgnoreCase)
             .OrderBy(g => g.Key is null)
             .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
             .Select(g => new ItemGroup(
@@ -410,6 +457,7 @@
     private void ClearFilters()
     {
         _category = null;
+        _account = null;
         _kind = null;
         _priority = null;
         _person = EveryoneKey;
@@ -443,6 +491,13 @@
     };
 
     private static string PriorityFilterName(OutgoingPriorityDto? priority) => priority?.ToString() ?? "All";
+
+    private string AccountFilterName(Guid? id) => id switch
+    {
+        null => "All",
+        var none when none == Guid.Empty => "Not set",
+        _ => _accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "That account",
+    };
 
     private string PersonFilterName(string key) => key switch
     {

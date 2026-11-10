@@ -31,6 +31,7 @@ public sealed class OutgoingListTests : IDisposable
         _context.Services.AddSingleton<TimeProvider>(new FixedClock(new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero)));
         _context.Services.AddScoped<UserSession>();
         _context.Services.AddSingleton<IUserSettingsApi>(_settings);
+        _context.Services.AddSingleton<Budget.Client.Accounts.IAccountsApi>(new StaticAccountsApi());
         _context.Services.AddScoped<UserSettingsStore>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
@@ -234,6 +235,63 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
+    public void Outgoings_can_be_filtered_by_the_account_they_are_paid_from_including_from_a_link()
+    {
+        var jointBills = AccountIds.GetOrAdd("JOINT BILLS", _ => Guid.NewGuid());
+        _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo($"/outgoings?account={jointBills}");
+
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        // Matching outgoings only, with totals to match (BUD-95).
+        Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "outgoing-name"));
+        Assert.Equal("£150.00", Text(cut, "month-total"));
+        Assert.Contains("Matching", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_account_includes_its_pots_when_filtering_and_grouping()
+    {
+        var monzo = Guid.NewGuid();
+        var holiday = Guid.NewGuid();
+        _context.Services.AddSingleton<Budget.Client.Accounts.IAccountsApi>(new AccountsWithPot(monzo, holiday));
+        _api.Items =
+        [
+            Outgoing("Food shopping", FoodId, "Food & household", 90, OutgoingPriorityDto.Preferred, 400m, PaymentUnitDto.Month, 400m) with { AccountId = monzo, PaidFrom = "Joint Monzo" },
+            Outgoing("Holiday fund", FoodId, "Food & household", 90, OutgoingPriorityDto.Optional, 100m, PaymentUnitDto.Month, 100m) with { AccountId = holiday, PaidFrom = "Joint Monzo › Holiday" },
+            Outgoing("Gym", FoodId, "Food & household", 90, OutgoingPriorityDto.Optional, 30m, PaymentUnitDto.Month, 30m),
+        ];
+        _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo($"/outgoings?account={monzo}");
+
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        // Budgeting is by account; a pot just keeps money apart within it (BUD-95).
+        Assert.Equal(new[] { "Food shopping", "Holiday fund" }, Texts(cut, "outgoing-name"));
+        Assert.Equal("£500.00", Text(cut, "month-total"));
+
+        cut.Find("[data-testid=group-paid-from]").Click();
+        Assert.Equal(new[] { "Joint Monzo" }, Texts(cut, "paid-from-name"));
+    }
+
+    private sealed class AccountsWithPot(Guid account, Guid pot) : Budget.Client.Accounts.IAccountsApi
+    {
+        public Task<IReadOnlyList<Budget.Shared.Accounts.AccountSummary>> ListAsync(Guid householdId) =>
+            Task.FromResult<IReadOnlyList<Budget.Shared.Accounts.AccountSummary>>(
+            [
+                new(account, "Joint Monzo", "Monzo", null, null, null, false, "Joint Monzo", 1),
+                new(pot, "Holiday", null, null, null, account, false, "Joint Monzo › Holiday", 1),
+            ]);
+
+        public Task<Budget.Client.Accounts.AccountsResult> AddAsync(Guid householdId, Budget.Shared.Accounts.SaveAccountRequest request) => throw new NotSupportedException();
+
+        public Task<Budget.Client.Accounts.AccountsResult> UpdateAsync(Guid householdId, Guid accountId, Budget.Shared.Accounts.SaveAccountRequest request) =>
+            throw new NotSupportedException();
+
+        public Task<Budget.Client.Accounts.AccountsResult> SetArchivedAsync(Guid householdId, Guid accountId, bool archived) => throw new NotSupportedException();
+
+        public Task<Budget.Client.Accounts.AccountsResult> MergeAsync(Guid householdId, Guid accountId, Guid intoAccountId) => throw new NotSupportedException();
+    }
+
+    [Fact]
     public void A_month_and_category_can_come_from_the_link()
     {
         _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo($"/outgoings?month=2027-01&category={HousingId}");
@@ -293,7 +351,11 @@ public sealed class OutgoingListTests : IDisposable
         string name, Guid categoryId, string category, int sortOrder, OutgoingPriorityDto priority, decimal amount, PaymentUnitDto unit, decimal monthly,
         OutgoingKindDto kind = OutgoingKindDto.Bill, Guid? personId = null, string? personName = null, string[]? notes = null, bool comingUp = false, string? paidFrom = null) =>
         new(Guid.NewGuid(), name, kind, priority, categoryId, category, sortOrder, personId, personName, amount, 1, unit, monthly, monthly,
-            notes ?? [], new DateOnly(2026, 1, 1), null, comingUp ? new DateOnly(2026, 11, 15) : null, comingUp, PaidFrom: paidFrom);
+            notes ?? [], new DateOnly(2026, 1, 1), null, comingUp ? new DateOnly(2026, 11, 15) : null, comingUp, PaidFrom: paidFrom,
+            AccountId: paidFrom is null ? null : AccountIds.GetOrAdd(paidFrom.Trim().ToUpperInvariant(), _ => Guid.NewGuid()));
+
+    /// <summary>One account id per Paid From name, ignoring case and spaces, as the server would give.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Guid> AccountIds = new();
 
     private sealed class FakeOutgoingApi : IOutgoingApi
     {
@@ -303,18 +365,21 @@ public sealed class OutgoingListTests : IDisposable
 
         public bool Empty { get; set; }
 
+        /// <summary>When set, returned instead of the usual outgoings.</summary>
+        public IReadOnlyList<OutgoingMonthItem>? Items { get; set; }
+
         public Task<OutgoingMonthResponse> GetMonthAsync(Guid householdId, int year, int month, bool all, int months = 1)
         {
             Requests.Add((year, month, all));
             MonthsRequested.Add(months);
-            IReadOnlyList<OutgoingMonthItem> items = Empty ? [] :
+            IReadOnlyList<OutgoingMonthItem> items = Items ?? (Empty ? [] :
             [
                 Outgoing("Council tax", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 180m, PaymentUnitDto.Month, 150m, notes: ["Rises to £180.00 a month from 16 Nov 2026"], paidFrom: "Joint bills"),
                 Outgoing("Mortgage", HousingId, "Housing", 10, OutgoingPriorityDto.Essential, 900m, PaymentUnitDto.Month, 0m, notes: ["Paused from 1 Nov 2026 until 1 Dec 2026"], paidFrom: " joint BILLS "),
                 Outgoing("Car insurance", InsuranceId, "Insurance", 40, OutgoingPriorityDto.Essential, 480m, PaymentUnitDto.Year, 40m,
                     personId: StaticPeopleApi.ChrisId, personName: "Chris Austin", comingUp: true, paidFrom: "Chris current"),
                 Outgoing("Food shopping", FoodId, "Food & household", 90, OutgoingPriorityDto.Preferred, 120m, PaymentUnitDto.Week, 520m, kind: OutgoingKindDto.Allowance),
-            ];
+            ]);
             return Task.FromResult(new OutgoingMonthResponse(year, month, items, "GBP", months));
         }
 

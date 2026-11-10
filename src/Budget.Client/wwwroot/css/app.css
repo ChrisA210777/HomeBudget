@@ -370,13 +370,9 @@ body {
         margin: 0;
     }
 
-    /* The filters share one line, each shrinking to fit. */
-    .list-filters {
-        flex-wrap: nowrap !important;
-    }
-
+    /* The filters share the width, two to a line (BUD-79, BUD-95). */
     .list-filters > .list-filter {
-        flex: 1 1 0;
+        flex: 1 1 calc(50% - 4px);
         min-width: 0;
         width: auto !important;
     }

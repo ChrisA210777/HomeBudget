@@ -14,6 +14,7 @@ namespace Budget.Client.Tests.Pages.Accounts;
 public sealed class AccountsPageTests : IDisposable
 {
     private static readonly Guid MonzoId = Guid.NewGuid();
+    private static readonly Guid ChrisCurrentId = Guid.NewGuid();
 
     private readonly TestContext _context = new();
     private readonly FakeAccountsApi _api = new();
@@ -34,7 +35,10 @@ public sealed class AccountsPageTests : IDisposable
         var cut = Render("Viewer");
 
         Assert.Equal(new[] { "Chris current", "Joint Monzo", "Holiday" }, Texts(cut, "account-name"));
-        Assert.Equal(new[] { "Chris Austin · 1 outgoing", "Joint · Monzo · 3 outgoings", "2 outgoings" }, Texts(cut, "account-details"));
+        // An account's count includes its pots, and goes to its outgoings; pots aren't linked (BUD-95).
+        Assert.Equal(new[] { "Chris Austin · 1 outgoing", "Joint · Monzo · 5 outgoings", "2 outgoings" }, Texts(cut, "account-details"));
+        Assert.Equal(new[] { "/outgoings?account=" + ChrisCurrentId, $"/outgoings?account={MonzoId}" },
+            cut.FindAll("[data-testid=account-outgoings]").Select(e => e.GetAttribute("href")));
         Assert.Single(cut.FindAll("[data-testid=pot]"));
         // Viewers can't change anything, and archived accounts are hidden until asked for.
         Assert.Empty(cut.FindAll("[data-testid=add-account-form]"));
@@ -99,7 +103,7 @@ public sealed class AccountsPageTests : IDisposable
     }
 
     private static string[] Texts(IRenderedComponent<AccountsPage> cut, string testId) =>
-        cut.FindAll($"[data-testid={testId}]").Select(e => e.TextContent.Trim()).ToArray();
+        cut.FindAll($"[data-testid={testId}]").Select(e => System.Text.RegularExpressions.Regex.Replace(e.TextContent, @"\s+", " ").Trim()).ToArray();
 
     private sealed class FakeAccountsApi : IAccountsApi
     {
@@ -110,7 +114,7 @@ public sealed class AccountsPageTests : IDisposable
         public Task<IReadOnlyList<AccountSummary>> ListAsync(Guid householdId) =>
             Task.FromResult<IReadOnlyList<AccountSummary>>(
             [
-                new(Guid.NewGuid(), "Chris current", null, StaticPeopleApi.ChrisId, "Chris Austin", null, false, "Chris current", 1),
+                new(ChrisCurrentId, "Chris current", null, StaticPeopleApi.ChrisId, "Chris Austin", null, false, "Chris current", 1),
                 new(MonzoId, "Joint Monzo", "Monzo", null, null, null, false, "Joint Monzo", 3),
                 new(Guid.NewGuid(), "Holiday", null, null, null, MonzoId, false, "Joint Monzo › Holiday", 2),
                 new(Guid.NewGuid(), "Old bank", null, null, null, null, true, "Old bank", 0),

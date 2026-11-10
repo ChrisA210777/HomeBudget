@@ -209,7 +209,19 @@
                     <MudIcon Icon="@(isPot ? Icons.Material.Filled.Savings : Icons.Material.Filled.AccountBalance)" Size="Size.Small" Color="Color.Secondary" aria-hidden="true" />
                     <div class="flex-grow-1" style="min-width: 0">
                         <MudText Typo="@(isPot ? Typo.body2 : Typo.subtitle1)" data-testid="account-name">@account.Name</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="account-details">@Details(account, isPot)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="account-details">
+                            @Owner(account, isPot)
+                            @* An account's count includes its pots, and links to its outgoings (BUD-95). *@
+                            @if (!isPot && OutgoingsFor(account) > 0)
+                            {
+                                <MudLink Href="@($"/outgoings?account={account.Id}")" Typo="Typo.caption" data-testid="account-outgoings">@OutgoingCount(OutgoingsFor(account))</MudLink>
+                            }
+                            else
+                            {
+                                @OutgoingCount(isPot ? account.OutgoingCount : OutgoingsFor(account))
+                            }
+                            @(account.IncomeCount > 0 ? $" · {(account.IncomeCount == 1 ? "1 income" : $"{account.IncomeCount} incomes")}" : string.Empty)
+                        </MudText>
                     </div>
                     @if (account.IsArchived)
                     {
@@ -237,25 +249,28 @@
             }
         </div>;
 
-    private string Details(AccountSummary account, bool isPot)
+    /// <summary>"Chris Austin · Monzo · " for an account; nothing for a pot, which belongs to its account's owner.</summary>
+    private static string Owner(AccountSummary account, bool isPot)
     {
-        var parts = new List<string>();
-        if (!isPot)
+        if (isPot)
         {
-            parts.Add(account.OwnerName ?? "Joint");
-            if (!string.IsNullOrWhiteSpace(account.Provider))
-            {
-                parts.Add(account.Provider);
-            }
+            return string.Empty;
         }
 
-        parts.Add(account.OutgoingCount == 1 ? "1 outgoing" : $"{account.OutgoingCount} outgoings");
-        if (account.IncomeCount > 0)
+        var parts = new List<string> { account.OwnerName ?? "Joint" };
+        if (!string.IsNullOrWhiteSpace(account.Provider))
         {
-            parts.Add(account.IncomeCount == 1 ? "1 income" : $"{account.IncomeCount} incomes");
+            parts.Add(account.Provider);
         }
-        return string.Join(" · ", parts);
+
+        return string.Join(" · ", parts) + " · ";
     }
+
+    /// <summary>An account's outgoings, including its pots'.</summary>
+    private int OutgoingsFor(AccountSummary account) =>
+        account.OutgoingCount + (_accounts ?? []).Where(p => p.ParentAccountId == account.Id).Sum(p => p.OutgoingCount);
+
+    private static string OutgoingCount(int count) => count == 1 ? "1 outgoing" : $"{count} outgoings";
 
     /// <summary>Any other open account or pot; an account with pots can only go into another account.</summary>
     private IEnumerable<AccountSummary> MergeTargets(AccountSummary account)
