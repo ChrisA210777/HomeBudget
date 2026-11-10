@@ -458,7 +458,7 @@ public class OutgoingTests
     }
 
     [Fact]
-    public void Nothing_is_due_before_it_starts()
+    public void No_payments_are_listed_before_it_starts()
     {
         var car = Create(250m, PaymentSchedule.Monthly, new DateOnly(2027, 1, 15));
 
