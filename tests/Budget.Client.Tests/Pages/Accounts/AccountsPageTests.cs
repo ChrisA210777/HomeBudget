@@ -60,7 +60,7 @@ public sealed class AccountsPageTests : IDisposable
     {
         var cut = Render("User");
 
-        cut.Find("[data-testid=add-pot]").Click();
+        cut.FindAll("[data-testid=account]").Single(e => e.GetAttribute("aria-label") == "Joint Monzo").QuerySelector("[data-testid=add-pot]")!.Click();
         cut.Find("input[data-testid=new-pot-name]").Change("Garden");
         cut.Find("[data-testid=add-pot-save]").Click();
 
