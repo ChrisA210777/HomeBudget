@@ -2,6 +2,7 @@ using Budget.Domain.Common;
 using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
 using Budget.Infrastructure.Persistence.Configurations;
+using Budget.Server.Features.Accounts;
 using Budget.Server.Features.Households;
 using Budget.Shared.Outgoings;
 using Microsoft.AspNetCore.Mvc;
@@ -59,6 +60,8 @@ internal static class OutgoingDetailEndpoints
             errors[nameof(request.PersonId)] = ["Choose someone in this household, or the whole household."];
         }
 
+        // A new account name adds the account, or a pot in one (BUD-89). Saved with the change, or not at all.
+        var accounts = await AccountDirectory.LoadAsync(db, householdId);
         return await ChangeAsync(db, householdId, outgoingId, request.Version, errors, time, errorKey: nameof(request.RenewalDate), outgoing =>
             outgoing.UpdateDetails(new OutgoingDetails
             {
@@ -74,7 +77,7 @@ internal static class OutgoingDetailEndpoints
                 AlertPeriod = (AlertPeriod)request.AlertPeriod,
                 Recipient = request.Kind == OutgoingKindDto.Allowance ? null : request.Recipient,
                 PaymentMethod = (PaymentMethod?)request.PaymentMethod,
-                PaidFrom = request.PaidFrom,
+                AccountId = accounts.Resolve(request.PaidFrom)?.Id,
                 ReferenceLabel = request.ReferenceLabel,
                 ReferenceValue = request.ReferenceValue,
                 Website = request.Website,
@@ -301,7 +304,7 @@ internal static class OutgoingDetailEndpoints
             status,
             outgoing.Recipient,
             (PaymentMethodDto?)outgoing.PaymentMethod,
-            outgoing.PaidFrom,
+            (await AccountDirectory.LoadAsync(db, householdId)).DisplayName(outgoing.AccountId),
             outgoing.ReferenceLabel,
             outgoing.ReferenceValue,
             outgoing.Website,

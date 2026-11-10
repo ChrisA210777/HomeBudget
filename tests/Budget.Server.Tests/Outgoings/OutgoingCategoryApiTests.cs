@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Outgoings;
 using Budget.Server.Tests.Infrastructure;
@@ -147,6 +148,7 @@ public class OutgoingCategoryApiTests(BudgetApiFactory factory) : IntegrationTes
         await ExecuteDbContextAsync(async db => categoryId = await db.OutgoingCategories.IgnoreQueryFilters()
             .Where(c => c.HouseholdId == householdId && c.Name == "Housing").Select(c => c.Id).SingleAsync());
 
+        var account = Account.Create(householdId, "Joint account");
         var outgoing = Outgoing.Create(householdId, new OutgoingDetails
         {
             Name = "Mortgage",
@@ -158,7 +160,7 @@ public class OutgoingCategoryApiTests(BudgetApiFactory factory) : IntegrationTes
             AlertPeriod = AlertPeriod.ThreeMonths,
             Recipient = "Example Building Society",
             PaymentMethod = PaymentMethod.DirectDebit,
-            PaidFrom = "Joint account",
+            AccountId = account.Id,
             ReferenceLabel = "Mortgage account",
             ReferenceValue = "M-12345",
             Website = "example.com",
@@ -169,6 +171,7 @@ public class OutgoingCategoryApiTests(BudgetApiFactory factory) : IntegrationTes
         outgoing.Pause(new DateOnly(2026, 12, 1), new DateOnly(2027, 2, 1), "Payment holiday");
         await ExecuteDbContextAsync(async db =>
         {
+            db.Accounts.Add(account);
             db.Outgoings.Add(outgoing);
             await db.SaveChangesAsync();
         });
@@ -185,6 +188,7 @@ public class OutgoingCategoryApiTests(BudgetApiFactory factory) : IntegrationTes
             Assert.Equal(AlertPeriod.ThreeMonths, loaded.AlertPeriod);
             Assert.Equal(24, loaded.RenewalEveryMonths);
             Assert.Equal("https://example.com/", loaded.Website);
+            Assert.Equal(account.Id, loaded.AccountId);
             Assert.Equal(2, loaded.AmountChanges.Count);
             Assert.Equal(new DateOnly(2027, 2, 1), loaded.StatusPeriods.Single().ResumesOn);
             Assert.Equal(0m, loaded.MonthlyEquivalentForMonth(2027, 1));

@@ -1,6 +1,6 @@
 using Budget.Shared;
 
-namespace Budget.Server.Features.Account;
+namespace Budget.Server.Features.SignIn;
 
 public static class CsrfHeaderMiddleware
 {

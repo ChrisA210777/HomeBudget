@@ -45,6 +45,9 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
             .ToListAsync();
 
         var people = await db.People.AsNoTracking().OrderBy(p => p.DisplayName).ToListAsync();
+        var accounts = await db.Accounts.AsNoTracking().OrderBy(a => a.Name).ToListAsync();
+        string? AccountName(Guid? id) =>
+            accounts.Find(a => a.Id == id) is { } account ? account.DisplayName(accounts.Find(a => a.Id == account.ParentAccountId)) : null;
         var categories = await db.OutgoingCategories.AsNoTracking().OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync();
         var incomes = await db.IncomeStreams.AsNoTracking()
             .Include(i => i.AmountChanges).Include(i => i.StatusPeriods).Include(i => i.Corrections)
@@ -123,6 +126,17 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                             .Select(c => Audit(Correction(c.EntryType.ToString(), c.EntryId, c.Action.ToString(), c.Before, c.After, c.Reason), c)).ToList()
                         : [],
                 }, i)).ToList(),
+            Accounts = accounts
+                .Where(a => !a.IsPot)
+                .Select(a => new ExportedAccount
+                {
+                    Name = a.Name,
+                    Provider = a.Provider,
+                    OwnerPersonId = a.OwnerPersonId,
+                    Archived = a.IsArchived,
+                    Pots = accounts.Where(p => p.ParentAccountId == a.Id).Select(p => new ExportedPot { Name = p.Name, Archived = p.IsArchived }).ToList(),
+                })
+                .ToList(),
             Outgoings = outgoings
                 .Where(o => options.IncludeHistory || !(o.EndsOn <= today))
                 .Select(o => Audit(new ExportedOutgoing
@@ -141,7 +155,7 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                     {
                         Recipient = o.Recipient,
                         PaymentMethod = o.PaymentMethod?.ToString(),
-                        PaidFrom = o.PaidFrom,
+                        PaidFrom = AccountName(o.AccountId),
                         ReferenceLabel = o.ReferenceLabel,
                         ReferenceValue = o.ReferenceValue,
                         Website = o.Website,

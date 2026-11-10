@@ -4,7 +4,7 @@ using Budget.Server.Tests.Infrastructure;
 using Budget.Shared;
 using Budget.Shared.Account;
 
-namespace Budget.Server.Tests.Account;
+namespace Budget.Server.Tests.SignIn;
 
 /// <summary>GET and PUT /bff/user/settings (BUD-87).</summary>
 [Collection(ApiCollection.Name)]

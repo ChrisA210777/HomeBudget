@@ -1,7 +1,9 @@
+using Budget.Domain.Accounts;
 using Budget.Domain.Common;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Domain.People;
+using Budget.Server.Features.Accounts;
 using Budget.Shared.DataExport;
 
 namespace Budget.Server.Features.DataExport;
@@ -16,6 +18,9 @@ public sealed class ImportPlan
     public List<IncomeStream> Incomes { get; } = [];
 
     public List<Outgoing> Outgoings { get; } = [];
+
+    /// <summary>Accounts and pots (BUD-89): from the file's list, plus any named only by an outgoing.</summary>
+    public List<Account> Accounts { get; } = [];
 
     /// <summary>Each person's <c>linkedMemberEmail</c> in the file, for linking logins when importing.</summary>
     public Dictionary<Person, string> LinkedEmails { get; } = [];
@@ -174,6 +179,42 @@ public static class ImportPlanner
             plan.Incomes.Add(income);
         }
 
+        // Accounts and pots in the file (version 2); outgoings then find theirs by name, and names from older
+        // files become accounts and pots the same way existing households' did (BUD-89, ADR-014).
+        var accounts = AccountDirectory.InMemory(householdId, plan.Accounts);
+        for (var i = 0; i < export.Accounts.Count; i++)
+        {
+            var source = export.Accounts[i];
+            Guid? ownerId = source.OwnerPersonId is { } oldOwner && people.TryGetValue(oldOwner, out var newOwner) ? newOwner : null;
+            var account = Try($"accounts[{i}]", () => Account.Create(householdId, source.Name, ownerId, source.Provider));
+            if (account is null)
+            {
+                continue;
+            }
+
+            plan.Accounts.Add(account);
+            if (source.Archived)
+            {
+                account.Archive();
+            }
+
+            for (var j = 0; j < source.Pots.Count; j++)
+            {
+                var potSource = source.Pots[j];
+                var pot = Try($"accounts[{i}].pots[{j}]", () => Account.CreatePot(account, potSource.Name));
+                if (pot is null)
+                {
+                    continue;
+                }
+
+                plan.Accounts.Add(pot);
+                if (potSource.Archived)
+                {
+                    pot.Archive();
+                }
+            }
+        }
+
         for (var i = 0; i < export.Outgoings.Count; i++)
         {
             var source = export.Outgoings[i];
@@ -204,7 +245,7 @@ public static class ImportPlanner
                 AlertPeriod = source.Renewal is { } renewal ? Enum.Parse<AlertPeriod>(renewal.AlertPeriod) : AlertPeriod.None,
                 Recipient = details.Recipient,
                 PaymentMethod = details.PaymentMethod is { } method ? Enum.Parse<PaymentMethod>(method) : null,
-                PaidFrom = details.PaidFrom,
+                AccountId = accounts.Resolve(details.PaidFrom, restoreArchived: false)?.Id,
                 ReferenceLabel = details.ReferenceLabel,
                 ReferenceValue = details.ReferenceValue,
                 Website = details.Website,

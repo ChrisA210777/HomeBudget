@@ -4,7 +4,7 @@ using Budget.Server.Tests.Infrastructure;
 using Budget.Shared;
 using Budget.Shared.Account;
 
-namespace Budget.Server.Tests.Account;
+namespace Budget.Server.Tests.SignIn;
 
 [Collection(ApiCollection.Name)]
 public class SignInTests(BudgetApiFactory factory) : IntegrationTestBase(factory)

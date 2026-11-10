@@ -34,6 +34,9 @@ public sealed record HouseholdExport
 
     public IReadOnlyList<ExportedCategory> Categories { get; init; } = [];
 
+    /// <summary>Accounts and their pots (version 2, BUD-89). Outgoings name theirs in <c>details.paidFrom</c>.</summary>
+    public IReadOnlyList<ExportedAccount> Accounts { get; init; } = [];
+
     public IReadOnlyList<ExportedIncome> Incomes { get; init; } = [];
 
     public IReadOnlyList<ExportedOutgoing> Outgoings { get; init; } = [];
@@ -221,6 +224,29 @@ public sealed record ExportedRenewal
     public string AlertPeriod { get; init; } = string.Empty;
 }
 
+/// <summary>An account and its pots (BUD-89). Names are unique: accounts in the file, and pots in their account.</summary>
+public sealed record ExportedAccount
+{
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>The bank, e.g. "Monzo".</summary>
+    public string? Provider { get; init; }
+
+    /// <summary>The person (an id in <see cref="HouseholdExport.People"/>) whose account it is, or <c>null</c> for the household's.</summary>
+    public Guid? OwnerPersonId { get; init; }
+
+    public bool Archived { get; init; }
+
+    public IReadOnlyList<ExportedPot> Pots { get; init; } = [];
+}
+
+public sealed record ExportedPot
+{
+    public string Name { get; init; } = string.Empty;
+
+    public bool Archived { get; init; }
+}
+
 public sealed record ExportedOutgoingDetails
 {
     public string? Recipient { get; init; }
@@ -228,6 +254,7 @@ public sealed record ExportedOutgoingDetails
     /// <summary>DirectDebit, StandingOrder, Cash, CreditCard, DebitCard, Cheque, BankTransfer or Other.</summary>
     public string? PaymentMethod { get; init; }
 
+    /// <summary>The account, or "Account › Pot", it's paid from (an account in <see cref="HouseholdExport.Accounts"/> from version 2).</summary>
     public string? PaidFrom { get; init; }
 
     public string? ReferenceLabel { get; init; }

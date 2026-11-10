@@ -51,7 +51,7 @@ public class CsvExportTests(BudgetApiFactory factory) : IntegrationTestBase(fact
         Assert.Equal(
             new[]
             {
-                "README.txt", "categories.csv", "corrections.csv", "household.csv", "income_amount_changes.csv", "income_status_periods.csv",
+                "README.txt", "accounts.csv", "categories.csv", "corrections.csv", "household.csv", "income_amount_changes.csv", "income_status_periods.csv",
                 "incomes.csv", "members.csv", "outgoing_amount_changes.csv", "outgoing_status_periods.csv", "outgoings.csv", "people.csv",
             },
             files.Keys.Order(StringComparer.Ordinal));

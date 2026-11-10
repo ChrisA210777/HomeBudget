@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Outgoings;
 using Budget.Server.Tests.Infrastructure;
@@ -57,7 +58,9 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
             Assert.Equal(insurance, saved.CategoryId);
             Assert.Equal(personId, saved.PersonId);
             Assert.Equal(PaymentMethod.DirectDebit, saved.PaymentMethod);
-            Assert.Equal("Joint account", saved.PaidFrom);
+            // A new account name adds the account (BUD-89).
+            var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(a => a.Id == saved.AccountId);
+            Assert.Equal(("Joint account", (Guid?)null, householdId), (account.Name, account.OwnerPersonId, account.HouseholdId));
             Assert.Equal("https://example.com/", saved.Website);
             Assert.Equal(new DateOnly(2027, 3, 14), saved.RenewalDate);
             Assert.True(saved.AutoRenews);
@@ -143,7 +146,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
         var housing = await CategoryIdAsync(householdId, "Housing");
         using var client = CreateClient(signedInAs: ownerId);
-        foreach (var account in new[] { "Joint account", "Chris's current account", "Joint account", null })
+        foreach (var account in new[] { "Joint account", "Chris's current account", " joint ACCOUNT ", null, "Joint account (Holiday Pot)", "Joint account › Food" })
         {
             (await client.PostAsJsonAsync(Url(OutgoingRoutes.Outgoings(householdId)), Valid(housing) with { PaidFrom = account })).Dispose();
         }
@@ -154,7 +157,8 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
 
         var names = await client.GetFromJsonAsync<List<string>>(Url(OutgoingRoutes.PaidFromNames(householdId)));
 
-        Assert.Equal(new[] { "Chris's current account", "Joint account" }, names);
+        // Each account once, ignoring case and spaces, with pots made from either way of writing them (BUD-89).
+        Assert.Equal(new[] { "Chris's current account", "Joint account", "Joint account › Food", "Joint account › Holiday" }, names);
     }
 
     [Fact]
@@ -227,7 +231,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         {
             RenewalDate = today.AddDays(10),
             AutoRenews = true,
-            PaidFrom = "Joint bills",
+            AccountId = await AccountIdAsync(householdId, "Joint bills"),
         }, 480m, PaymentSchedule.Yearly, "Start");
         var fixedRate = Outgoing.Create(householdId, Details("Mortgage", housing, today.AddYears(-1)) with
         {
@@ -400,7 +404,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var housing = await CategoryIdAsync(householdId, "Housing");
         var leisure = await CategoryIdAsync(householdId, "Leisure & memberships");
 
-        var mortgage = Outgoing.Create(householdId, Details("Mortgage", housing, new DateOnly(2026, 1, 1)) with { PaidFrom = "Joint bills" }, 900m, PaymentSchedule.Monthly, "Start");
+        var mortgage = Outgoing.Create(householdId, Details("Mortgage", housing, new DateOnly(2026, 1, 1)) with { AccountId = await AccountIdAsync(householdId, "Joint bills") }, 900m, PaymentSchedule.Monthly, "Start");
         mortgage.PauseFor(new DateOnly(2026, 11, 1), payments: 1, "Payment holiday");
         var councilTax = Outgoing.Create(householdId, Details("Council tax", housing, new DateOnly(2026, 4, 1)), 150m, PaymentSchedule.Monthly, "Start");
         councilTax.ChangeAmount(new DateOnly(2026, 12, 1), 180m, PaymentSchedule.Monthly, "New band");
@@ -447,7 +451,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var insurance = await CategoryIdAsync(householdId, "Insurance");
         var food = await CategoryIdAsync(householdId, "Food & household");
 
-        var mortgage = Outgoing.Create(householdId, Details("Mortgage", housing, new DateOnly(2026, 1, 1)) with { PaidFrom = "Joint bills" }, 900m, PaymentSchedule.Monthly, "Start");
+        var mortgage = Outgoing.Create(householdId, Details("Mortgage", housing, new DateOnly(2026, 1, 1)) with { AccountId = await AccountIdAsync(householdId, "Joint bills") }, 900m, PaymentSchedule.Monthly, "Start");
         var carInsurance = Outgoing.Create(householdId, Details("Car insurance", insurance, new DateOnly(2026, 3, 14)), 480m, PaymentSchedule.Yearly, "Start");
         var shopping = Outgoing.Create(householdId, Details("Food shopping", food, new DateOnly(2026, 11, 2)) with { Kind = OutgoingKind.Allowance }, 120m, PaymentSchedule.Weekly, "Start");
         await ExecuteDbContextAsync(async db =>
@@ -540,6 +544,17 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         Amount = 10m,
         FirstPaymentDate = new DateOnly(2026, 11, 1),
     };
+
+    private async Task<Guid> AccountIdAsync(Guid householdId, string name)
+    {
+        var account = Account.Create(householdId, name);
+        await ExecuteDbContextAsync(async db =>
+        {
+            db.Accounts.Add(account);
+            await db.SaveChangesAsync();
+        });
+        return account.Id;
+    }
 
     private async Task<Guid> CategoryIdAsync(Guid householdId, string name)
     {

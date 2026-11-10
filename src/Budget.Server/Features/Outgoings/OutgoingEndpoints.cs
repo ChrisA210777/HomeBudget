@@ -2,6 +2,7 @@ using System.Globalization;
 using Budget.Domain.Common;
 using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.Accounts;
 using Budget.Server.Features.Households;
 using Budget.Shared.Households;
 using Budget.Shared.Income;
@@ -71,6 +72,7 @@ public static class OutgoingEndpoints
             .ToListAsync();
         var categories = await db.OutgoingCategories.ToDictionaryAsync(c => c.Id, c => new { c.Name, c.SortOrder, c.Icon });
         var people = await db.People.ToDictionaryAsync(p => p.Id, p => p.DisplayName);
+        var accounts = await AccountDirectory.LoadAsync(db, householdId);
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
         var items = outgoings
@@ -103,7 +105,7 @@ public static class OutgoingEndpoints
                     o.IsComingUp(today),
                     o.AutoRenews,
                     category?.Icon ?? CategoryIcons.Default,
-                    o.PaidFrom);
+                    accounts.DisplayName(o.AccountId));
             })
             .OrderBy(i => i.CategorySortOrder)
             .ThenBy(i => i.CategoryName, StringComparer.CurrentCultureIgnoreCase)
@@ -137,6 +139,7 @@ public static class OutgoingEndpoints
             .ToListAsync();
         var categories = await db.OutgoingCategories.ToDictionaryAsync(c => c.Id, c => new { c.Name, c.SortOrder, c.Icon });
         var people = await db.People.ToDictionaryAsync(p => p.Id, p => p.DisplayName);
+        var accounts = await AccountDirectory.LoadAsync(db, householdId);
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
         var payments = outgoings
@@ -156,7 +159,7 @@ public static class OutgoingEndpoints
                     category?.Name ?? string.Empty,
                     category?.SortOrder ?? int.MaxValue,
                     category?.Icon ?? CategoryIcons.Default,
-                    o.PaidFrom,
+                    accounts.DisplayName(o.AccountId),
                     o.PersonId is { } personId ? people.GetValueOrDefault(personId) : null);
             }))
             .OrderBy(p => p.Date)
@@ -181,6 +184,7 @@ public static class OutgoingEndpoints
             .AsNoTracking()
             .ToListAsync();
         var categories = await db.OutgoingCategories.ToDictionaryAsync(c => c.Id, c => new { c.Name, c.Icon });
+        var accounts = await AccountDirectory.LoadAsync(db, householdId);
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
         var renewals = outgoings
@@ -199,7 +203,7 @@ public static class OutgoingEndpoints
                     paid.Amount,
                     paid.Every,
                     (PaymentUnitDto)paid.Unit,
-                    o.PaidFrom,
+                    accounts.DisplayName(o.AccountId),
                     o.AutoRenews,
                     r.IsPaused);
             }))
@@ -306,14 +310,9 @@ public static class OutgoingEndpoints
         .Select(g => g.Key)
         .ToList();
 
-    private static async Task<IReadOnlyList<string>> PaidFromNamesAsync(BudgetDbContext db) =>
-        (await db.Outgoings
-            .Where(o => o.PaidFrom != null)
-            .Select(o => o.PaidFrom!)
-            .Distinct()
-            .ToListAsync())
-        .OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
-        .ToList();
+    /// <summary>The accounts and pots that can be chosen, e.g. "Joint Monzo › Holiday" (BUD-89).</summary>
+    private static async Task<IReadOnlyList<string>> PaidFromNamesAsync(Guid householdId, BudgetDbContext db) =>
+        (await AccountDirectory.LoadAsync(db, householdId)).ActiveNames();
 
     private static async Task<IResult> CreateAsync(Guid householdId, CreateOutgoingRequest request, BudgetDbContext db)
     {
@@ -335,6 +334,8 @@ public static class OutgoingEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        // A new account name adds the account, or a pot in one (BUD-89).
+        var accounts = await AccountDirectory.LoadAsync(db, householdId);
         var details = new OutgoingDetails
         {
             Name = request.Name,
@@ -349,7 +350,7 @@ public static class OutgoingEndpoints
             AlertPeriod = (AlertPeriod)request.AlertPeriod,
             Recipient = request.Kind == OutgoingKindDto.Allowance ? null : request.Recipient,
             PaymentMethod = (PaymentMethod?)request.PaymentMethod,
-            PaidFrom = request.PaidFrom,
+            AccountId = accounts.Resolve(request.PaidFrom)?.Id,
             ReferenceLabel = request.ReferenceLabel,
             ReferenceValue = request.ReferenceValue,
             Website = request.Website,
