@@ -173,6 +173,18 @@ public static class AccountEndpoints
             }
         }
 
+        // A transfer between the two would end up going from an account to itself (BUD-91).
+        var map = moves.ToDictionary(m => m.From, m => m.To);
+        Guid After(Guid id) => map.TryGetValue(id, out var to) ? to : id;
+        var transfers = await db.Transfers.Select(t => new { t.FromAccountId, t.ToAccountId }).ToListAsync();
+        if (transfers.Any(t => After(t.FromAccountId) == After(t.ToAccountId)))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.IntoAccountId)] = ["There's a transfer between these accounts. Delete it, or move it to another account, first."],
+            });
+        }
+
         source.Archive();
         if (target.IsArchived)
         {
@@ -187,6 +199,8 @@ public static class AccountEndpoints
             {
                 await db.Outgoings.Where(o => o.AccountId == from).ExecuteUpdateAsync(s => s.SetProperty(o => o.AccountId, to));
                 await db.IncomeStreams.Where(i => i.AccountId == from).ExecuteUpdateAsync(s => s.SetProperty(i => i.AccountId, to));
+                await db.Transfers.Where(t => t.FromAccountId == from).ExecuteUpdateAsync(s => s.SetProperty(t => t.FromAccountId, to));
+                await db.Transfers.Where(t => t.ToAccountId == from).ExecuteUpdateAsync(s => s.SetProperty(t => t.ToAccountId, to));
             }
 
             await db.SaveChangesAsync();
