@@ -53,6 +53,7 @@ public class CsvExportTests(BudgetApiFactory factory) : IntegrationTestBase(fact
             {
                 "README.txt", "accounts.csv", "categories.csv", "corrections.csv", "household.csv", "income_amount_changes.csv", "income_status_periods.csv",
                 "incomes.csv", "members.csv", "outgoing_amount_changes.csv", "outgoing_status_periods.csv", "outgoings.csv", "people.csv",
+                "transfer_amount_changes.csv", "transfer_status_periods.csv", "transfers.csv",
             },
             files.Keys.Order(StringComparer.Ordinal));
         Assert.Contains("Format version 1", files["README.txt"], StringComparison.Ordinal);
@@ -80,8 +81,9 @@ public class CsvExportTests(BudgetApiFactory factory) : IntegrationTestBase(fact
         var outgoings = Lines(files["outgoings.csv"]);
         Assert.Equal(4, outgoings.Length);
         Assert.Contains(",https://example.com,0800 000 000,Fixed until March 2027,", outgoings[1], StringComparison.Ordinal);
-        Assert.Equal("name,currencyCode,exportedAt,schemaVersion", Lines(files["household.csv"])[0]);
-        Assert.Equal("The Austins,GBP,2026-11-06T17:30:00+00:00,1", Lines(files["household.csv"])[1]);
+        Assert.Equal("name,currencyCode,transfersEnabled,exportedAt,schemaVersion", Lines(files["household.csv"])[0]);
+        Assert.Equal("The Austins,GBP,false,2026-11-06T17:30:00+00:00,1", Lines(files["household.csv"])[1]);
+        Assert.Equal(new[] { "id,name,from,to,firstPaymentDate,notes,recordedBy,recordedAt,changedBy,changedAt" }, Lines(files["transfers.csv"]));
     }
 
     [Fact]

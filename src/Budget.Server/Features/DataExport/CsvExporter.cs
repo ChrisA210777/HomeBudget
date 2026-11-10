@@ -39,8 +39,8 @@ public static class CsvExporter
                 Add(archive, name, header, lines);
             }
 
-            Table("household.csv", ["name", "currencyCode", "exportedAt", "schemaVersion"], [export],
-                e => [e.Household.Name, e.Household.CurrencyCode, e.ExportedAt, e.SchemaVersion]);
+            Table("household.csv", ["name", "currencyCode", "transfersEnabled", "exportedAt", "schemaVersion"], [export],
+                e => [e.Household.Name, e.Household.CurrencyCode, e.Household.TransfersEnabled, e.ExportedAt, e.SchemaVersion]);
             Table("members.csv", ["displayName", "email", "role", "isOwner"], export.Members,
                 m => [m.DisplayName, m.Email, m.Role, m.IsOwner]);
             Table("people.csv", ["id", "displayName", "linkedMemberEmail"], export.People,
@@ -77,11 +77,22 @@ public static class CsvExporter
                 export.Outgoings.SelectMany(o => o.StatusPeriods.Select(p => (Parent: o.Id, Period: p))),
                 x => [x.Period.Id, x.Parent, x.Period.Reason, x.Period.StartDate, x.Period.ResumesOn, x.Period.Comment], x => x.Period);
 
+            // Transfers between accounts (BUD-91), with the accounts by name as in paidFrom.
+            Table("transfers.csv", ["id", "name", "from", "to", "firstPaymentDate", "notes"], export.Transfers,
+                t => [t.Id, t.Name, t.From, t.To, t.FirstPaymentDate, t.Notes], t => t);
+            Table("transfer_amount_changes.csv", ["id", "transferId", "effectiveFrom", "amount", "every", "unit", "comment"],
+                export.Transfers.SelectMany(t => t.AmountChanges.Select(c => (Parent: t.Id, Change: c))),
+                x => [x.Change.Id, x.Parent, x.Change.EffectiveFrom, x.Change.Amount, x.Change.Every, x.Change.Unit, x.Change.Comment], x => x.Change);
+            Table("transfer_status_periods.csv", ["id", "transferId", "reason", "startDate", "resumesOn", "comment"],
+                export.Transfers.SelectMany(t => t.StatusPeriods.Select(p => (Parent: t.Id, Period: p))),
+                x => [x.Period.Id, x.Parent, x.Period.Reason, x.Period.StartDate, x.Period.ResumesOn, x.Period.Comment], x => x.Period);
+
             if (export.Options.IncludeHistory)
             {
                 Table("corrections.csv", ["parentType", "parentId", "entryType", "entryId", "action", "before", "after", "reason"],
                     export.Incomes.SelectMany(i => i.Corrections.Select(c => (Type: "Income", Parent: i.Id, Correction: c)))
-                        .Concat(export.Outgoings.SelectMany(o => o.Corrections.Select(c => (Type: "Outgoing", Parent: o.Id, Correction: c)))),
+                        .Concat(export.Outgoings.SelectMany(o => o.Corrections.Select(c => (Type: "Outgoing", Parent: o.Id, Correction: c))))
+                        .Concat(export.Transfers.SelectMany(t => t.Corrections.Select(c => (Type: "Transfer", Parent: t.Id, Correction: c)))),
                     x => [x.Type, x.Parent, x.Correction.EntryType, x.Correction.EntryId, x.Correction.Action, x.Correction.Before, x.Correction.After, x.Correction.Reason],
                     x => x.Correction);
             }
@@ -144,7 +155,7 @@ public static class CsvExporter
         Dates are yyyy-MM-dd. Amounts are plain numbers in the household's currency ({export.Household.CurrencyCode}).
         Text that starts with = + - or @ has an apostrophe added so Excel doesn't treat it as a formula.
 
-        household.csv                 The household: name, currency, when it was exported and the format version.
+        household.csv                 The household: name, currency, whether transfers are on, when it was exported and the format version.
         members.csv                   Who can sign in, and their role. For information only.
         people.csv                    The people whose income and outgoings are tracked; linkedMemberEmail is their login.
         categories.csv                Outgoing categories, including hidden ones.
@@ -155,6 +166,9 @@ public static class CsvExporter
         outgoings.csv                 Bills, savings and allowances, with their details and renewal.
         outgoing_amount_changes.csv   Each outgoing amount from a date: amount paid every N weeks, months or years.
         outgoing_status_periods.csv   Pauses (until resumesOn) and endings for outgoings.
+        transfers.csv                 Money moved from one account or pot to another. Not spending, so not in the budget.
+        transfer_amount_changes.csv   Each transfer amount from a date: amount moved every N weeks, months or years.
+        transfer_status_periods.csv   Pauses (until resumesOn) and endings for transfers.
         {(export.Options.IncludeHistory ? "corrections.csv               Corrections and deletions of amounts and periods, with what they were and why." : string.Empty)}
         """;
 }

@@ -2,6 +2,7 @@ using System.Reflection;
 using Budget.Domain.Common;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
+using Budget.Domain.Transfers;
 using Budget.Infrastructure.Persistence;
 using Budget.Shared.DataExport;
 using Microsoft.EntityFrameworkCore;
@@ -55,12 +56,15 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
         var outgoings = await db.Outgoings.AsNoTracking()
             .Include(o => o.AmountChanges).Include(o => o.StatusPeriods).Include(o => o.Corrections)
             .AsSplitQuery().OrderBy(o => o.Name).ToListAsync();
+        var transfers = await db.Transfers.AsNoTracking()
+            .Include(t => t.AmountChanges).Include(t => t.StatusPeriods).Include(t => t.Corrections)
+            .AsSplitQuery().OrderBy(t => t.FirstPaymentDate).ToListAsync();
 
         // Emails for linked people and, with audit details, names for whoever recorded things. Only users who are
         // linked to this household's people, or who recorded something in it, are looked up.
         var linkedUserIds = people.Where(p => p.LinkedUserId is not null).Select(p => p.LinkedUserId!.Value);
         var auditUserIds = options.IncludeAudit
-            ? AllAudited(people, categories, incomes, outgoings).SelectMany(a => new[] { a.CreatedBy, a.ModifiedBy }).OfType<Guid>()
+            ? AllAudited(people, categories, incomes, outgoings, transfers).SelectMany(a => new[] { a.CreatedBy, a.ModifiedBy }).OfType<Guid>()
             : [];
         var userIds = linkedUserIds.Concat(auditUserIds).Distinct().ToList();
         var users = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id))
@@ -84,7 +88,7 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
             ExportedAt = now,
             AppVersion = AppVersion,
             Options = options,
-            Household = new ExportedHousehold { Name = household.Name, CurrencyCode = household.CurrencyCode },
+            Household = new ExportedHousehold { Name = household.Name, CurrencyCode = household.CurrencyCode, TransfersEnabled = household.TransfersEnabled },
             Members = members,
             People = people.Select(p => Audit(new ExportedPerson
             {
@@ -181,6 +185,34 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                             .Select(c => Audit(Correction(c.EntryType.ToString(), c.EntryId, c.Action.ToString(), c.Before, c.After, c.Reason), c)).ToList()
                         : [],
                 }, o)).ToList(),
+            Transfers = transfers
+                .Where(t => options.IncludeHistory || !(t.EndsOn <= today))
+                .Select(t => Audit(new ExportedTransfer
+                {
+                    Id = t.Id,
+                    Name = t.Name,
+                    From = AccountName(t.FromAccountId) ?? string.Empty,
+                    To = AccountName(t.ToAccountId) ?? string.Empty,
+                    FirstPaymentDate = t.FirstPaymentDate,
+                    Notes = t.Notes,
+                    AmountChanges = CurrentAndFuture(t.AmountChanges, c => c.EffectiveFrom, today, options)
+                        .Select(c => Audit(AmountChange(c.Id, c.EffectiveFrom, c.Amount, c.Every, c.Unit, c.Comment), c)).ToList(),
+                    StatusPeriods = t.StatusPeriods
+                        .Where(p => options.IncludeHistory || p.Reason == OutgoingStatusReason.Ended || !(p.ResumesOn <= today))
+                        .OrderBy(p => p.StartDate)
+                        .Select(p => Audit(new ExportedOutgoingStatusPeriod
+                        {
+                            Id = p.Id,
+                            Reason = p.Reason.ToString(),
+                            StartDate = p.StartDate,
+                            ResumesOn = p.ResumesOn,
+                            Comment = p.Comment,
+                        }, p)).ToList(),
+                    Corrections = options.IncludeHistory
+                        ? t.Corrections.OrderBy(c => c.RecordedAt).ThenBy(c => c.CreatedAt)
+                            .Select(c => Audit(Correction(c.EntryType.ToString(), c.EntryId, c.Action.ToString(), c.Before, c.After, c.Reason), c)).ToList()
+                        : [],
+                }, t)).ToList(),
         };
     }
 
@@ -221,8 +253,9 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
     };
 
     private static IEnumerable<IAuditable> AllAudited(
-        IEnumerable<IAuditable> people, IEnumerable<IAuditable> categories, IEnumerable<IncomeStream> incomes, IEnumerable<Outgoing> outgoings) =>
+        IEnumerable<IAuditable> people, IEnumerable<IAuditable> categories, IEnumerable<IncomeStream> incomes, IEnumerable<Outgoing> outgoings, IEnumerable<Transfer> transfers) =>
         people.Concat(categories)
             .Concat(incomes).Concat(incomes.SelectMany(i => i.AmountChanges.Cast<IAuditable>().Concat(i.StatusPeriods).Concat(i.Corrections)))
-            .Concat(outgoings).Concat(outgoings.SelectMany(o => o.AmountChanges.Cast<IAuditable>().Concat(o.StatusPeriods).Concat(o.Corrections)));
+            .Concat(outgoings).Concat(outgoings.SelectMany(o => o.AmountChanges.Cast<IAuditable>().Concat(o.StatusPeriods).Concat(o.Corrections)))
+            .Concat(transfers).Concat(transfers.SelectMany(t => t.AmountChanges.Cast<IAuditable>().Concat(t.StatusPeriods).Concat(t.Corrections)));
 }
