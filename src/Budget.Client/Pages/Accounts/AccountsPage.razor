@@ -35,7 +35,7 @@
                 <MudText Typo="Typo.subtitle1" Class="mb-2">Add an account</MudText>
                 <div class="d-flex flex-wrap gap-3">
                     <div style="flex: 2 1 12rem">
-                        <MudTextField @bind-Value="_newName" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" data-testid="new-account-name" />
+                        <MudTextField @bind-Value="_newName" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" Immediate="true" data-testid="new-account-name" />
                     </div>
                     <div style="flex: 1 1 8rem">
                         <MudTextField @bind-Value="_newProvider" Label="Bank (optional)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" data-testid="new-account-provider" />
@@ -81,7 +81,7 @@
                     <div class="d-flex align-center gap-2 px-4 pb-3 pl-10">
                         @if (_addingPotTo == account.Id)
                         {
-                            <MudTextField @bind-Value="_newPotName" Label="Pot name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" data-testid="new-pot-name" />
+                            <MudTextField @bind-Value="_newPotName" Label="Pot name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" Immediate="true" data-testid="new-pot-name" />
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="() => AddPotAsync(account)"
                                        Disabled="@(_saving || !Online || string.IsNullOrWhiteSpace(_newPotName))" data-testid="add-pot-save">Add</MudButton>
                             <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => _addingPotTo = null">Cancel</MudButton>
@@ -162,7 +162,7 @@
             {
                 <div class="d-flex flex-wrap gap-3">
                     <div style="flex: 2 1 12rem">
-                        <MudTextField @bind-Value="_editName" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" data-testid="edit-account-name" />
+                        <MudTextField @bind-Value="_editName" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" Immediate="true" data-testid="edit-account-name" />
                     </div>
                     @if (!isPot)
                     {

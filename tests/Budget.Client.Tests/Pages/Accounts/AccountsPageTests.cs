@@ -47,7 +47,7 @@ public sealed class AccountsPageTests : IDisposable
     {
         var cut = Render("User");
 
-        cut.Find("input[data-testid=new-account-name]").Change("Joint bills");
+        cut.Find("input[data-testid=new-account-name]").Input("Joint bills");
         cut.Find("input[data-testid=new-account-provider]").Change("Nationwide");
         cut.Find("[data-testid=add-account]").Click();
 
@@ -61,7 +61,7 @@ public sealed class AccountsPageTests : IDisposable
         var cut = Render("User");
 
         cut.FindAll("[data-testid=account]").Single(e => e.GetAttribute("aria-label") == "Joint Monzo").QuerySelector("[data-testid=add-pot]")!.Click();
-        cut.Find("input[data-testid=new-pot-name]").Change("Garden");
+        cut.Find("input[data-testid=new-pot-name]").Input("Garden");
         cut.Find("[data-testid=add-pot-save]").Click();
 
         cut.WaitForAssertion(() => Assert.Equal(("Garden", (Guid?)MonzoId), (Assert.Single(_api.Added).Name, _api.Added[0].ParentAccountId)));
@@ -73,7 +73,7 @@ public sealed class AccountsPageTests : IDisposable
         _api.Refusal = "There's already an account with that name.";
         var cut = Render("User");
 
-        cut.Find("input[data-testid=new-account-name]").Change("Joint Monzo");
+        cut.Find("input[data-testid=new-account-name]").Input("Joint Monzo");
         cut.Find("[data-testid=add-account]").Click();
 
         cut.WaitForAssertion(() => Assert.Contains("already an account", cut.Find("[data-testid=account-error]").TextContent, StringComparison.Ordinal));
