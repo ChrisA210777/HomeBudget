@@ -71,6 +71,42 @@
             </table>
         </MudPaper>
 
+        @if (b.Comparison is { } comparison && (comparison.Difference != 0 || comparison.Changes.Count > 0))
+        {
+            var previousName = IncomeDates.MonthName(comparison.Year, comparison.Month).Split(' ')[0];
+            @* What changed since last month, only on request so the summary stays simple (BUD-83, ADR-013). *@
+            <MudPaper Outlined="true" Class="pa-3 mb-3" data-testid="what-changed">
+                <div class="d-flex align-center flex-wrap gap-2">
+                    <MudIcon Icon="@Trend(comparison.Difference)" Color="@TrendColour(comparison.Difference)" aria-hidden="true" />
+                    <MudText Typo="Typo.body1" Class="flex-grow-1" data-testid="what-changed-summary">@Summary(comparison.Difference, previousName)</MudText>
+                    @if (comparison.Changes.Count > 0)
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                   EndIcon="@(_showChanges ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                   aria-expanded="@(_showChanges ? "true" : "false")" aria-controls="what-changed-list"
+                                   OnClick="() => _showChanges = !_showChanges" data-testid="what-changed-toggle">What changed?</MudButton>
+                    }
+                </div>
+                @if (_showChanges && comparison.Changes.Count > 0)
+                {
+                    <ul id="what-changed-list" class="plain-list budget-lines mt-2" aria-label="@($"Changes since {previousName}")">
+                        @foreach (var change in comparison.Changes)
+                        {
+                            <li class="d-flex align-start gap-2 py-2" data-testid="change">
+                                <MudIcon Icon="@Trend(change.Effect)" Color="@TrendColour(change.Effect)" Size="Size.Small" Class="mt-1" aria-hidden="true" />
+                                <div class="flex-grow-1" style="min-width: 0">
+                                    <MudLink Href="@(change.IsIncome ? $"/income/{change.Id}" : $"/outgoings/{change.Id}")" data-testid="change-name">@change.Name</MudLink>
+                                    <MudText Typo="Typo.caption" Class="d-block" data-testid="change-reason">@Explain(change)</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="change-amounts">@Format(change.Previous) → @Format(change.Current)@(change.IsIncome ? " income" : string.Empty)</MudText>
+                                </div>
+                                <MudText Typo="Typo.body2" Class="text-right text-nowrap" data-testid="change-effect">@Effect(change.Effect)</MudText>
+                            </li>
+                        }
+                    </ul>
+                }
+            </MudPaper>
+        }
+
         @if (b.LeftAfterEverything < 0)
         {
             <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="shortfall-warning">
@@ -133,6 +169,7 @@
     private HouseholdMembershipSummary? _household;
     private BudgetMonthResponse? _budget;
     private bool _loaded;
+    private bool _showChanges;
     private int _year;
     private int _month;
 
@@ -171,6 +208,48 @@
         }
 
         return @<span>@Format(amount)</span>;
+    }
+
+    private string Summary(decimal difference, string previousMonth) => difference switch
+    {
+        > 0 => $"{Format(difference)} better than {previousMonth}",
+        < 0 => $"{Format(-difference)} worse than {previousMonth}",
+        _ => $"The same as {previousMonth} overall",
+    };
+
+    /// <summary>The change in money left, in words as well as a sign, e.g. "£30.00 less left".</summary>
+    private string Effect(decimal effect) => effect < 0 ? $"{Format(-effect)} less left" : $"{Format(effect)} more left";
+
+    private static string Trend(decimal effect) => effect switch
+    {
+        > 0 => Icons.Material.Filled.TrendingUp,
+        < 0 => Icons.Material.Filled.TrendingDown,
+        _ => Icons.Material.Filled.TrendingFlat,
+    };
+
+    private static Color TrendColour(decimal effect) => effect switch
+    {
+        > 0 => Color.Success,
+        < 0 => Color.Error,
+        _ => Color.Default,
+    };
+
+    /// <summary>Why it changed, with the comment entered at the time, e.g. "Price went up · Annual price rise".</summary>
+    public static string Explain(BudgetChangeLine change)
+    {
+        var reason = change.Reason switch
+        {
+            BudgetChangeReasonDto.New => change.IsIncome ? "New income" : "New",
+            BudgetChangeReasonDto.Ended => "Ended",
+            BudgetChangeReasonDto.Paused => "Paused",
+            BudgetChangeReasonDto.Resumed => "Payments resumed",
+            BudgetChangeReasonDto.AmountChanged when change.IsIncome => change.Current > change.Previous ? "Went up" : "Went down",
+            BudgetChangeReasonDto.AmountChanged => change.Current > change.Previous ? "Price went up" : "Price went down",
+            BudgetChangeReasonDto.Reduced => change.Status is { } status ? IncomeLabels.Reason(status) : "Reduced",
+            BudgetChangeReasonDto.BackToUsual => change.Status is { } status ? $"Back to usual after {IncomeLabels.Reason(status).ToLowerInvariant()}" : "Back to usual",
+            _ => "Changed",
+        };
+        return string.IsNullOrWhiteSpace(change.Comment) ? reason : $"{reason} · {change.Comment}";
     }
 
     private static string KindName(OutgoingKindDto kind) => kind switch

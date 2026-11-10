@@ -74,6 +74,34 @@ public class BudgetApiTests(BudgetApiFactory factory) : IntegrationTestBase(fact
     }
 
     [Fact]
+    public async Task The_month_is_compared_with_the_one_before_with_reasons_biggest_first()
+    {
+        var (client, householdId) = await HouseholdAsync();
+        await AddIncomeAsync(client, householdId, 3000m);
+        var gym = await AddOutgoingAsync(client, householdId, "Gym", "Leisure & memberships", OutgoingPriorityDto.Optional, 30m, PaymentUnitDto.Month);
+        await AddOutgoingAsync(client, householdId, "New car", "Car & travel", OutgoingPriorityDto.Essential, 250m, PaymentUnitDto.Month, firstPayment: new DateOnly(2026, 12, 5));
+        await AddOutgoingAsync(client, householdId, "Car insurance", "Insurance", OutgoingPriorityDto.Essential, 480m, PaymentUnitDto.Year);
+        await ExecuteDbContextAsync(async db =>
+        {
+            var outgoing = await db.Outgoings.IgnoreQueryFilters().Include(o => o.AmountChanges).Include(o => o.StatusPeriods).SingleAsync(o => o.Id == gym);
+            outgoing.ChangeAmount(new DateOnly(2026, 12, 5), 35m, Budget.Domain.Outgoings.PaymentSchedule.Monthly, "Price rise");
+            await db.SaveChangesAsync();
+        });
+
+        var december = (await client.GetFromJsonAsync<BudgetMonthResponse>(Url(BudgetRoutes.Month(householdId, 2026, 12))))!;
+
+        var comparison = december.Comparison!;
+        Assert.Equal((2026, 11), (comparison.Year, comparison.Month));
+        Assert.Equal((2930m, 2675m, -255m), (comparison.LeftAfterEverything, december.LeftAfterEverything, comparison.Difference));
+        // The yearly insurance is spread over every month, so it isn't a change.
+        Assert.Equal(
+            new[] { ("New car", 0m, 250m, -250m, BudgetChangeReasonDto.New, (string?)null), ("Gym", 30m, 35m, -5m, BudgetChangeReasonDto.AmountChanged, "Price rise") },
+            comparison.Changes.Select(c => (c.Name, c.Previous, c.Current, c.Effect, c.Reason, c.Comment)));
+        Assert.All(comparison.Changes, c => Assert.False(c.IsIncome));
+        Assert.Equal(gym, comparison.Changes[1].Id);
+    }
+
+    [Fact]
     public async Task The_figures_match_the_income_and_outgoings_pages()
     {
         var (client, householdId) = await HouseholdAsync();

@@ -1,3 +1,4 @@
+using Budget.Shared.Income;
 using Budget.Shared.Outgoings;
 
 namespace Budget.Shared.Budgeting;
@@ -28,7 +29,8 @@ public sealed record BudgetMonthResponse(
     decimal LeftAfterPreferred,
     decimal LeftAfterEverything,
     IReadOnlyList<BudgetKindLine> ByKind,
-    IReadOnlyList<BudgetCategoryLine> ByCategory)
+    IReadOnlyList<BudgetCategoryLine> ByCategory,
+    BudgetComparison? Comparison = null)
 {
     public decimal Outgoings => Essential + Preferred + Optional;
 }
@@ -37,3 +39,37 @@ public sealed record BudgetKindLine(OutgoingKindDto Kind, decimal Amount);
 
 /// <summary>A category's monthly total, in the household's category order; only categories with something in them.</summary>
 public sealed record BudgetCategoryLine(Guid CategoryId, string Name, decimal Amount, string Icon = CategoryIcons.Default);
+
+/// <summary>
+/// How the month compares with the one before (BUD-83, ADR-013): what was left then, the difference,
+/// and only the outgoings and income that changed, biggest effect first.
+/// </summary>
+public sealed record BudgetComparison(int Year, int Month, decimal LeftAfterEverything, decimal Difference, IReadOnlyList<BudgetChangeLine> Changes);
+
+/// <summary>Why an amount differs from the month before.</summary>
+public enum BudgetChangeReasonDto
+{
+    New,
+    Ended,
+    Paused,
+    Resumed,
+    AmountChanged,
+    Reduced,
+    BackToUsual,
+}
+
+/// <summary>
+/// An outgoing or income whose budget amount changed. <see cref="Effect"/> is the change in money left:
+/// negative when it leaves less (a price rise, less income). <see cref="Comment"/> is the comment on the
+/// change, e.g. "Annual price rise"; <see cref="Status"/> is the income status behind a reduction.
+/// </summary>
+public sealed record BudgetChangeLine(
+    bool IsIncome,
+    Guid Id,
+    string Name,
+    decimal Previous,
+    decimal Current,
+    decimal Effect,
+    BudgetChangeReasonDto Reason,
+    string? Comment,
+    IncomeStatusReasonDto? Status = null);
