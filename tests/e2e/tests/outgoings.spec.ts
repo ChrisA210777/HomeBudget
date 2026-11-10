@@ -189,3 +189,25 @@ test('groups close to their header, one at a time or all at once', async ({ page
   await expect(group.getByTestId('outgoing-name')).toBeHidden();
   await expect(page.getByTestId('toggle-all-groups')).toHaveText('Expand all');
 });
+
+test('upcoming payments show what is due each day, a week or a month at a time', async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Hedge trimming fund', 'Home maintenance', '20');
+  await page.goto('/outgoings');
+  await settled(page);
+
+  // BUD-82: a monthly outgoing starting today is due today, at its real amount.
+  await page.getByTestId('go-to-upcoming').click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Upcoming payments' })).toBeVisible();
+  await settled(page);
+  const today = page.getByTestId('payment-day').filter({ has: page.getByTestId('payment-today') });
+  await expect(today.getByTestId('payment-name')).toHaveText('Hedge trimming fund');
+  await expect(today.getByTestId('payment-amount')).toHaveText('£20.00');
+
+  await page.getByTestId('show-month').click();
+  await expect(page.getByTestId('period-total')).toHaveText('£20.00');
+  await page.getByTestId('next-period').click();
+  await expect(page.getByTestId('payment-name')).toHaveText(['Hedge trimming fund']);
+  await page.getByTestId('go-to-today').click();
+  await expect(page.getByTestId('payment-today')).toBeVisible();
+});

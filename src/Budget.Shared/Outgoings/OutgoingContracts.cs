@@ -99,7 +99,34 @@ public static class OutgoingRoutes
 
     /// <summary>GET: the "paid from" account names already used in the household, for suggestions.</summary>
     public static string PaidFromNames(Guid householdId) => $"{Outgoings(householdId)}/paid-from";
+
+    /// <summary>GET: the payments actually due between two dates inclusive, at most 62 days apart (BUD-82).</summary>
+    public static string Payments(Guid householdId, DateOnly from, DateOnly to) =>
+        $"{Outgoings(householdId)}/payments?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
+
+    /// <summary>The longest range of payments that can be asked for at once: a month and a bit.</summary>
+    public const int MaxPaymentDays = 62;
 }
+
+/// <summary>The payments due between <see cref="From"/> and <see cref="To"/>, in date order (BUD-82, ADR-013).</summary>
+public sealed record UpcomingPaymentsResponse(DateOnly From, DateOnly To, string CurrencyCode, IReadOnlyList<UpcomingPayment> Payments);
+
+/// <summary>One payment due: what is actually paid on the day, not a monthly average.</summary>
+public sealed record UpcomingPayment(
+    DateOnly Date,
+    Guid OutgoingId,
+    string Name,
+    decimal Amount,
+    int Every,
+    PaymentUnitDto Unit,
+    OutgoingKindDto Kind,
+    OutgoingPriorityDto Priority,
+    Guid CategoryId,
+    string CategoryName,
+    int CategorySortOrder,
+    string CategoryIcon,
+    string? PaidFrom,
+    string? PersonName);
 
 public sealed record CreateOutgoingRequest
 {

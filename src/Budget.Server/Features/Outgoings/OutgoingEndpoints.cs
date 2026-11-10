@@ -23,6 +23,7 @@ public static class OutgoingEndpoints
         outgoings.MapGet("/", GetMonthAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapPost("/", CreateAsync).RequireAuthorization(HouseholdPolicies.User);
         outgoings.MapGet("/paid-from", PaidFromNamesAsync).RequireAuthorization(HouseholdPolicies.Viewer);
+        outgoings.MapGet("/payments", PaymentsAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapGet("/coming-up", ComingUpAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         outgoings.MapGet("/reference-labels", ReferenceLabelsAsync).RequireAuthorization(HouseholdPolicies.Viewer);
 
@@ -109,6 +110,71 @@ public static class OutgoingEndpoints
             .ToList();
 
         return Results.Ok(new OutgoingMonthResponse(year, monthNumber, items, currency, count));
+    }
+
+    /// <summary>The payments actually due between two dates (BUD-82, ADR-013), in date order.</summary>
+    private static async Task<IResult> PaymentsAsync(Guid householdId, string? from, string? to, BudgetDbContext db)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var start = ParseDate(from, "from", errors);
+        var end = ParseDate(to, "to", errors);
+        if (errors.Count == 0 && (end < start || end.DayNumber - start.DayNumber >= OutgoingRoutes.MaxPaymentDays))
+        {
+            errors["to"] = [$"Ask for 1 to {OutgoingRoutes.MaxPaymentDays} days, ending on or after the start."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var outgoings = await db.Outgoings
+            .Include(o => o.AmountChanges)
+            .Include(o => o.StatusPeriods)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .ToListAsync();
+        var categories = await db.OutgoingCategories.ToDictionaryAsync(c => c.Id, c => new { c.Name, c.SortOrder, c.Icon });
+        var people = await db.People.ToDictionaryAsync(p => p.Id, p => p.DisplayName);
+        var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
+
+        var payments = outgoings
+            .SelectMany(o => o.PaymentsBetween(start, end).Select(p =>
+            {
+                var category = categories.GetValueOrDefault(o.CategoryId);
+                return new UpcomingPayment(
+                    p.Date,
+                    o.Id,
+                    o.Name,
+                    p.Amount,
+                    p.Schedule.Every,
+                    (PaymentUnitDto)p.Schedule.Unit,
+                    (OutgoingKindDto)o.Kind,
+                    (OutgoingPriorityDto)o.Priority,
+                    o.CategoryId,
+                    category?.Name ?? string.Empty,
+                    category?.SortOrder ?? int.MaxValue,
+                    category?.Icon ?? CategoryIcons.Default,
+                    o.PaidFrom,
+                    o.PersonId is { } personId ? people.GetValueOrDefault(personId) : null);
+            }))
+            .OrderBy(p => p.Date)
+            .ThenBy(p => p.CategorySortOrder)
+            .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return Results.Ok(new UpcomingPaymentsResponse(start, end, currency, payments));
+    }
+
+    private static DateOnly ParseDate(string? text, string key, Dictionary<string, string[]> errors)
+    {
+        if (DateOnly.TryParseExact(text, "yyyy-MM-dd", Display, DateTimeStyles.None, out var date))
+        {
+            return date;
+        }
+
+        errors[key] = ["Use the format yyyy-MM-dd, e.g. 2026-11-08."];
+        return default;
     }
 
     /// <summary>Why this month differs from usual: starting, price changes, pauses and ending.</summary>
