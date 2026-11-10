@@ -3,6 +3,7 @@ using Budget.Domain.Common;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Domain.People;
+using Budget.Domain.Transfers;
 using Budget.Server.Features.Accounts;
 using Budget.Shared.DataExport;
 
@@ -18,6 +19,9 @@ public sealed class ImportPlan
     public List<IncomeStream> Incomes { get; } = [];
 
     public List<Outgoing> Outgoings { get; } = [];
+
+    /// <summary>Transfers between accounts (version 4, BUD-91).</summary>
+    public List<Transfer> Transfers { get; } = [];
 
     /// <summary>Accounts and pots (BUD-89): from the file's list, plus any named only by an outgoing.</summary>
     public List<Account> Accounts { get; } = [];
@@ -313,6 +317,87 @@ public static class ImportPlanner
             }
 
             plan.Outgoings.Add(outgoing);
+        }
+
+        for (var i = 0; i < export.Transfers.Count; i++)
+        {
+            var source = export.Transfers[i];
+            var path = $"transfers[{i}]";
+            if (source.AmountChanges.Count == 0)
+            {
+                continue;
+            }
+
+            // Accounts named only by a transfer are added, as for outgoings and income.
+            var from = accounts.Resolve(source.From, restoreArchived: false);
+            var to = accounts.Resolve(source.To, restoreArchived: false);
+            if (from is null || to is null)
+            {
+                problems.Add(new ExportProblem($"{path}.{(from is null ? "from" : "to")}", "is required."));
+                continue;
+            }
+
+            var entryIds = new Dictionary<Guid, Guid>();
+            var changes = source.AmountChanges.OrderBy(c => c.EffectiveFrom).ToList();
+            var first = changes[0];
+            if (first.EffectiveFrom < source.FirstPaymentDate)
+            {
+                problems.Add(new ExportProblem($"{path}.amountChanges[{Index(source.AmountChanges, first)}].effectiveFrom", "is before the first payment."));
+                continue;
+            }
+
+            var transfer = Keep(Try(path, () => Transfer.Create(
+                householdId,
+                new TransferDetails { Name = source.Name, FromAccountId = from.Id, ToAccountId = to.Id, FirstPaymentDate = source.FirstPaymentDate, Notes = source.Notes },
+                first.Amount,
+                Schedule(first),
+                first.Comment)), source);
+            if (transfer is null)
+            {
+                continue;
+            }
+
+            foreach (var change in changes)
+            {
+                if (change.EffectiveFrom == source.FirstPaymentDate)
+                {
+                    entryIds[change.Id] = Keep(transfer.AmountChanges.Single(c => c.EffectiveFrom == source.FirstPaymentDate), change)!.Id;
+                    continue;
+                }
+
+                var added = Keep(Try($"{path}.amountChanges[{Index(source.AmountChanges, change)}]", () =>
+                    transfer.ChangeAmount(change.EffectiveFrom, change.Amount, Schedule(change), change.Comment)), change);
+                if (added is not null)
+                {
+                    entryIds[change.Id] = added.Id;
+                }
+            }
+
+            for (var p = 0; p < source.StatusPeriods.Count; p++)
+            {
+                var period = source.StatusPeriods[p];
+                var added = Keep(Try($"{path}.statusPeriods[{p}]", () => period.Reason == nameof(OutgoingStatusReason.Ended)
+                    ? transfer.End(period.StartDate, period.Comment)
+                    : transfer.Pause(period.StartDate, period.ResumesOn, period.Comment)), period);
+                if (added is not null)
+                {
+                    entryIds[period.Id] = added.Id;
+                }
+            }
+
+            for (var c = 0; c < source.Corrections.Count; c++)
+            {
+                var correction = source.Corrections[c];
+                Keep(Try($"{path}.corrections[{c}]", () => transfer.RestoreCorrection(
+                    Enum.Parse<OutgoingEntryType>(correction.EntryType),
+                    EntryId(entryIds, correction.EntryId),
+                    Enum.Parse<OutgoingCorrectionAction>(correction.Action),
+                    correction.Before,
+                    correction.After,
+                    correction.Reason)), correction);
+            }
+
+            plan.Transfers.Add(transfer);
         }
 
         return (problems.Count == 0 ? plan : null, problems);

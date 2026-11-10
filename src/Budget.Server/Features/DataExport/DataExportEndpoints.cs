@@ -91,7 +91,8 @@ public static class DataExportEndpoints
                 Outgoings = export.Outgoings.Count,
                 HistoryEntries =
                     export.Incomes.Sum(i => i.AmountChanges.Count + i.StatusPeriods.Count + i.Corrections.Count)
-                    + export.Outgoings.Sum(o => o.AmountChanges.Count + o.StatusPeriods.Count + o.Corrections.Count),
+                    + export.Outgoings.Sum(o => o.AmountChanges.Count + o.StatusPeriods.Count + o.Corrections.Count)
+                    + export.Transfers.Sum(t => t.AmountChanges.Count + t.StatusPeriods.Count + t.Corrections.Count),
             },
             Members = export.Members.Select(m => new ImportMember(m.DisplayName, m.Email, m.Role, m.IsOwner)).ToList(),
             People = export.People
@@ -148,6 +149,7 @@ public static class DataExportEndpoints
         var user = await db.Users.SingleAsync(u => u.Id == userId);
 
         var household = Household.Create(userId, time.GetUtcNow(), householdName);
+        household.SetTransfersEnabled(export.Household.TransfersEnabled);
         var (plan, problems) = ImportPlanner.Plan(export, household.Id);
         if (plan is null)
         {
@@ -171,6 +173,7 @@ public static class DataExportEndpoints
         db.IncomeStreams.AddRange(plan.Incomes);
         db.Accounts.AddRange(plan.Accounts);
         db.Outgoings.AddRange(plan.Outgoings);
+        db.Transfers.AddRange(plan.Transfers);
         user.LastActiveHouseholdId = household.Id;
 
         // One save, so it's all or nothing.
@@ -232,11 +235,18 @@ public static class DataExportEndpoints
                 household.Rename(export.Household.Name);
             }
 
+            // A file with transfers on turns them on; one without (e.g. from before version 4) leaves the setting alone.
+            if (export.Household.TransfersEnabled)
+            {
+                household.SetTransfersEnabled(true);
+            }
+
             db.People.AddRange(plan.People);
             db.OutgoingCategories.AddRange(plan.Categories);
             db.IncomeStreams.AddRange(plan.Incomes);
             db.Accounts.AddRange(plan.Accounts);
             db.Outgoings.AddRange(plan.Outgoings);
+            db.Transfers.AddRange(plan.Transfers);
             await db.SaveChangesAsync();
 
             await transaction.CommitAsync();

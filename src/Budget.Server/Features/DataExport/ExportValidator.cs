@@ -2,6 +2,7 @@ using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
+using Budget.Domain.Transfers;
 using Budget.Domain.People;
 using Budget.Shared.DataExport;
 using Budget.Shared.Outgoings;
@@ -243,6 +244,44 @@ public static class ExportValidator
 
             UniqueIds($"{path}.statusPeriods", outgoing.StatusPeriods.Select(p => p.Id));
             Corrections(path, outgoing.Corrections, OutgoingCorrection.DescriptionMaxLength);
+        }
+
+        // Transfers between accounts (version 4, BUD-91).
+        UniqueIds("transfers", export.Transfers.Select(t => t.Id));
+        for (var i = 0; i < export.Transfers.Count; i++)
+        {
+            var transfer = export.Transfers[i];
+            var path = $"transfers[{i}]";
+            Text($"{path}.name", transfer.Name, Transfer.NameMaxLength, required: false);
+            Text($"{path}.from", transfer.From, OutgoingValidator.PaidFromMaxLength);
+            Text($"{path}.to", transfer.To, OutgoingValidator.PaidFromMaxLength);
+            Text($"{path}.notes", transfer.Notes, Transfer.NotesMaxLength, required: false);
+            if (transfer.FirstPaymentDate == default)
+            {
+                Add($"{path}.firstPaymentDate", "is required.");
+            }
+
+            AmountChanges(path, transfer.AmountChanges, Transfer.CommentMaxLength);
+            for (var p = 0; p < transfer.StatusPeriods.Count; p++)
+            {
+                var period = transfer.StatusPeriods[p];
+                var periodPath = $"{path}.statusPeriods[{p}]";
+                OneOf($"{periodPath}.reason", period.Reason, ExportValues.OutgoingStatusReasons);
+                if (period.ResumesOn <= period.StartDate)
+                {
+                    Add($"{periodPath}.resumesOn", "must be after the start date.");
+                }
+
+                if (period.Reason == "Ended" && period.ResumesOn is not null)
+                {
+                    Add($"{periodPath}.resumesOn", "must be empty for an ending.");
+                }
+
+                Text($"{periodPath}.comment", period.Comment, Transfer.CommentMaxLength);
+            }
+
+            UniqueIds($"{path}.statusPeriods", transfer.StatusPeriods.Select(p => p.Id));
+            Corrections(path, transfer.Corrections, TransferCorrection.DescriptionMaxLength);
         }
 
         return problems;

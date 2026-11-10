@@ -35,7 +35,7 @@ public interface IExportUpgrader
 public static class ExportReader
 {
     /// <summary>One per version before the current one, in order. None yet: version 1 is the first.</summary>
-    public static IReadOnlyList<IExportUpgrader> Upgraders { get; } = [new ExportUpgraderV1(), new ExportUpgraderV2()];
+    public static IReadOnlyList<IExportUpgrader> Upgraders { get; } = [new ExportUpgraderV1(), new ExportUpgraderV2(), new ExportUpgraderV3()];
 
     public static ExportReadResult Read(byte[] file)
     {

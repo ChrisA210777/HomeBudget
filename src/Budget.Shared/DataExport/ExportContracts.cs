@@ -40,6 +40,9 @@ public sealed record HouseholdExport
     public IReadOnlyList<ExportedIncome> Incomes { get; init; } = [];
 
     public IReadOnlyList<ExportedOutgoing> Outgoings { get; init; } = [];
+
+    /// <summary>Transfers between accounts (version 4, BUD-91).</summary>
+    public IReadOnlyList<ExportedTransfer> Transfers { get; init; } = [];
 }
 
 public sealed record ExportOptions
@@ -57,6 +60,9 @@ public sealed record ExportedHousehold
 
     /// <summary>ISO 4217, e.g. "GBP".</summary>
     public string CurrencyCode { get; init; } = string.Empty;
+
+    /// <summary>"Accounts and transfers" is on (version 4, BUD-91).</summary>
+    public bool TransfersEnabled { get; init; }
 }
 
 public sealed record ExportedMember
@@ -269,6 +275,30 @@ public sealed record ExportedOutgoingDetails
     public string? ContactPhone { get; init; }
 
     public string? Notes { get; init; }
+}
+
+/// <summary>Money moved from one account or pot to another on a schedule (version 4, BUD-91).</summary>
+public sealed record ExportedTransfer : ExportedAudited
+{
+    public Guid Id { get; init; }
+
+    public string? Name { get; init; }
+
+    /// <summary>The account, or "Account › Pot", it comes from (an account in <see cref="HouseholdExport.Accounts"/>).</summary>
+    public string From { get; init; } = string.Empty;
+
+    /// <summary>The account, or "Account › Pot", it goes into.</summary>
+    public string To { get; init; } = string.Empty;
+
+    public DateOnly FirstPaymentDate { get; init; }
+
+    public string? Notes { get; init; }
+
+    public IReadOnlyList<ExportedAmountChange> AmountChanges { get; init; } = [];
+
+    public IReadOnlyList<ExportedOutgoingStatusPeriod> StatusPeriods { get; init; } = [];
+
+    public IReadOnlyList<ExportedCorrection> Corrections { get; init; } = [];
 }
 
 public sealed record ExportedOutgoingStatusPeriod : ExportedAudited

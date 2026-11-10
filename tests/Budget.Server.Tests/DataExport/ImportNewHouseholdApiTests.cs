@@ -82,6 +82,25 @@ public class ImportNewHouseholdApiTests(BudgetApiFactory factory) : IntegrationT
     }
 
     [Fact]
+    public async Task Transfers_and_their_setting_are_imported_and_exported_again()
+    {
+        var (userId, ownHouseholdId) = await CreateHouseholdOwnerAsync();
+        using var client = CreateClient(signedInAs: userId);
+        var v4 = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "ImportCompatibility", "v4", "full-history-and-audit.json"));
+        var newId = (await ImportAsync(client, ownHouseholdId, v4)).HouseholdId!.Value;
+
+        var export = JsonSerializer.Deserialize<HouseholdExport>(
+            await client.GetByteArrayAsync(new Uri(DataRoutes.Export(newId, includeHistory: true, includeAudit: true), UriKind.Relative)), ExportFormat.JsonOptions)!;
+
+        Assert.True(export.Household.TransfersEnabled);
+        Assert.Equal(
+            new[] { ("Bills top-up", "Chris current", "Joint account"), ((string?)null, "Joint account", "Joint account › Holiday") },
+            export.Transfers.Select(t => (t.Name, t.From, t.To)));
+        var topUp = export.Transfers[0];
+        Assert.Equal((2, 1, 1, "Chris Austin"), (topUp.AmountChanges.Count, topUp.StatusPeriods.Count, topUp.Corrections.Count, topUp.RecordedBy));
+    }
+
+    [Fact]
     public async Task You_can_choose_your_name_and_which_person_is_you()
     {
         var (userId, ownHouseholdId) = await CreateHouseholdOwnerAsync();
