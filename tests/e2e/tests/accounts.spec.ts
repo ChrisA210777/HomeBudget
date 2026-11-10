@@ -85,7 +85,7 @@ test("an account's outgoings are one tap away from the Accounts page", async ({ 
 
 test('grouped by Paid from, an account shows its pots as subgroups with subtotals', async ({ page }) => {
   await signIn(page);
-  for (const [name, paidFrom, amount] of [['Window cleaner', 'Garden account', '15'], ['Hedge trimming fund', 'Garden account (Hedges Pot)', '20']]) {
+  for (const [name, paidFrom, amount] of [['Gnome repairs', 'Garden account', '15'], ['Hedge trimming fund', 'Garden account (Hedges Pot)', '20']]) {
     await page.goto('/outgoings/new');
     await settled(page);
     await typeOutgoingName(page, name);
