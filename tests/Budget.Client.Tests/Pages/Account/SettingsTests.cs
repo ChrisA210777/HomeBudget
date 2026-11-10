@@ -42,7 +42,7 @@ public sealed class SettingsTests : IDisposable
     {
         var cut = _context.RenderComponent<Settings>();
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<DayOfWeek>>().Instance.GetState(x => x.Value)Changed.InvokeAsync(DayOfWeek.Monday));
+        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<DayOfWeek>>().Instance.ValueChanged.InvokeAsync(DayOfWeek.Monday));
 
         var update = Assert.Single(_api.Updates);
         Assert.Equal((DayOfWeek?)DayOfWeek.Monday, update.FirstDayOfWeek);
@@ -56,7 +56,7 @@ public sealed class SettingsTests : IDisposable
         var cut = _context.RenderComponent<Settings>();
         _api.Offline = true;
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<OutgoingsGroupingDto>>().Instance.GetState(x => x.Value)Changed.InvokeAsync(OutgoingsGroupingDto.PaidFrom));
+        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<OutgoingsGroupingDto>>().Instance.ValueChanged.InvokeAsync(OutgoingsGroupingDto.PaidFrom));
 
         Assert.Equal(OutgoingsGroupingDto.PaidFrom, _context.Services.GetRequiredService<UserSettingsStore>().Current.OutgoingsGrouping);
         Assert.Equal(OutgoingsGroupingDto.Category, _api.Saved.OutgoingsGrouping);
