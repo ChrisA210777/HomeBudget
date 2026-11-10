@@ -11,10 +11,6 @@ namespace Budget.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "PaidFrom",
-                table: "Outgoings");
-
             migrationBuilder.AddColumn<Guid>(
                 name: "AccountId",
                 table: "Outgoings",
@@ -91,17 +87,71 @@ namespace Budget.Infrastructure.Persistence.Migrations
                 principalTable: "Accounts",
                 principalColumn: "Id",
                 onDelete: ReferentialAction.Restrict);
+
+            // Each household's "Paid from" names become accounts (ADR-014, BUD-89), ignoring case and spaces at
+            // either end, and "Y (X Pot)" becomes pot X in account Y (the last bracket, as AccountNames.Parse reads it).
+            // SELECT INTO keeps the column's collation, so the comparisons ignore case like the rest of the database.
+            migrationBuilder.Sql("""
+                SELECT DISTINCT o.HouseholdId, LTRIM(RTRIM(o.PaidFrom)) AS Name
+                INTO #Names
+                FROM Outgoings o
+                WHERE o.PaidFrom IS NOT NULL AND LTRIM(RTRIM(o.PaidFrom)) <> N'';
+
+                SELECT n.HouseholdId, n.Name,
+                    CASE WHEN n.Name LIKE N'%_(%_ pot)' THEN LTRIM(RTRIM(LEFT(n.Name, b.Position - 1))) ELSE n.Name END AS AccountName,
+                    CASE WHEN n.Name LIKE N'%_(%_ pot)' THEN LTRIM(RTRIM(SUBSTRING(n.Name, b.Position + 1, LEN(n.Name) - b.Position - 4))) END AS PotName
+                INTO #PaidFrom
+                FROM #Names n
+                CROSS APPLY (SELECT LEN(n.Name) - CHARINDEX(N'(', REVERSE(n.Name)) + 1 AS Position) b;
+
+                INSERT INTO Accounts (Id, HouseholdId, Name, Provider, OwnerPersonId, ParentAccountId, IsArchived, CreatedAt, CreatedBy, ModifiedAt, ModifiedBy)
+                SELECT NEWID(), HouseholdId, MIN(AccountName), NULL, NULL, NULL, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
+                FROM #PaidFrom
+                GROUP BY HouseholdId, AccountName;
+
+                INSERT INTO Accounts (Id, HouseholdId, Name, Provider, OwnerPersonId, ParentAccountId, IsArchived, CreatedAt, CreatedBy, ModifiedAt, ModifiedBy)
+                SELECT NEWID(), p.HouseholdId, MIN(p.PotName), NULL, NULL, a.Id, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
+                FROM #PaidFrom p
+                JOIN Accounts a ON a.HouseholdId = p.HouseholdId AND a.ParentAccountId IS NULL AND a.Name = p.AccountName
+                WHERE p.PotName IS NOT NULL AND p.PotName <> N''
+                GROUP BY p.HouseholdId, a.Id, p.PotName;
+
+                UPDATE o SET AccountId = COALESCE(pot.Id, account.Id)
+                FROM Outgoings o
+                JOIN #PaidFrom p ON p.HouseholdId = o.HouseholdId AND p.Name = LTRIM(RTRIM(o.PaidFrom))
+                JOIN Accounts account ON account.HouseholdId = p.HouseholdId AND account.ParentAccountId IS NULL AND account.Name = p.AccountName
+                LEFT JOIN Accounts pot ON pot.ParentAccountId = account.Id AND pot.Name = p.PotName;
+
+                DROP TABLE #PaidFrom;
+                DROP TABLE #Names;
+                """);
+
+            migrationBuilder.DropColumn(
+                name: "PaidFrom",
+                table: "Outgoings");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<string>(
+                name: "PaidFrom",
+                table: "Outgoings",
+                type: "nvarchar(100)",
+                maxLength: 100,
+                nullable: true);
+
+            // Back to text: "Account", or "Account (Pot Pot)" as it would have been typed.
+            migrationBuilder.Sql("""
+                UPDATE o SET PaidFrom = LEFT(CASE WHEN parent.Id IS NULL THEN a.Name ELSE parent.Name + N' (' + a.Name + N' Pot)' END, 100)
+                FROM Outgoings o
+                JOIN Accounts a ON a.Id = o.AccountId
+                LEFT JOIN Accounts parent ON parent.Id = a.ParentAccountId;
+                """);
+
             migrationBuilder.DropForeignKey(
                 name: "FK_Outgoings_Accounts_AccountId",
                 table: "Outgoings");
-
-            migrationBuilder.DropTable(
-                name: "Accounts");
 
             migrationBuilder.DropIndex(
                 name: "IX_Outgoings_AccountId",
@@ -111,12 +161,10 @@ namespace Budget.Infrastructure.Persistence.Migrations
                 name: "AccountId",
                 table: "Outgoings");
 
-            migrationBuilder.AddColumn<string>(
-                name: "PaidFrom",
-                table: "Outgoings",
-                type: "nvarchar(100)",
-                maxLength: 100,
-                nullable: true);
+            migrationBuilder.Sql("UPDATE Accounts SET ParentAccountId = NULL;");
+
+            migrationBuilder.DropTable(
+                name: "Accounts");
         }
     }
 }

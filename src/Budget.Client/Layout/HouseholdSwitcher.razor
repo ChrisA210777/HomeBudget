@@ -30,6 +30,7 @@
             </MudMenuItem>
         }
         <MudDivider Class="my-1" />
+        <MudMenuItem Icon="@Icons.Material.Filled.AccountBalance" Href="/accounts" data-testid="household-accounts">Accounts</MudMenuItem>
         @if (Active.Role == "Admin")
         {
             <MudMenuItem Icon="@Icons.Material.Filled.ImportExport" Href="/household/data" data-testid="household-data">Download or import data</MudMenuItem>
