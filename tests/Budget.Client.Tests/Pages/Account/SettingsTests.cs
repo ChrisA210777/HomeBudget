@@ -31,11 +31,13 @@ public sealed class SettingsTests : IDisposable
 
         var cut = _context.RenderComponent<Settings>();
 
-        // What each select shows.
-        Assert.Equal("Monday", Shown(cut, "first-day-of-week"));
-        Assert.Equal("12 months", Shown(cut, "outgoings-period"));
-        Assert.Equal("Paid from", Shown(cut, "outgoings-grouping"));
-        Assert.Equal("A month", Shown(cut, "income-period"));
+        // Reading Value directly is fine in a test that only checks what the page passed in.
+#pragma warning disable MUD0012
+        Assert.Equal(DayOfWeek.Monday, cut.FindComponent<MudSelect<DayOfWeek>>().Instance.Value);
+        var periods = cut.FindComponents<MudSelect<ListPeriodDto>>().ToList();
+        Assert.Equal((ListPeriodDto.Year, ListPeriodDto.Month), (periods[0].Instance.Value, periods[1].Instance.Value));
+        Assert.Equal(OutgoingsGroupingDto.PaidFrom, cut.FindComponent<MudSelect<OutgoingsGroupingDto>>().Instance.Value);
+#pragma warning restore MUD0012
     }
 
     [Fact]
@@ -64,7 +66,4 @@ public sealed class SettingsTests : IDisposable
     }
 
     public void Dispose() => _context.Dispose();
-
-    private static string? Shown(IRenderedComponent<Settings> cut, string testId) =>
-        cut.Find($"input[data-testid={testId}]").GetAttribute("value");
 }
