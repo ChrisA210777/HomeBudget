@@ -3,7 +3,9 @@
 @using Budget.Client.Income
 @using Budget.Client.Outgoings
 @using Budget.Client.People
+@using Budget.Client.Accounts
 @using Budget.Shared.Account
+@using Budget.Shared.Accounts
 @using Budget.Shared.Income
 @using Budget.Shared.Outgoings
 @using Budget.Shared.People
@@ -12,6 +14,7 @@
 @inject IPeopleApi PeopleApi
 @inject TimeProvider Clock
 @inject UserSettingsStore Settings
+@inject IAccountsApi AccountsApi
 
 <PageTitle>Outgoings · Home Budget</PageTitle>
 
@@ -108,6 +111,18 @@
                         @foreach (var person in _people)
                         {
                             <MudSelectItem T="string" Value="@person.Id.ToString()">@person.DisplayName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                @* By the account or pot it's paid from, exactly (BUD-95). *@
+                <div class="list-filter" style="width: 13rem">
+                    <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="AccountFilterName" Label="Paid from" Margin="Margin.Dense"
+                               Variant="Variant.Outlined" data-testid="filter-account">
+                        <MudSelectItem T="Guid?" Value="null">@AccountFilterName(null)</MudSelectItem>
+                        <MudSelectItem T="Guid?" Value="Guid.Empty">@AccountFilterName(Guid.Empty)</MudSelectItem>
+                        @foreach (var account in _accounts.Where(a => !a.IsArchived || a.Id == _account))
+                        {
+                            <MudSelectItem T="Guid?" Value="account.Id">@account.DisplayName</MudSelectItem>
                         }
                     </MudSelect>
                 </div>
@@ -255,6 +270,10 @@
     [SupplyParameterFromQuery(Name = "category")]
     public Guid? CategoryQuery { get; set; }
 
+    /// <summary>Show only outgoings paid from this account or pot, e.g. from the Accounts page (BUD-95).</summary>
+    [SupplyParameterFromQuery(Name = "account")]
+    public Guid? AccountQuery { get; set; }
+
     private const string EveryoneKey = "";
     private const string HouseholdKey = "household";
 
@@ -282,13 +301,17 @@
     private static string ShortMonth(DateOnly date) => date.ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
     private Guid? _category;
+
+    /// <summary>An account or pot, <see cref="Guid.Empty"/> for none recorded, or <c>null</c> for any (BUD-95).</summary>
+    private Guid? _account;
+    private IReadOnlyList<AccountSummary> _accounts = [];
     private OutgoingKindDto? _kind;
     private OutgoingPriorityDto? _priority;
     private string _person = EveryoneKey;
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
-    private bool IsFiltered => _category is not null || _kind is not null || _priority is not null || _person != EveryoneKey;
+    private bool IsFiltered => _category is not null || _account is not null || _kind is not null || _priority is not null || _person != EveryoneKey;
 
     protected override async Task OnInitializedAsync()
     {
@@ -300,6 +323,7 @@
         }
 
         _category = CategoryQuery;
+        _account = AccountQuery;
 
         // The view and grouping chosen last time, on any device (BUD-87).
         var settings = await Settings.GetAsync();
@@ -312,6 +336,7 @@
         if (_household is not null)
         {
             _people = await PeopleApi.ListAsync(_household.HouseholdId);
+            _accounts = await AccountsApi.ListAsync(_household.HouseholdId);
         }
 
         await LoadAsync();
@@ -328,6 +353,7 @@
     private IEnumerable<OutgoingMonthItem> Filtered() =>
         _data!.Items.Where(i =>
             (_category is null || i.CategoryId == _category)
+            && (_account is null || (i.AccountId ?? Guid.Empty) == _account)
             && (_kind is null || i.Kind == _kind)
             && (_priority is null || i.Priority == _priority)
             && (_person == EveryoneKey
@@ -410,6 +436,7 @@
     private void ClearFilters()
     {
         _category = null;
+        _account = null;
         _kind = null;
         _priority = null;
         _person = EveryoneKey;
@@ -443,6 +470,13 @@
     };
 
     private static string PriorityFilterName(OutgoingPriorityDto? priority) => priority?.ToString() ?? "All";
+
+    private string AccountFilterName(Guid? id) => id switch
+    {
+        null => "All",
+        var none when none == Guid.Empty => "Not set",
+        _ => _accounts.FirstOrDefault(a => a.Id == id)?.DisplayName ?? "That account",
+    };
 
     private string PersonFilterName(string key) => key switch
     {

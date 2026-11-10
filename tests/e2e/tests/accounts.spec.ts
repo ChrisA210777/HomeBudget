@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { settled, signIn } from './helpers';
+import { choose, settled, signIn, typeOutgoingName } from './helpers';
 
 // BUD-89: accounts and pots, chosen as "Paid from" on outgoings.
 
@@ -41,4 +41,28 @@ test('income can be paid into an account, and grouped by it', async ({ page }) =
   await settled(page);
   await page.getByTestId('group-paid-into').click();
   await expect(page.getByTestId('paid-into-name')).toHaveText(['Joint Monzo › Bills']);
+});
+
+test("an account's outgoings are one tap away from the Accounts page", async ({ page }) => {
+  await signIn(page);
+  await page.goto('/outgoings/new');
+  await settled(page);
+  await typeOutgoingName(page, 'Hedge trimming fund');
+  await choose(page, 'category', 'Home maintenance');
+  await choose(page, 'priority', 'Optional');
+  await page.getByTestId('amount').fill('20');
+  await page.getByTestId('toggle-details').click();
+  await page.getByTestId('paid-from').fill('Garden account');
+  await page.getByTestId('paid-from').press('Tab');
+  await page.getByTestId('save').click();
+  await expect(page.getByTestId('outgoing-name').filter({ hasText: 'Hedge trimming fund' })).toBeVisible();
+
+  // BUD-95: the count links to Outgoings, filtered to that account.
+  await page.goto('/accounts');
+  await settled(page);
+  await page.getByTestId('account-outgoings').click();
+  await expect(page).toHaveURL(/\/outgoings\?account=/);
+  await settled(page);
+  await expect(page.getByTestId('outgoing-name')).toHaveText(['Hedge trimming fund']);
+  await expect(page.getByTestId('month-total')).toHaveText('£20.00');
 });

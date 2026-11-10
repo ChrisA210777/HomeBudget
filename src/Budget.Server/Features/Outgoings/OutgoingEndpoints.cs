@@ -105,7 +105,8 @@ public static class OutgoingEndpoints
                     o.IsComingUp(today),
                     o.AutoRenews,
                     category?.Icon ?? CategoryIcons.Default,
-                    accounts.DisplayName(o.AccountId));
+                    accounts.DisplayName(o.AccountId),
+                    o.AccountId);
             })
             .OrderBy(i => i.CategorySortOrder)
             .ThenBy(i => i.CategoryName, StringComparer.CurrentCultureIgnoreCase)

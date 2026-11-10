@@ -35,6 +35,8 @@ public sealed class AccountsPageTests : IDisposable
 
         Assert.Equal(new[] { "Chris current", "Joint Monzo", "Holiday" }, Texts(cut, "account-name"));
         Assert.Equal(new[] { "Chris Austin · 1 outgoing", "Joint · Monzo · 3 outgoings", "2 outgoings" }, Texts(cut, "account-details"));
+        // Each count goes to the outgoings paid from it (BUD-95).
+        Assert.Equal($"/outgoings?account={MonzoId}", cut.FindAll("[data-testid=account-outgoings]").ToList()[1].GetAttribute("href"));
         Assert.Single(cut.FindAll("[data-testid=pot]"));
         // Viewers can't change anything, and archived accounts are hidden until asked for.
         Assert.Empty(cut.FindAll("[data-testid=add-account-form]"));
@@ -99,7 +101,7 @@ public sealed class AccountsPageTests : IDisposable
     }
 
     private static string[] Texts(IRenderedComponent<AccountsPage> cut, string testId) =>
-        cut.FindAll($"[data-testid={testId}]").Select(e => e.TextContent.Trim()).ToArray();
+        cut.FindAll($"[data-testid={testId}]").Select(e => System.Text.RegularExpressions.Regex.Replace(e.TextContent, @"\s+", " ").Trim()).ToArray();
 
     private sealed class FakeAccountsApi : IAccountsApi
     {

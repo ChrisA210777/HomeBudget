@@ -31,6 +31,7 @@ public sealed class OutgoingListTests : IDisposable
         _context.Services.AddSingleton<TimeProvider>(new FixedClock(new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero)));
         _context.Services.AddScoped<UserSession>();
         _context.Services.AddSingleton<IUserSettingsApi>(_settings);
+        _context.Services.AddSingleton<Budget.Client.Accounts.IAccountsApi>(new StaticAccountsApi());
         _context.Services.AddScoped<UserSettingsStore>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
@@ -234,6 +235,20 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
+    public void Outgoings_can_be_filtered_by_the_account_they_are_paid_from_including_from_a_link()
+    {
+        var jointBills = AccountIds.GetOrAdd("JOINT BILLS", _ => Guid.NewGuid());
+        _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo($"/outgoings?account={jointBills}");
+
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        // Matching outgoings only, with totals to match (BUD-95).
+        Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "outgoing-name"));
+        Assert.Equal("£150.00", Text(cut, "month-total"));
+        Assert.Contains("Matching", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_month_and_category_can_come_from_the_link()
     {
         _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo($"/outgoings?month=2027-01&category={HousingId}");
@@ -293,7 +308,11 @@ public sealed class OutgoingListTests : IDisposable
         string name, Guid categoryId, string category, int sortOrder, OutgoingPriorityDto priority, decimal amount, PaymentUnitDto unit, decimal monthly,
         OutgoingKindDto kind = OutgoingKindDto.Bill, Guid? personId = null, string? personName = null, string[]? notes = null, bool comingUp = false, string? paidFrom = null) =>
         new(Guid.NewGuid(), name, kind, priority, categoryId, category, sortOrder, personId, personName, amount, 1, unit, monthly, monthly,
-            notes ?? [], new DateOnly(2026, 1, 1), null, comingUp ? new DateOnly(2026, 11, 15) : null, comingUp, PaidFrom: paidFrom);
+            notes ?? [], new DateOnly(2026, 1, 1), null, comingUp ? new DateOnly(2026, 11, 15) : null, comingUp, PaidFrom: paidFrom,
+            AccountId: paidFrom is null ? null : AccountIds.GetOrAdd(paidFrom.Trim().ToUpperInvariant(), _ => Guid.NewGuid()));
+
+    /// <summary>One account id per Paid From name, ignoring case and spaces, as the server would give.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Guid> AccountIds = new();
 
     private sealed class FakeOutgoingApi : IOutgoingApi
     {

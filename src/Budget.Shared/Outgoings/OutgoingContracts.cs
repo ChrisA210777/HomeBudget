@@ -416,7 +416,8 @@ public sealed record OutgoingMonthItem(
     bool IsComingUp,
     bool AutoRenews = false,
     string CategoryIcon = CategoryIcons.Default,
-    string? PaidFrom = null);
+    string? PaidFrom = null,
+    Guid? AccountId = null);
 
 /// <summary>Totals for a set of outgoings, each rounded once from the exact amounts.</summary>
 public sealed record OutgoingTotals(decimal Total, decimal Essential, decimal Preferred, decimal Optional)
