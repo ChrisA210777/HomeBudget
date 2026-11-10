@@ -32,6 +32,9 @@ public sealed class IncomeStream : AuditableEntity, IHouseholdOwned
 
     public string Name { get; private set; } = string.Empty;
 
+    /// <summary>The account or pot it's paid into (BUD-90, ADR-014), in the same household.</summary>
+    public Guid? AccountId { get; private set; }
+
     public IReadOnlyCollection<IncomeAmountChange> AmountChanges => _amountChanges.AsReadOnly();
 
     public IReadOnlyCollection<IncomeStatusPeriod> StatusPeriods => _statusPeriods.AsReadOnly();
@@ -61,6 +64,9 @@ public sealed class IncomeStream : AuditableEntity, IHouseholdOwned
 
     public void Rename(string name) =>
         Name = IncomeTimeline.RequiredText(name, nameof(name), NameMaxLength);
+
+    /// <summary>The account or pot it's paid into, or <c>null</c> if not recorded.</summary>
+    public void PayInto(Guid? accountId) => AccountId = accountId;
 
     public void ChangePerson(Guid personId)
     {

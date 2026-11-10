@@ -53,8 +53,8 @@ public static class CsvExporter
                 export.Accounts.SelectMany(a => new[] { (Account: a, Pot: (ExportedPot?)null) }.Concat(a.Pots.Select(p => (Account: a, Pot: (ExportedPot?)p)))),
                 x => [x.Account.Name, x.Pot?.Name, x.Pot is null ? x.Account.Provider : null, x.Account.OwnerPersonId, x.Pot?.Archived ?? x.Account.Archived]);
 
-            Table("incomes.csv", ["id", "name", "personId"], export.Incomes,
-                i => [i.Id, i.Name, i.PersonId], i => i);
+            Table("incomes.csv", ["id", "name", "personId", "paidInto"], export.Incomes,
+                i => [i.Id, i.Name, i.PersonId, i.PaidInto], i => i);
             Table("income_amount_changes.csv", ["id", "incomeId", "effectiveFrom", "amount", "every", "unit", "comment"],
                 export.Incomes.SelectMany(i => i.AmountChanges.Select(c => (Parent: i.Id, Change: c))),
                 x => [x.Change.Id, x.Parent, x.Change.EffectiveFrom, x.Change.Amount, x.Change.Every, x.Change.Unit, x.Change.Comment], x => x.Change);
@@ -149,7 +149,7 @@ public static class CsvExporter
         people.csv                    The people whose income and outgoings are tracked; linkedMemberEmail is their login.
         categories.csv                Outgoing categories, including hidden ones.
         accounts.csv                  Accounts, and pots within them (a row with a pot name is a pot in that account). ownerPersonId is blank for the household's own.
-        incomes.csv                   Income sources, each for a person (personId).
+        incomes.csv                   Income sources, each for a person (personId), and the account they're paid into.
         income_amount_changes.csv     Each income amount from a date: amount received every N weeks, months or years.
         income_status_periods.csv     Leave, pauses and endings for incomes.
         outgoings.csv                 Bills, savings and allowances, with their details and renewal.

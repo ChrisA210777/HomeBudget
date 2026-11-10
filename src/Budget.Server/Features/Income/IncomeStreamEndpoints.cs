@@ -3,6 +3,7 @@ using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
 using Budget.Infrastructure.Persistence.Configurations;
+using Budget.Server.Features.Accounts;
 using Budget.Server.Features.Households;
 using Budget.Shared.Households;
 using Budget.Shared.Income;
@@ -72,6 +73,7 @@ public static class IncomeStreamEndpoints
 
         var streams = await LoadStreams(db, includeCorrections: false).AsNoTracking().ToListAsync();
         var people = await db.People.ToDictionaryAsync(p => p.Id, p => p.DisplayName);
+        var accounts = await AccountDirectory.LoadAsync(db, householdId);
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
         var shown = streams
@@ -93,7 +95,8 @@ public static class IncomeStreamEndpoints
                 (PaymentUnitDto)ReceivedOn(x.Stream, last).Unit,
                 Notes(x.Stream, first, last, currency),
                 x.Stream.StartsOn,
-                x.Stream.EndsOn))
+                x.Stream.EndsOn,
+                accounts.DisplayName(x.Stream.AccountId)))
             .ToList();
 
         // Rounded once, from the unrounded amounts.
@@ -120,6 +123,9 @@ public static class IncomeStreamEndpoints
 
         var comment = string.IsNullOrWhiteSpace(request.Comment) ? IncomeValidator.DefaultStartingComment : request.Comment;
         var stream = IncomeStream.Create(householdId, request.PersonId, request.Name, request.Amount!.Value, request.StartsOn!.Value, comment, Schedule(request.Every, request.Unit));
+
+        // A new account name adds the account, or a pot in one (BUD-90).
+        stream.PayInto((await AccountDirectory.LoadAsync(db, householdId)).Resolve(request.PaidInto)?.Id);
         db.IncomeStreams.Add(stream);
         await db.SaveChangesAsync();
 
@@ -131,11 +137,13 @@ public static class IncomeStreamEndpoints
     {
         var errors = IncomeValidator.Validate(request).ToDictionary(e => e.Key, e => e.Value);
         await CheckPersonAsync(db, request.PersonId, nameof(request.PersonId), errors);
+        var accounts = await AccountDirectory.LoadAsync(db, householdId);
 
         return await ChangeAsync(db, householdId, incomeStreamId, request.Version, errors, time, errorKey: nameof(request.Name), stream =>
         {
             stream.Rename(request.Name);
             stream.ChangePerson(request.PersonId);
+            stream.PayInto(accounts.Resolve(request.PaidInto)?.Id);
         });
     }
 
@@ -310,7 +318,8 @@ public static class IncomeStreamEndpoints
                 .Select(c => new CorrectionEntry(c.EntryType.ToString(), c.Action.ToString(), c.Before, c.After, c.Reason, c.RecordedByName ?? NameOf(c.CreatedBy), c.RecordedAt))
                 .ToList(),
             currency,
-            version is null ? string.Empty : Convert.ToBase64String(version));
+            version is null ? string.Empty : Convert.ToBase64String(version),
+            (await AccountDirectory.LoadAsync(db, householdId)).DisplayName(stream.AccountId));
     }
 
     /// <summary>The amount change in force on a date (or the first, before it starts): what's actually received.</summary>

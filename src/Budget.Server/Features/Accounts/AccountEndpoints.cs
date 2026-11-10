@@ -39,6 +39,11 @@ public static class AccountEndpoints
             .GroupBy(o => o.AccountId!.Value)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count);
+        var incomeCounts = await db.IncomeStreams
+            .Where(s => s.AccountId != null)
+            .GroupBy(s => s.AccountId!.Value)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count);
 
         AccountSummary Summary(Account a) => new(
             a.Id,
@@ -49,7 +54,8 @@ public static class AccountEndpoints
             a.ParentAccountId,
             a.IsArchived,
             directory.DisplayName(a.Id)!,
-            counts.GetValueOrDefault(a.Id));
+            counts.GetValueOrDefault(a.Id),
+            incomeCounts.GetValueOrDefault(a.Id));
 
         var byName = StringComparer.CurrentCultureIgnoreCase;
         return directory.All
@@ -130,7 +136,7 @@ public static class AccountEndpoints
     }
 
     /// <summary>
-    /// Moves every outgoing to the other account or pot, then archives this one. Merging an account moves its pots
+    /// Moves every outgoing and income to the other account or pot, then archives this one. Merging an account moves its pots
     /// too, combining any with the same name. An account with pots can't be merged into a pot.
     /// </summary>
     private static async Task<IResult> MergeAsync(Guid householdId, Guid accountId, MergeAccountRequest request, BudgetDbContext db)
@@ -180,6 +186,7 @@ public static class AccountEndpoints
             foreach (var (from, to) in moves)
             {
                 await db.Outgoings.Where(o => o.AccountId == from).ExecuteUpdateAsync(s => s.SetProperty(o => o.AccountId, to));
+                await db.IncomeStreams.Where(i => i.AccountId == from).ExecuteUpdateAsync(s => s.SetProperty(i => i.AccountId, to));
             }
 
             await db.SaveChangesAsync();

@@ -124,6 +124,42 @@ public static class ImportPlanner
             }
         }
 
+        // Accounts and pots in the file (version 2); income and outgoings then find theirs by name, and names from older
+        // files become accounts and pots the same way existing households' did (BUD-89, ADR-014).
+        var accounts = AccountDirectory.InMemory(householdId, plan.Accounts);
+        for (var i = 0; i < export.Accounts.Count; i++)
+        {
+            var source = export.Accounts[i];
+            Guid? ownerId = source.OwnerPersonId is { } oldOwner && people.TryGetValue(oldOwner, out var newOwner) ? newOwner : null;
+            var account = Try($"accounts[{i}]", () => Account.Create(householdId, source.Name, ownerId, source.Provider));
+            if (account is null)
+            {
+                continue;
+            }
+
+            plan.Accounts.Add(account);
+            if (source.Archived)
+            {
+                account.Archive();
+            }
+
+            for (var j = 0; j < source.Pots.Count; j++)
+            {
+                var potSource = source.Pots[j];
+                var pot = Try($"accounts[{i}].pots[{j}]", () => Account.CreatePot(account, potSource.Name));
+                if (pot is null)
+                {
+                    continue;
+                }
+
+                plan.Accounts.Add(pot);
+                if (potSource.Archived)
+                {
+                    pot.Archive();
+                }
+            }
+        }
+
         for (var i = 0; i < export.Incomes.Count; i++)
         {
             var source = export.Incomes[i];
@@ -141,6 +177,8 @@ public static class ImportPlanner
             {
                 continue;
             }
+
+            income.PayInto(accounts.Resolve(source.PaidInto, restoreArchived: false)?.Id);
 
             entryIds[first.Id] = Keep(income.AmountChanges.Single(), first)!.Id;
             foreach (var change in changes.Skip(1))
@@ -177,42 +215,6 @@ public static class ImportPlanner
             }
 
             plan.Incomes.Add(income);
-        }
-
-        // Accounts and pots in the file (version 2); outgoings then find theirs by name, and names from older
-        // files become accounts and pots the same way existing households' did (BUD-89, ADR-014).
-        var accounts = AccountDirectory.InMemory(householdId, plan.Accounts);
-        for (var i = 0; i < export.Accounts.Count; i++)
-        {
-            var source = export.Accounts[i];
-            Guid? ownerId = source.OwnerPersonId is { } oldOwner && people.TryGetValue(oldOwner, out var newOwner) ? newOwner : null;
-            var account = Try($"accounts[{i}]", () => Account.Create(householdId, source.Name, ownerId, source.Provider));
-            if (account is null)
-            {
-                continue;
-            }
-
-            plan.Accounts.Add(account);
-            if (source.Archived)
-            {
-                account.Archive();
-            }
-
-            for (var j = 0; j < source.Pots.Count; j++)
-            {
-                var potSource = source.Pots[j];
-                var pot = Try($"accounts[{i}].pots[{j}]", () => Account.CreatePot(account, potSource.Name));
-                if (pot is null)
-                {
-                    continue;
-                }
-
-                plan.Accounts.Add(pot);
-                if (potSource.Archived)
-                {
-                    pot.Archive();
-                }
-            }
         }
 
         for (var i = 0; i < export.Outgoings.Count; i++)

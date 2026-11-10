@@ -61,6 +61,9 @@ public sealed record CreateIncomeStreamRequest
 
     /// <summary>Optional; defaults to "Starting amount".</summary>
     public string? Comment { get; init; }
+
+    /// <summary>The account, or "Account › Pot", it's paid into (BUD-90); a new name adds it. Blank for none.</summary>
+    public string? PaidInto { get; init; }
 }
 
 public sealed record UpdateIncomeStreamRequest
@@ -68,6 +71,9 @@ public sealed record UpdateIncomeStreamRequest
     public string Name { get; init; } = string.Empty;
 
     public Guid PersonId { get; init; }
+
+    /// <summary>The account, or "Account › Pot", it's paid into (BUD-90); a new name adds it. Blank clears it.</summary>
+    public string? PaidInto { get; init; }
 
     public string? Version { get; init; }
 }
@@ -144,7 +150,8 @@ public sealed record IncomeMonthItem(
     PaymentUnitDto Unit,
     IReadOnlyList<string> Notes,
     DateOnly StartsOn,
-    DateOnly? EndsOn);
+    DateOnly? EndsOn,
+    string? PaidInto = null);
 
 /// <summary>An income with its full history, for its own page.</summary>
 public sealed record IncomeStreamDetails(
@@ -162,7 +169,8 @@ public sealed record IncomeStreamDetails(
     IReadOnlyList<StatusPeriodEntry> StatusPeriods,
     IReadOnlyList<CorrectionEntry> Corrections,
     string CurrencyCode,
-    string Version);
+    string Version,
+    string? PaidInto = null);
 
 /// <param name="MonthlyAmount">The monthly equivalent of <paramref name="Amount"/> every <paramref name="Every"/> <paramref name="Unit"/>s, rounded.</param>
 public sealed record AmountChangeEntry(

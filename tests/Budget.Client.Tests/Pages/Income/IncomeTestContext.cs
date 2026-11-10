@@ -21,6 +21,7 @@ public abstract class IncomeTestContext : IDisposable
         Context.Services.AddScoped<UserSession>();
         Context.Services.AddSingleton<IUserSettingsApi>(Settings);
         Context.Services.AddScoped<UserSettingsStore>();
+        Context.Services.AddSingleton<Budget.Client.Accounts.IAccountsApi>(new StaticAccountsApi());
         Context.JSInterop.Mode = JSRuntimeMode.Loose;
         Context.AddTestAuthorization().SetAuthorized("Chris Austin");
     }

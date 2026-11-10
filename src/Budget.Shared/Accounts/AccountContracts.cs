@@ -32,7 +32,8 @@ public sealed record AccountSummary(
     Guid? ParentAccountId,
     bool IsArchived,
     string DisplayName,
-    int OutgoingCount);
+    int OutgoingCount,
+    int IncomeCount = 0);
 
 /// <summary>Adds an account, or a pot in <see cref="ParentAccountId"/>; or changes one (the parent can't change).</summary>
 public sealed record SaveAccountRequest
