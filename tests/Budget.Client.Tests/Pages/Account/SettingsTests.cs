@@ -31,10 +31,11 @@ public sealed class SettingsTests : IDisposable
 
         var cut = _context.RenderComponent<Settings>();
 
-        Assert.Equal(DayOfWeek.Monday, cut.FindComponent<MudSelect<DayOfWeek>>().Instance.GetState(x => x.Value));
-        var periods = cut.FindComponents<MudSelect<ListPeriodDto>>();
-        Assert.Equal((ListPeriodDto.Year, ListPeriodDto.Month), (periods[0].Instance.GetState(x => x.Value), periods[1].Instance.GetState(x => x.Value)));
-        Assert.Equal(OutgoingsGroupingDto.PaidFrom, cut.FindComponent<MudSelect<OutgoingsGroupingDto>>().Instance.GetState(x => x.Value));
+        // What each select shows.
+        Assert.Equal("Monday", Shown(cut, "first-day-of-week"));
+        Assert.Equal("12 months", Shown(cut, "outgoings-period"));
+        Assert.Equal("Paid from", Shown(cut, "outgoings-grouping"));
+        Assert.Equal("A month", Shown(cut, "income-period"));
     }
 
     [Fact]
@@ -63,4 +64,7 @@ public sealed class SettingsTests : IDisposable
     }
 
     public void Dispose() => _context.Dispose();
+
+    private static string? Shown(IRenderedComponent<Settings> cut, string testId) =>
+        cut.Find($"input[data-testid={testId}]").GetAttribute("value");
 }
