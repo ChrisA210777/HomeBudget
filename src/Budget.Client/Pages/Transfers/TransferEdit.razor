@@ -88,7 +88,7 @@
                 <MudTextField @bind-Value="_name" Label="Name (optional)" HelperText="For example, “Bills top-up”. Without one, it's shown as From → Into."
                               MaxLength="TransferValidator.NameMaxLength" Variant="Variant.Outlined" Immediate="true"
                               Error="Has(nameof(CreateTransferRequest.Name))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.Name))" data-testid="name" />
-                <MudTextField @bind-Value="_notes" Label="Notes (optional)" Lines="3" AutoGrow="true" MaxLength="TransferValidator.NotesMaxLength" Variant="Variant.Outlined"
+                <MudTextField @bind-Value="_notes" Label="Notes (optional)" Lines="3" Sizing="InputSizing.Auto" MaxLength="TransferValidator.NotesMaxLength" Variant="Variant.Outlined"
                               Error="Has(nameof(CreateTransferRequest.Notes))" ErrorText="@ErrorFor(nameof(CreateTransferRequest.Notes))" data-testid="notes" />
 
                 <div class="d-flex justify-end gap-2 mt-2">
