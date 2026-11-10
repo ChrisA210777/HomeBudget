@@ -8,7 +8,7 @@ namespace Budget.Domain.Outgoings;
 /// <see cref="Schedule"/> (e.g. £480 a year). Keeping the schedule with each change means
 /// switching from monthly to annual payments doesn't rewrite earlier months.
 /// </summary>
-public sealed class OutgoingAmountChange : AuditableEntity
+public sealed class OutgoingAmountChange : AuditableEntity, IScheduledAmount
 {
     private OutgoingAmountChange()
     {
@@ -59,7 +59,7 @@ public sealed class OutgoingAmountChange : AuditableEntity
 /// A pause (e.g. a mortgage payment holiday), optionally with the date payments resume, or the
 /// date the outgoing ended. Nothing is due while it applies.
 /// </summary>
-public sealed class OutgoingStatusPeriod : AuditableEntity
+public sealed class OutgoingStatusPeriod : AuditableEntity, IScheduledPause
 {
     private OutgoingStatusPeriod()
     {

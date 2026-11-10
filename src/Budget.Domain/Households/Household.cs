@@ -25,6 +25,12 @@ public sealed class Household : AuditableEntity
     /// <summary>ISO 4217 currency code used for the household's money (see ADR-007).</summary>
     public string CurrencyCode { get; private set; } = DefaultCurrencyCode;
 
+    /// <summary>
+    /// "Accounts and transfers" (ADR-014, BUD-91): off by default. When on, transfers between accounts, the
+    /// account check and calculated transfers appear. Turning it off hides them but keeps the data.
+    /// </summary>
+    public bool TransfersEnabled { get; private set; }
+
     public IReadOnlyCollection<HouseholdMember> Members => _members.AsReadOnly();
 
     /// <summary>
@@ -50,6 +56,9 @@ public sealed class Household : AuditableEntity
 
     /// <summary>Renames the household. The name is trimmed and must be 1 to <see cref="NameMaxLength"/> characters.</summary>
     public void Rename(string name) => Name = NormaliseName(name);
+
+    /// <summary>Turns "Accounts and transfers" on or off. Only Admins may (checked by the API).</summary>
+    public void SetTransfersEnabled(bool enabled) => TransfersEnabled = enabled;
 
     /// <summary>Adds someone to the household with the given role. They can't already be a member.</summary>
     /// <remarks>The household's members must be loaded.</remarks>
