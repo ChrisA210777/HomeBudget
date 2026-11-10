@@ -114,13 +114,13 @@
                         }
                     </MudSelect>
                 </div>
-                @* By the account or pot it's paid from, exactly (BUD-95). *@
+                @* By the account it's paid from, including its pots (BUD-95). *@
                 <div class="list-filter" style="width: 13rem">
                     <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="AccountFilterName" Label="Paid from" Margin="Margin.Dense"
                                Variant="Variant.Outlined" data-testid="filter-account">
                         <MudSelectItem T="Guid?" Value="null">@AccountFilterName(null)</MudSelectItem>
                         <MudSelectItem T="Guid?" Value="Guid.Empty">@AccountFilterName(Guid.Empty)</MudSelectItem>
-                        @foreach (var account in _accounts.Where(a => !a.IsArchived || a.Id == _account))
+                        @foreach (var account in _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)))
                         {
                             <MudSelectItem T="Guid?" Value="account.Id">@account.DisplayName</MudSelectItem>
                         }
@@ -232,7 +232,7 @@
                                         <MudLink Href="@($"/outgoings/{item.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudLink>
                                         <div class="d-flex flex-wrap align-center gap-1 mt-1">
                                             <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="PriorityColour(item.Priority)" Class="ma-0" data-testid="outgoing-priority">@item.Priority</MudChip>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)@(_byPaidFrom ? $" · {item.CategoryName}" : string.Empty)</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)@(_byPaidFrom ? $" · {item.CategoryName}{(AccountOf(item).Pot is { } pot ? $" · {pot} pot" : string.Empty)}" : string.Empty)</MudText>
                                         </div>
                                         <MudText Typo="Typo.caption" Class="d-block mt-1" data-testid="outgoing-paid">@Paid(item)</MudText>
                                         @foreach (var note in item.Notes)
@@ -353,7 +353,7 @@
     private IEnumerable<OutgoingMonthItem> Filtered() =>
         _data!.Items.Where(i =>
             (_category is null || i.CategoryId == _category)
-            && (_account is null || (i.AccountId ?? Guid.Empty) == _account)
+            && (_account is null || (AccountOf(i).Id ?? Guid.Empty) == _account)
             && (_kind is null || i.Kind == _kind)
             && (_priority is null || i.Priority == _priority)
             && (_person == EveryoneKey
@@ -384,6 +384,27 @@
             _collapsed.Clear();
             await Settings.UpdateAsync(new UpdateUserSettingsRequest { OutgoingsGrouping = byPaidFrom ? OutgoingsGroupingDto.PaidFrom : OutgoingsGroupingDto.Category });
         }
+    }
+
+    /// <summary>
+    /// The account an outgoing is paid from, at account level: a pot counts as its account, as budgeting is done by
+    /// account and pots just keep money apart (BUD-95). Falls back to the name if the account isn't in the list.
+    /// </summary>
+    private (Guid? Id, string? Name, string? Pot) AccountOf(OutgoingMonthItem item)
+    {
+        if (item.AccountId is { } id && _accounts.FirstOrDefault(a => a.Id == id) is { } account)
+        {
+            var parent = account.ParentAccountId is { } parentId ? _accounts.FirstOrDefault(a => a.Id == parentId) : null;
+            return parent is null ? (account.Id, account.Name, null) : (parent.Id, parent.Name, account.Name);
+        }
+
+        if (string.IsNullOrWhiteSpace(item.PaidFrom))
+        {
+            return (null, null, null);
+        }
+
+        var parts = item.PaidFrom.Split('›', 2);
+        return (item.AccountId, parts[0].Trim(), parts.Length > 1 ? parts[1].Trim() : null);
     }
 
     /// <summary>Accounts with no Paid From go last, as "Not set".</summary>
@@ -420,7 +441,7 @@
     /// </summary>
     private IEnumerable<ItemGroup> Groups(List<OutgoingMonthItem> items) => _byPaidFrom
         ? items
-            .GroupBy(i => string.IsNullOrWhiteSpace(i.PaidFrom) ? null : i.PaidFrom.Trim(), StringComparer.CurrentCultureIgnoreCase)
+            .GroupBy(i => AccountOf(i).Name, StringComparer.CurrentCultureIgnoreCase)
             .OrderBy(g => g.Key is null)
             .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
             .Select(g => new ItemGroup(
@@ -475,7 +496,7 @@
     {
         null => "All",
         var none when none == Guid.Empty => "Not set",
-        _ => _accounts.FirstOrDefault(a => a.Id == id)?.DisplayName ?? "That account",
+        _ => _accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "That account",
     };
 
     private string PersonFilterName(string key) => key switch

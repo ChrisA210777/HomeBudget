@@ -211,14 +211,14 @@
                         <MudText Typo="@(isPot ? Typo.body2 : Typo.subtitle1)" data-testid="account-name">@account.Name</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="account-details">
                             @Owner(account, isPot)
-                            @* The count links to the outgoings paid from it (BUD-95). *@
-                            @if (account.OutgoingCount > 0)
+                            @* An account's count includes its pots, and links to its outgoings (BUD-95). *@
+                            @if (!isPot && OutgoingsFor(account) > 0)
                             {
-                                <MudLink Href="@($"/outgoings?account={account.Id}")" Typo="Typo.caption" data-testid="account-outgoings">@OutgoingCount(account)</MudLink>
+                                <MudLink Href="@($"/outgoings?account={account.Id}")" Typo="Typo.caption" data-testid="account-outgoings">@OutgoingCount(OutgoingsFor(account))</MudLink>
                             }
                             else
                             {
-                                @OutgoingCount(account)
+                                @OutgoingCount(isPot ? account.OutgoingCount : OutgoingsFor(account))
                             }
                             @(account.IncomeCount > 0 ? $" · {(account.IncomeCount == 1 ? "1 income" : $"{account.IncomeCount} incomes")}" : string.Empty)
                         </MudText>
@@ -266,8 +266,11 @@
         return string.Join(" · ", parts) + " · ";
     }
 
-    private static string OutgoingCount(AccountSummary account) =>
-        account.OutgoingCount == 1 ? "1 outgoing" : $"{account.OutgoingCount} outgoings";
+    /// <summary>An account's outgoings, including its pots'.</summary>
+    private int OutgoingsFor(AccountSummary account) =>
+        account.OutgoingCount + (_accounts ?? []).Where(p => p.ParentAccountId == account.Id).Sum(p => p.OutgoingCount);
+
+    private static string OutgoingCount(int count) => count == 1 ? "1 outgoing" : $"{count} outgoings";
 
     /// <summary>Any other open account or pot; an account with pots can only go into another account.</summary>
     private IEnumerable<AccountSummary> MergeTargets(AccountSummary account)
