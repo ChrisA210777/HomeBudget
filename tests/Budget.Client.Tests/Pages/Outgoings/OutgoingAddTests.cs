@@ -37,6 +37,7 @@ public sealed class OutgoingAddTests : IDisposable
     public async Task Adds_a_bill_for_the_household_from_today_and_goes_to_the_list()
     {
         var cut = _context.RenderComponent<OutgoingAdd>();
+        Assert.Empty(cut.FindAll("[data-testid=comment]")); // The first amount is recorded as "Starting amount" (BUD-78).
 
         await SetNameAsync(cut, "Insurance for the car");
         await ChooseAsync(cut, Selects<Guid>(cut)[0], InsuranceId);
@@ -59,6 +60,7 @@ public sealed class OutgoingAddTests : IDisposable
             Assert.Equal(new DateOnly(2026, 11, 5), request.FirstPaymentDate);
             Assert.Null(request.RenewalDate);
             Assert.Equal(AlertPeriodDto.None, request.AlertPeriod);
+            Assert.Null(request.Comment);
         });
         Assert.EndsWith("/outgoings", _context.Services.GetRequiredService<FakeNavigationManager>().Uri, StringComparison.Ordinal);
     }

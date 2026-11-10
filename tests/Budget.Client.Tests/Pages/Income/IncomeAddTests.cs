@@ -15,6 +15,7 @@ public sealed class IncomeAddTests : IncomeTestContext
     public void Adds_income_for_you_from_the_start_of_this_month_and_opens_it()
     {
         var cut = Context.RenderComponent<IncomeAdd>();
+        Assert.Empty(cut.FindAll("[data-testid=comment]")); // The first amount is recorded as "Starting amount" (BUD-78).
 
         cut.Find("input[data-testid=name]").Change("Chris – salary");
         cut.Find("input[data-testid=amount]").Input("3000.50");
@@ -29,6 +30,7 @@ public sealed class IncomeAddTests : IncomeTestContext
             Assert.Equal(StaticPeopleApi.ChrisId, request.PersonId);
             Assert.Equal(3000.50m, request.Amount);
             Assert.Equal(new DateOnly(2026, 11, 1), request.StartsOn);
+            Assert.Null(request.Comment);
         });
         var navigation = Context.Services.GetRequiredService<FakeNavigationManager>();
         Assert.EndsWith($"/income/{IncomeSamples.SalaryId}", navigation.Uri, StringComparison.Ordinal);

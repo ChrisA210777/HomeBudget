@@ -74,9 +74,6 @@
                                Error="Has(nameof(CreateIncomeStreamRequest.StartsOn))" ErrorText="@ErrorFor(nameof(CreateIncomeStreamRequest.StartsOn))"
                                Variant="Variant.Outlined" data-testid="starts-on" />
 
-                <MudTextField @bind-Value="_comment" Label="Comment (optional)" Placeholder="@IncomeValidator.DefaultStartingComment"
-                              MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined" data-testid="comment" />
-
                 <div class="d-flex justify-end gap-2 mt-2">
                     <MudButton Variant="Variant.Text" Href="/income">Cancel</MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">Add income</MudButton>
@@ -106,7 +103,6 @@
     private int _every = 1;
     private PaymentUnitDto _unit = PaymentUnitDto.Month;
     private DateTime? _startsOn;
-    private string? _comment;
 
     protected override async Task OnInitializedAsync()
     {
@@ -134,7 +130,6 @@
             Every = _every,
             Unit = _unit,
             StartsOn = IncomeDates.ToDateOnly(_startsOn),
-            Comment = _comment,
         };
 
         _errors = IncomeValidator.Validate(request);
