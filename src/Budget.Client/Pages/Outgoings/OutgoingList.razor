@@ -13,24 +13,101 @@
 
 <PageTitle>Outgoings · Home Budget</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
-    <div class="d-flex align-center flex-wrap gap-2 mb-2">
-        <h1 class="mud-typography mud-typography-h4 flex-grow-1">Outgoings</h1>
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Category" Href="/outgoings/categories" data-testid="go-to-categories">
-            Categories
-        </MudButton>
-        @if (_canEdit)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/outgoings/new" data-testid="add-outgoing">
-                Add an outgoing
-            </MudButton>
-        }
-    </div>
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-2 mb-16">
+    @{
+        var shown = _data is null ? [] : Filtered().ToList();
+        var totals = OutgoingTotals.For(shown);
+    }
 
-    <div class="d-flex align-center justify-space-between mb-3">
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
-        <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
+    @* The title and actions stay at the top while the list scrolls; on larger screens the summary and filters do too (BUD-79). *@
+    <div class="list-head" data-testid="list-head">
+        <div class="list-head-title d-flex align-center gap-2" data-testid="list-head-title">
+            <h1 class="mud-typography mud-typography-h4 flex-grow-1 list-head-heading">Outgoings</h1>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Category" Href="/outgoings/categories"
+                       Class="icon-only-xs" aria-label="Categories" title="Categories" data-testid="go-to-categories">
+                <span class="button-label">Categories</span>
+            </MudButton>
+            @if (_canEdit)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/outgoings/new"
+                           Class="icon-only-xs" aria-label="Add an outgoing" title="Add an outgoing" data-testid="add-outgoing">
+                    <span class="button-label">Add an outgoing</span>
+                </MudButton>
+            }
+        </div>
+
+        <div class="d-flex align-center justify-space-between mb-2">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
+            <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
+        </div>
+
+        @if (_data is not null)
+        {
+            <MudPaper Class="pa-4 mb-3" Elevation="1">
+                <MudText Typo="Typo.overline">@(IsFiltered ? "Matching outgoings this month" : "Outgoings this month")</MudText>
+                <MudText Typo="Typo.h4" data-testid="month-total">@Format(totals.Total)</MudText>
+                <div class="d-flex flex-wrap gap-4 mt-2">
+                    <div>
+                        <MudText Typo="Typo.caption" Class="d-block">Essential</MudText>
+                        <MudText Typo="Typo.subtitle1" data-testid="total-essential">@Format(totals.Essential)</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Class="d-block">Preferred</MudText>
+                        <MudText Typo="Typo.subtitle1" data-testid="total-preferred">@Format(totals.Preferred)</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Class="d-block">Optional</MudText>
+                        <MudText Typo="Typo.subtitle1" data-testid="total-optional">@Format(totals.Optional)</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+
+            @* One line on phones too: each filter shrinks to share the width (BUD-79). *@
+            <div class="list-filters d-flex flex-wrap gap-2 pb-1" data-testid="list-filters">
+                <div class="list-filter" style="width: 11rem">
+                    <MudSelect T="OutgoingKindDto?" @bind-Value="_kind" ToStringFunc="KindFilterName" Label="Kind" Margin="Margin.Dense"
+                               Variant="Variant.Outlined" data-testid="filter-kind">
+                        <MudSelectItem T="OutgoingKindDto?" Value="null">@KindFilterName(null)</MudSelectItem>
+                        @foreach (var kind in Enum.GetValues<OutgoingKindDto>())
+                        {
+                            <MudSelectItem T="OutgoingKindDto?" Value="kind">@KindFilterName(kind)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                <div class="list-filter" style="width: 11rem">
+                    <MudSelect T="OutgoingPriorityDto?" @bind-Value="_priority" ToStringFunc="PriorityFilterName" Label="Priority" Margin="Margin.Dense"
+                               Variant="Variant.Outlined" data-testid="filter-priority">
+                        <MudSelectItem T="OutgoingPriorityDto?" Value="null">@PriorityFilterName(null)</MudSelectItem>
+                        @foreach (var priority in Enum.GetValues<OutgoingPriorityDto>())
+                        {
+                            <MudSelectItem T="OutgoingPriorityDto?" Value="priority">@PriorityFilterName(priority)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                <div class="list-filter" style="width: 13rem">
+                    <MudSelect T="string" @bind-Value="_person" ToStringFunc="PersonFilterName" Label="For" Margin="Margin.Dense"
+                               Variant="Variant.Outlined" data-testid="filter-person">
+                        <MudSelectItem T="string" Value="@EveryoneKey">@PersonFilterName(EveryoneKey)</MudSelectItem>
+                        <MudSelectItem T="string" Value="@HouseholdKey">@PersonFilterName(HouseholdKey)</MudSelectItem>
+                        @foreach (var person in _people)
+                        {
+                            <MudSelectItem T="string" Value="@person.Id.ToString()">@person.DisplayName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </div>
+
+            @if (_category is { } categoryId)
+            {
+                <div class="d-flex align-center flex-wrap gap-2 pb-1" data-testid="category-filter">
+                    <MudText Typo="Typo.body2">
+                        Showing <b>@(_data.Items.FirstOrDefault(i => i.CategoryId == categoryId)?.CategoryName ?? "one category")</b> only.
+                    </MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="() => _category = null" data-testid="clear-category">Show all categories</MudButton>
+                </div>
+            }
+        }
     </div>
 
     @if (_household is null && _loaded)
@@ -43,72 +120,6 @@
     }
     else
     {
-        var shown = Filtered().ToList();
-        var totals = OutgoingTotals.For(shown);
-
-        <MudPaper Class="pa-4 mb-3" Elevation="1">
-            <MudText Typo="Typo.overline">@(IsFiltered ? "Matching outgoings this month" : "Outgoings this month")</MudText>
-            <MudText Typo="Typo.h4" data-testid="month-total">@Format(totals.Total)</MudText>
-            <div class="d-flex flex-wrap gap-4 mt-2">
-                <div>
-                    <MudText Typo="Typo.caption" Class="d-block">Essential</MudText>
-                    <MudText Typo="Typo.subtitle1" data-testid="total-essential">@Format(totals.Essential)</MudText>
-                </div>
-                <div>
-                    <MudText Typo="Typo.caption" Class="d-block">Preferred</MudText>
-                    <MudText Typo="Typo.subtitle1" data-testid="total-preferred">@Format(totals.Preferred)</MudText>
-                </div>
-                <div>
-                    <MudText Typo="Typo.caption" Class="d-block">Optional</MudText>
-                    <MudText Typo="Typo.subtitle1" data-testid="total-optional">@Format(totals.Optional)</MudText>
-                </div>
-            </div>
-        </MudPaper>
-
-        <div class="d-flex flex-wrap gap-2 mb-1">
-            <div style="width: 11rem">
-                <MudSelect T="OutgoingKindDto?" @bind-Value="_kind" ToStringFunc="KindFilterName" Label="Kind" Margin="Margin.Dense"
-                           Variant="Variant.Outlined" data-testid="filter-kind">
-                    <MudSelectItem T="OutgoingKindDto?" Value="null">@KindFilterName(null)</MudSelectItem>
-                    @foreach (var kind in Enum.GetValues<OutgoingKindDto>())
-                    {
-                        <MudSelectItem T="OutgoingKindDto?" Value="kind">@KindFilterName(kind)</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-            <div style="width: 11rem">
-                <MudSelect T="OutgoingPriorityDto?" @bind-Value="_priority" ToStringFunc="PriorityFilterName" Label="Priority" Margin="Margin.Dense"
-                           Variant="Variant.Outlined" data-testid="filter-priority">
-                    <MudSelectItem T="OutgoingPriorityDto?" Value="null">@PriorityFilterName(null)</MudSelectItem>
-                    @foreach (var priority in Enum.GetValues<OutgoingPriorityDto>())
-                    {
-                        <MudSelectItem T="OutgoingPriorityDto?" Value="priority">@PriorityFilterName(priority)</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-            <div style="width: 13rem">
-                <MudSelect T="string" @bind-Value="_person" ToStringFunc="PersonFilterName" Label="For" Margin="Margin.Dense"
-                           Variant="Variant.Outlined" data-testid="filter-person">
-                    <MudSelectItem T="string" Value="@EveryoneKey">@PersonFilterName(EveryoneKey)</MudSelectItem>
-                    <MudSelectItem T="string" Value="@HouseholdKey">@PersonFilterName(HouseholdKey)</MudSelectItem>
-                    @foreach (var person in _people)
-                    {
-                        <MudSelectItem T="string" Value="@person.Id.ToString()">@person.DisplayName</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-        </div>
-
-        @if (_category is { } categoryId)
-        {
-            <div class="d-flex align-center flex-wrap gap-2 mb-1" data-testid="category-filter">
-                <MudText Typo="Typo.body2">
-                    Showing <b>@(_data.Items.FirstOrDefault(i => i.CategoryId == categoryId)?.CategoryName ?? "one category")</b> only.
-                </MudText>
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="() => _category = null" data-testid="clear-category">Show all categories</MudButton>
-            </div>
-        }
-
         <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show all, including ones not started or ended" data-testid="show-all" />
 
         @if (_data.Items.Count == 0)
@@ -295,18 +306,18 @@
 
     private static string KindFilterName(OutgoingKindDto? kind) => kind switch
     {
-        null => "All kinds",
+        null => "All",
         OutgoingKindDto.Bill => "Bills",
         OutgoingKindDto.Savings => "Savings",
         _ => "Allowances",
     };
 
-    private static string PriorityFilterName(OutgoingPriorityDto? priority) => priority?.ToString() ?? "All priorities";
+    private static string PriorityFilterName(OutgoingPriorityDto? priority) => priority?.ToString() ?? "All";
 
     private string PersonFilterName(string key) => key switch
     {
         EveryoneKey => "Everyone",
-        HouseholdKey => "The whole household",
+        HouseholdKey => "Household",
         _ => _people.FirstOrDefault(p => p.Id.ToString() == key)?.DisplayName ?? string.Empty,
     };
 }

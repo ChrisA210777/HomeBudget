@@ -1,0 +1,101 @@
+import { expect, test } from './fixtures';
+import { addOutgoing, isPhone, settled, signIn } from './helpers';
+import type { Locator, Page } from '@playwright/test';
+
+// BUD-79: on the Outgoings and Income lists the title and actions stay at the top while the list
+// scrolls. Larger screens keep the summary and filters too. On phones the buttons shrink to their
+// icons and the filters share one line.
+
+async function box(locator: Locator) {
+  const found = await locator.boundingBox();
+  expect(found, 'element should be on screen').not.toBeNull();
+  return found!;
+}
+
+/** Scrolls the page to the bottom and checks that it actually moved. */
+async function scrollToBottom(page: Page): Promise<void> {
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+}
+
+/** The pinned title row sits directly under the app bar. */
+async function expectTitlePinned(page: Page): Promise<void> {
+  const appBar = await box(page.locator('.mud-appbar'));
+  const title = await box(page.getByTestId('list-head-title'));
+  expect(Math.abs(title.y - (appBar.y + appBar.height)), `title top ${title.y}, app bar bottom ${appBar.y + appBar.height}`).toBeLessThanOrEqual(1);
+  await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
+}
+
+test('the outgoings title, actions and (on larger screens) summary stay at the top while scrolling', async ({ page }, testInfo) => {
+  const phone = isPhone(testInfo);
+  await page.setViewportSize(phone ? { width: 390, height: 560 } : { width: 1280, height: 740 });
+  await signIn(page);
+  for (const [name, category] of [['Gym', 'Leisure'], ['Car insurance', 'Insurance'], ['Water', 'Utilities'], ['Phone', 'Utilities']]) {
+    await addOutgoing(page, name, category, '20');
+  }
+  await page.goto('/outgoings');
+  await settled(page);
+
+  await scrollToBottom(page);
+
+  await expectTitlePinned(page);
+  await expect(page.getByTestId('add-outgoing')).toBeInViewport();
+  await expect(page.getByTestId('go-to-categories')).toBeInViewport();
+  if (phone) {
+    // No room on a phone, so the summary scrolls away with the list.
+    await expect(page.getByTestId('month-total')).not.toBeInViewport();
+  } else {
+    await expect(page.getByTestId('month-total')).toBeInViewport();
+    await expect(page.getByTestId('filter-kind')).toBeInViewport();
+  }
+});
+
+test('on a phone the outgoings actions shrink to icons and the filters fit on one line', async ({ page }, testInfo) => {
+  test.skip(!isPhone(testInfo), 'Phone layout only');
+  await page.setViewportSize({ width: 360, height: 740 });
+  await signIn(page);
+  await page.goto('/outgoings');
+  await settled(page);
+
+  const heading = await box(page.getByRole('heading', { level: 1, name: 'Outgoings' }));
+  for (const [testId, name] of [['add-outgoing', 'Add an outgoing'], ['go-to-categories', 'Categories']]) {
+    const button = page.getByTestId(testId);
+    await expect(button).toHaveAccessibleName(name);
+    await expect(button.locator('.button-label')).toBeHidden();
+    const buttonBox = await box(button);
+    const middle = buttonBox.y + buttonBox.height / 2;
+    expect(middle, `${testId} should be on the title's line`).toBeGreaterThan(heading.y);
+    expect(middle, `${testId} should be on the title's line`).toBeLessThan(heading.y + heading.height);
+  }
+
+  const filters = await Promise.all(['filter-kind', 'filter-priority', 'filter-person'].map(id => box(page.locator('.list-filter').filter({ has: page.getByTestId(id) }))));
+  for (const filter of filters) {
+    expect(Math.abs(filter.y - filters[0].y), 'filters should share one line').toBeLessThanOrEqual(1);
+    expect(filter.x + filter.width).toBeLessThanOrEqual(360);
+  }
+});
+
+test('the income title and action stay at the top while scrolling', async ({ page }, testInfo) => {
+  const phone = isPhone(testInfo);
+  await page.setViewportSize(phone ? { width: 360, height: 420 } : { width: 1280, height: 740 });
+  await signIn(page);
+  await page.goto('/income');
+  await settled(page);
+
+  // A short page may not scroll; pad the end of the page so it does.
+  await page.evaluate(() => {
+    const spacer = document.createElement('div');
+    spacer.style.height = '2000px';
+    document.querySelector('.list-head')!.parentElement!.appendChild(spacer);
+  });
+  await scrollToBottom(page);
+
+  await expectTitlePinned(page);
+  await expect(page.getByTestId('add-income')).toBeInViewport();
+  await expect(page.getByTestId('add-income')).toHaveAccessibleName('Add income');
+  if (phone) {
+    await expect(page.getByTestId('add-income').locator('.button-label')).toBeHidden();
+  } else {
+    await expect(page.getByTestId('month-total')).toBeInViewport();
+  }
+});

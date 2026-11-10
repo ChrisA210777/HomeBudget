@@ -9,21 +9,33 @@
 
 <PageTitle>Income · Home Budget</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
-    <div class="d-flex align-center flex-wrap gap-2 mb-2">
-        <h1 class="mud-typography mud-typography-h4 flex-grow-1">Income</h1>
-        @if (_canEdit)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/income/new" data-testid="add-income">
-                Add income
-            </MudButton>
-        }
-    </div>
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-2 mb-16">
+    @* The same layout as Outgoings: the title and action stay at the top while the list scrolls (BUD-79). *@
+    <div class="list-head" data-testid="list-head">
+        <div class="list-head-title d-flex align-center gap-2" data-testid="list-head-title">
+            <h1 class="mud-typography mud-typography-h4 flex-grow-1 list-head-heading">Income</h1>
+            @if (_canEdit)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/income/new"
+                           Class="icon-only-xs" aria-label="Add income" title="Add income" data-testid="add-income">
+                    <span class="button-label">Add income</span>
+                </MudButton>
+            }
+        </div>
 
-    <div class="d-flex align-center justify-space-between mb-3">
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
-        <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
+        <div class="d-flex align-center justify-space-between mb-2">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
+            <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
+        </div>
+
+        @if (_data is not null)
+        {
+            <MudPaper Class="pa-4 mb-3" Elevation="1">
+                <MudText Typo="Typo.overline">Take-home income this month</MudText>
+                <MudText Typo="Typo.h4" data-testid="month-total">@Money.Format(_data.Total, _data.CurrencyCode)</MudText>
+            </MudPaper>
+        }
     </div>
 
     @if (_household is null && _loaded)
@@ -36,11 +48,6 @@
     }
     else
     {
-        <MudPaper Class="pa-4 mb-3" Elevation="1">
-            <MudText Typo="Typo.overline">Take-home income this month</MudText>
-            <MudText Typo="Typo.h4" data-testid="month-total">@Money.Format(_data.Total, _data.CurrencyCode)</MudText>
-        </MudPaper>
-
         <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show income that hasn't started or has ended" />
 
         @if (_data.Items.Count == 0)

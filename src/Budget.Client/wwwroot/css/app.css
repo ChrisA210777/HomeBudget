@@ -309,3 +309,75 @@ body {
 .every-field input {
     text-align: center;
 }
+
+/* List pages (Outgoings, Income): the title and actions stay at the top while the list
+   scrolls. Larger screens with room to spare keep the summary and filters too (BUD-79). */
+:root {
+    --app-sticky-top: var(--mud-appbar-height);
+}
+
+.list-head {
+    display: contents;
+}
+
+.list-head-title {
+    position: sticky;
+    top: var(--app-sticky-top);
+    z-index: 3;
+    padding: 0.5rem 0;
+    background-color: var(--mud-palette-background);
+}
+
+.list-head-heading {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 960px) and (min-height: 720px) {
+    .list-head {
+        display: block;
+        position: sticky;
+        top: var(--app-sticky-top);
+        z-index: 3;
+        background-color: var(--mud-palette-background);
+    }
+
+    .list-head .list-head-title {
+        position: static;
+    }
+}
+
+@media (max-width: 599.98px) {
+    :root {
+        --app-sticky-top: calc(var(--mud-appbar-height) - var(--mud-appbar-height) / 8);
+    }
+
+    /* Buttons shrink to their icons, keeping their names for screen readers. */
+    .icon-only-xs.mud-button-root {
+        min-width: 0;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .icon-only-xs .button-label {
+        display: none;
+    }
+
+    .icon-only-xs .mud-button-icon-start {
+        margin: 0;
+    }
+
+    /* The filters share one line, each shrinking to fit. */
+    .list-filters {
+        flex-wrap: nowrap !important;
+    }
+
+    .list-filters > .list-filter {
+        flex: 1 1 0;
+        min-width: 0;
+        width: auto !important;
+    }
+}
