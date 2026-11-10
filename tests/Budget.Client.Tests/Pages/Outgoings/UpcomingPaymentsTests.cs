@@ -103,20 +103,20 @@ public sealed class UpcomingPaymentsTests : IDisposable
     {
         var cut = _context.RenderComponent<UpcomingPayments>();
 
-        cut.FindAll("[data-testid=account-total]")[1].Click();
+        cut.FindAll("[data-testid=account-total]").ToList()[1].Click();
 
         cut.WaitForAssertion(() => Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "payment-name")));
         Assert.Equal("£930.00", Text(cut, "period-total"));
         Assert.Equal("2 payments", Text(cut, "payment-count"));
-        Assert.Equal("true", cut.FindAll("[data-testid=account-total]")[1].GetAttribute("aria-pressed"));
+        Assert.Equal("true", cut.FindAll("[data-testid=account-total]").ToList()[1].GetAttribute("aria-pressed"));
         // The totals still show every account, so another can be picked.
         Assert.Equal(3, cut.FindAll("[data-testid=account-total]").Count);
 
-        cut.FindAll("[data-testid=account-total]")[2].Click();
+        cut.FindAll("[data-testid=account-total]").ToList()[2].Click();
         cut.WaitForAssertion(() => Assert.Equal(new[] { "Food shopping" }, Texts(cut, "payment-name")));
 
         // Tapping the selected one again shows everything.
-        cut.FindAll("[data-testid=account-total]")[2].Click();
+        cut.FindAll("[data-testid=account-total]").ToList()[2].Click();
         cut.WaitForAssertion(() => Assert.Equal("4 payments", Text(cut, "payment-count")));
     }
 
