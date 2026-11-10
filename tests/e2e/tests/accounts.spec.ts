@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { choose, settled, signIn, typeOutgoingName } from './helpers';
+import { addIncome, choose, settled, signIn, typeOutgoingName } from './helpers';
 
 // BUD-89: accounts and pots, chosen as "Paid from" on outgoings.
 
@@ -37,10 +37,16 @@ test('income can be paid into an account, and grouped by it', async ({ page }) =
   await page.getByTestId('save').click();
   await expect(page.getByTestId('income-dates')).toContainText('Paid into Joint Monzo › Bills');
 
+  // BUD-99: always grouped by account, with a pot counted in its account; headings once there's more than one.
   await page.goto('/income');
   await settled(page);
-  await page.getByTestId('group-paid-into').click();
-  await expect(page.getByTestId('paid-into-name')).toHaveText(['Joint Monzo › Bills']);
+  await expect(page.getByTestId('paid-into-group')).toHaveCount(0);
+  await expect(page.getByTestId('income-person')).toContainText('Bills pot');
+
+  await addIncome(page, 'Salary', '2500');
+  await page.goto('/income');
+  await settled(page);
+  await expect(page.getByTestId('paid-into-name')).toHaveText(['Joint Monzo', 'Not set']);
 });
 
 test("an account's outgoings are one tap away from the Accounts page", async ({ page }) => {

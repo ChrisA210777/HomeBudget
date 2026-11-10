@@ -383,7 +383,8 @@ public sealed record OutgoingCreatedResponse(Guid Id, string Name, decimal Month
 /// The outgoings for <see cref="Months"/> months starting with <see cref="Year"/>-<see cref="Month"/>: 1 for a
 /// month, or 12 for a year (BUD-80). Each item's amounts are then the total budget for those months.
 /// </summary>
-public sealed record OutgoingMonthResponse(int Year, int Month, IReadOnlyList<OutgoingMonthItem> Items, string CurrencyCode, int Months = 1);
+/// <param name="Inactive">How many outgoings haven't started by, or ended before, the period (BUD-99). Listed only when asked for "all".</param>
+public sealed record OutgoingMonthResponse(int Year, int Month, IReadOnlyList<OutgoingMonthItem> Items, string CurrencyCode, int Months = 1, int Inactive = 0);
 
 /// <summary>
 /// One outgoing in a month.

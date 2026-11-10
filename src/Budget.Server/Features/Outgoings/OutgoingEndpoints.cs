@@ -113,7 +113,8 @@ public static class OutgoingEndpoints
             .ThenBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        return Results.Ok(new OutgoingMonthResponse(year, monthNumber, items, currency, count));
+        var inactive = outgoings.Count(o => !(o.StartsOn <= last && !(o.EndsOn <= first)));
+        return Results.Ok(new OutgoingMonthResponse(year, monthNumber, items, currency, count, inactive));
     }
 
     /// <summary>The payments actually due between two dates (BUD-82, ADR-013), in date order.</summary>
