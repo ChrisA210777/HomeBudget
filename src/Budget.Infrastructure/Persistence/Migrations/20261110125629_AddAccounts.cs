@@ -93,17 +93,14 @@ namespace Budget.Infrastructure.Persistence.Migrations
             // SELECT INTO keeps the column's collation, so the comparisons ignore case like the rest of the database.
             // Where spellings differ only in case, the binary minimum keeps the one with capitals, e.g. "Joint bills".
             migrationBuilder.Sql("""
-                SELECT DISTINCT o.HouseholdId, LTRIM(RTRIM(o.PaidFrom)) AS Name
-                INTO #Names
-                FROM Outgoings o
-                WHERE o.PaidFrom IS NOT NULL AND LTRIM(RTRIM(o.PaidFrom)) <> N'';
-
-                SELECT n.HouseholdId, n.Name,
+                SELECT o.Id AS OutgoingId, o.HouseholdId,
                     CASE WHEN n.Name LIKE N'%_(%_ pot)' THEN LTRIM(RTRIM(LEFT(n.Name, b.Position - 1))) ELSE n.Name END AS AccountName,
                     CASE WHEN n.Name LIKE N'%_(%_ pot)' THEN LTRIM(RTRIM(SUBSTRING(n.Name, b.Position + 1, LEN(n.Name) - b.Position - 4))) END AS PotName
                 INTO #PaidFrom
-                FROM #Names n
-                CROSS APPLY (SELECT LEN(n.Name) - CHARINDEX(N'(', REVERSE(n.Name)) + 1 AS Position) b;
+                FROM Outgoings o
+                CROSS APPLY (SELECT LTRIM(RTRIM(o.PaidFrom)) AS Name) n
+                CROSS APPLY (SELECT LEN(n.Name) - CHARINDEX(N'(', REVERSE(n.Name)) + 1 AS Position) b
+                WHERE o.PaidFrom IS NOT NULL AND n.Name <> N'';
 
                 INSERT INTO Accounts (Id, HouseholdId, Name, Provider, OwnerPersonId, ParentAccountId, IsArchived, CreatedAt, CreatedBy, ModifiedAt, ModifiedBy)
                 SELECT NEWID(), HouseholdId, MIN(AccountName COLLATE Latin1_General_BIN2), NULL, NULL, NULL, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), NULL
@@ -119,12 +116,11 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                 UPDATE o SET AccountId = COALESCE(pot.Id, account.Id)
                 FROM Outgoings o
-                JOIN #PaidFrom p ON p.HouseholdId = o.HouseholdId AND p.Name = LTRIM(RTRIM(o.PaidFrom))
+                JOIN #PaidFrom p ON p.OutgoingId = o.Id
                 JOIN Accounts account ON account.HouseholdId = p.HouseholdId AND account.ParentAccountId IS NULL AND account.Name = p.AccountName
                 LEFT JOIN Accounts pot ON pot.ParentAccountId = account.Id AND pot.Name = p.PotName;
 
                 DROP TABLE #PaidFrom;
-                DROP TABLE #Names;
                 """);
 
             migrationBuilder.DropColumn(
