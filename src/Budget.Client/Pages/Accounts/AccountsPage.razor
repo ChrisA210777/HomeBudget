@@ -7,6 +7,7 @@
 @inject UserSession Session
 @inject IAccountsApi AccountsApi
 @inject IPeopleApi PeopleApi
+@inject Budget.Client.Households.IHouseholdApi HouseholdApi
 @inject ISnackbar Snackbar
 
 <PageTitle>Accounts · Home Budget</PageTitle>
@@ -17,6 +18,25 @@
     <MudText Typo="Typo.body2" Class="mb-4">
         The bank accounts, and pots within them, that money is paid from and into. Choose one for each outgoing or income, or type a new name there to add it.
     </MudText>
+
+    @if (_household is not null && (_isAdmin || _transfersEnabled))
+    {
+        @* "Accounts and transfers" (BUD-91, ADR-014): off by default; Admins turn it on. *@
+        <MudPaper Outlined="true" Class="pa-3 mb-4" data-testid="transfers-setting">
+            @if (_isAdmin)
+            {
+                <MudSwitch T="bool" Value="_transfersEnabled" ValueChanged="SetTransfersEnabledAsync" Color="Color.Primary" Disabled="@(_saving || !Online)"
+                           Label="Track transfers between accounts" data-testid="transfers-enabled" />
+            }
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Record money moved between accounts and pots, such as a monthly top-up of a joint bills account. Transfers aren't spending, so they don't change the budget.
+            </MudText>
+            @if (_transfersEnabled)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz" Href="/transfers" Class="mt-1" data-testid="go-to-transfers">Transfers</MudButton>
+            }
+        </MudPaper>
+    }
 
     @if (_error is not null)
     {
@@ -113,6 +133,7 @@
     private IReadOnlyList<PersonSummary> _people = [];
     private bool _canEdit;
     private bool _isAdmin;
+    private bool _transfersEnabled;
     private bool _saving;
     private bool _showArchived;
     private string? _error;
@@ -145,6 +166,7 @@
         _household = await Session.GetActiveHouseholdAsync();
         _canEdit = _household is not null && _household.Role != "Viewer";
         _isAdmin = _household?.Role == "Admin";
+        _transfersEnabled = _household?.TransfersEnabled == true;
         if (_household is not null)
         {
             _people = await PeopleApi.ListAsync(_household.HouseholdId);
@@ -153,6 +175,25 @@
         else
         {
             _accounts = [];
+        }
+    }
+
+    private async Task SetTransfersEnabledAsync(bool enabled)
+    {
+        _saving = true;
+        try
+        {
+            var household = await HouseholdApi.SaveSettingsAsync(_household!.HouseholdId, new Budget.Shared.Households.HouseholdSettingsRequest { TransfersEnabled = enabled });
+            _transfersEnabled = household.TransfersEnabled;
+            await Session.SetTransfersEnabledAsync(_household.HouseholdId, _transfersEnabled);
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Couldn't save that setting. Try again.";
+        }
+        finally
+        {
+            _saving = false;
         }
     }
 
