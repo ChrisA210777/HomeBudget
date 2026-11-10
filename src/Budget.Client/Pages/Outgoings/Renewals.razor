@@ -56,6 +56,12 @@
                                         <div class="d-flex align-center gap-2">
                                             <MudIcon Icon="@CategoryIconSvg.For(renewal.CategoryIcon)" Size="Size.Small" Color="Color.Secondary" aria-hidden="true" />
                                             <MudLink Href="@($"/outgoings/{renewal.OutgoingId}")" Typo="Typo.body1" data-testid="renewal-name">@renewal.Name</MudLink>
+                                            @* Who it's for, so two with the same name can be told apart (BUD-97). *@
+                                            @if (renewal.PersonName is { } person)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Person" Class="ma-0"
+                                                         aria-label="@($"For {person}")" data-testid="renewal-person">@person</MudChip>
+                                            }
                                         </div>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="renewal-details">@Details(renewal)</MudText>
                                         <div class="d-flex flex-wrap gap-1 mt-1">
@@ -65,6 +71,10 @@
                                                          title="@($"Renews on {renewal.RenewsOn.ToString("d MMMM yyyy", Display)}")" data-testid="renewal-years">
                                                     @YearsText(renewal.YearsUntil)
                                                 </MudChip>
+                                            }
+                                            @if (renewal.AutoRenews)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Autorenew" Class="ma-0" data-testid="renewal-auto">Auto-renews</MudChip>
                                             }
                                             @if (renewal.IsPaused)
                                             {
@@ -114,7 +124,6 @@
             parts.Add($"from {renewal.PaidFrom.Trim()}");
         }
 
-        parts.Add(renewal.AutoRenews ? "Renews automatically" : "Doesn't renew automatically");
         return string.Join(" · ", parts);
     }
 }

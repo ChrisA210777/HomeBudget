@@ -227,8 +227,12 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var insurance = await CategoryIdAsync(householdId, "Insurance");
         var housing = await CategoryIdAsync(householdId, "Housing");
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        (Guid Id, string Name) person = default;
+        await ExecuteDbContextAsync(async db => person = await db.People.IgnoreQueryFilters()
+            .Where(p => p.HouseholdId == householdId).Select(p => new ValueTuple<Guid, string>(p.Id, p.DisplayName)).FirstAsync());
         var carInsurance = Outgoing.Create(householdId, Details("Car insurance", insurance, today.AddYears(-1)) with
         {
+            PersonId = person.Id,
             RenewalDate = today.AddDays(10),
             AutoRenews = true,
             AccountId = await AccountIdAsync(householdId, "Joint bills"),
@@ -255,6 +259,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var mortgage = calendar.Renewals[1];
         Assert.Equal((today.AddDays(40).AddYears(2), 2, 900m, "Housing"), (mortgage.RenewsOn, mortgage.YearsUntil, mortgage.Amount, mortgage.CategoryName));
         Assert.Equal(mortgage.RenewsOn.AddYears(-2), mortgage.Date);
+        Assert.Equal((person.Name, (string?)null), (car.PersonName, mortgage.PersonName));
     }
 
     [Fact]

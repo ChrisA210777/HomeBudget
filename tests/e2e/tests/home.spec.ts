@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { addIncome, signIn } from './helpers';
+import { addIncome, addOutgoing, settled, signIn } from './helpers';
 
 test('a new household is shown its next steps, which go once done', async ({ page }) => {
   await signIn(page);
@@ -26,6 +26,19 @@ test('categories are reached from the outgoings page', async ({ page }) => {
   await page.goto('/outgoings');
   await page.getByTestId('go-to-categories').click();
   await expect(page).toHaveURL(/\/outgoings\/categories$/);
+});
+
+test("a category's count opens its outgoings", async ({ page }) => {
+  await signIn(page);
+  await addOutgoing(page, 'Gym', 'Leisure', '20');
+  await page.goto('/outgoings/categories');
+  await settled(page);
+
+  await page.getByTestId('category').filter({ hasText: 'Leisure' }).getByTestId('category-usage').click();
+
+  await expect(page).toHaveURL(/\/outgoings\?category=/);
+  await expect(page.getByTestId('clear-category')).toBeVisible();
+  await expect(page.getByTestId('outgoing-name')).toHaveText(['Gym']);
 });
 
 test('a category icon can be changed', async ({ page }) => {

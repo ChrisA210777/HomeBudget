@@ -187,6 +187,7 @@ public static class OutgoingEndpoints
             .ToListAsync();
         var categories = await db.OutgoingCategories.ToDictionaryAsync(c => c.Id, c => new { c.Name, c.Icon });
         var accounts = await AccountDirectory.LoadAsync(db, householdId);
+        var people = await db.People.ToDictionaryAsync(p => p.Id, p => p.DisplayName);
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
         var renewals = outgoings
@@ -207,7 +208,8 @@ public static class OutgoingEndpoints
                     (PaymentUnitDto)paid.Unit,
                     accounts.DisplayName(o.AccountId),
                     o.AutoRenews,
-                    r.IsPaused);
+                    r.IsPaused,
+                    o.PersonId is { } personId ? people.GetValueOrDefault(personId) : null);
             }))
             .OrderBy(r => r.Date)
             .ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)

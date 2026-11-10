@@ -31,7 +31,7 @@ public sealed class RenewalsTests : IDisposable
         _api.Calendar = new RenewalsResponse(new DateOnly(2026, 11, 9), new DateOnly(2027, 11, 8), "GBP",
         [
             Entry(new DateOnly(2026, 11, 20), new DateOnly(2026, 11, 20), 0, "Car insurance", 480m, PaymentUnitDto.Year, "Joint bills", autoRenews: true),
-            Entry(new DateOnly(2026, 11, 28), new DateOnly(2026, 11, 28), 0, "Phone contract", 25m, PaymentUnitDto.Month, null, paused: true),
+            Entry(new DateOnly(2026, 11, 28), new DateOnly(2026, 11, 28), 0, "Phone contract", 25m, PaymentUnitDto.Month, null, paused: true) with { PersonName = "Jane" },
             Entry(new DateOnly(2027, 3, 15), new DateOnly(2029, 3, 15), 2, "Mortgage", 900m, PaymentUnitDto.Month, "Joint bills"),
         ]);
 
@@ -41,8 +41,11 @@ public sealed class RenewalsTests : IDisposable
         Assert.Equal(new[] { "Car insurance", "Phone contract", "Mortgage" }, Texts(cut, "renewal-name"));
         Assert.Equal(new[] { "20", "28", "15" }, Texts(cut, "renewal-day"));
         Assert.Equal(new[] { "£480.00", "£25.00", "£900.00" }, Texts(cut, "renewal-amount"));
-        Assert.Equal("Yearly · Insurance · from Joint bills · Renews automatically", Texts(cut, "renewal-details")[0]);
-        Assert.Equal("Monthly · Insurance · Doesn't renew automatically", Texts(cut, "renewal-details")[1]);
+        Assert.Equal("Yearly · Insurance · from Joint bills", Texts(cut, "renewal-details")[0]);
+        Assert.Equal("Monthly · Insurance", Texts(cut, "renewal-details")[1]);
+        Assert.Equal(new[] { "Auto-renews" }, Texts(cut, "renewal-auto"));
+        Assert.Equal(new[] { "Jane" }, Texts(cut, "renewal-person"));
+        Assert.Equal("For Jane", cut.Find("[data-testid=renewal-person]").GetAttribute("aria-label"));
         Assert.Equal(new[] { "Renews in 2 years" }, Texts(cut, "renewal-years"));
         Assert.Equal("Renews on 15 March 2029", cut.Find("[data-testid=renewal-years]").GetAttribute("title"));
         Assert.Single(cut.FindAll("[data-testid=renewal-paused]"));
