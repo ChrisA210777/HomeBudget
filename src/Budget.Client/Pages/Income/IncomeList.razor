@@ -1,11 +1,14 @@
 @page "/income"
 @attribute [Authorize]
+@using Budget.Client.Accounts
 @using Budget.Client.Income
 @using Budget.Shared.Account
+@using Budget.Shared.Accounts
 @using Budget.Shared.Income
 @using Budget.Shared.Outgoings
 @inject UserSession Session
 @inject IIncomeApi IncomeApi
+@inject IAccountsApi AccountsApi
 @inject TimeProvider Clock
 @inject UserSettingsStore Settings
 
@@ -59,20 +62,6 @@
     }
     else
     {
-        <div class="d-flex align-center flex-wrap gap-x-4 gap-y-1">
-            <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show income that hasn't started or has ended" />
-            @* By the account it's paid into, as Outgoings can be grouped by Paid from (BUD-90). *@
-            <div class="d-flex align-center gap-2">
-                <MudText Typo="Typo.body2" id="income-group-by-label">Group by</MudText>
-                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-labelledby="income-group-by-label" data-testid="group-toggle">
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byAccount ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_byAccount ? "false" : "true")"
-                               OnClick="() => _byAccount = false" data-testid="group-none">None</MudButton>
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byAccount ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_byAccount ? "true" : "false")"
-                               OnClick="() => _byAccount = true" data-testid="group-paid-into">Paid into</MudButton>
-                </MudButtonGroup>
-            </div>
-        </div>
-
         @if (_data.Items.Count == 0)
         {
             <MudPaper Class="pa-6 mt-2 text-center" Elevation="0" Outlined="true" data-testid="income-empty">
@@ -84,9 +73,11 @@
             </MudPaper>
         }
 
-        @foreach (var group in Groups(_data.Items))
+        var groups = Groups(_data.Items).ToList();
+        var grouped = groups.Count > 1;
+        @foreach (var group in groups)
         {
-            @if (group.Name is not null)
+            @if (grouped)
             {
                 <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2 mt-4 mb-0 category-heading" style="font-weight: 600" data-testid="paid-into-group">
                     <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
@@ -102,7 +93,7 @@
                     <div class="d-flex align-start gap-2">
                         <div class="flex-grow-1" style="min-width: 0">
                             <MudLink Href="@($"/income/{item.Id}")" Typo="Typo.h6" data-testid="income-name">@item.Name</MudLink>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="income-person">@item.PersonName@(item.PaidInto is { } account && !_byAccount ? $" · into {account}" : string.Empty)</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="income-person">@item.PersonName@(AccountOf(item).Pot is { } pot ? $" · {pot} pot" : !grouped && AccountOf(item).Name is { } account ? $" · into {account}" : string.Empty)</MudText>
                             @if (item.ReceivedAmount is { } received && !(item.Every == 1 && item.Unit == PaymentUnitDto.Month))
                             {
                                 <MudText Typo="Typo.caption" Class="d-block" data-testid="income-received">
@@ -130,6 +121,15 @@
             </MudCard>
         }
         }
+
+        @* Income that hasn't started or has ended is out of the way, but a tap away (BUD-99). *@
+        @if (_data.Inactive > 0)
+        {
+            <div class="d-flex align-center flex-wrap gap-2 mt-4" data-testid="inactive">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@InactiveText(_data.Inactive)</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="() => ToggleAllAsync(!_all)" data-testid="show-all">@(_all ? "Hide" : "Show")</MudButton>
+            </div>
+        }
     }
 </MudContainer>
 
@@ -147,16 +147,20 @@
 
     private bool IsYear => _months == 12;
 
-    private bool _byAccount;
+    private IReadOnlyList<AccountSummary> _accounts = [];
 
-    /// <summary>One unnamed group, or one per account by name with "Not set" last (BUD-90).</summary>
-    private IEnumerable<(string? Name, List<IncomeMonthItem> Items)> Groups(IReadOnlyList<IncomeMonthItem> items) => _byAccount
-        ? items
-            .GroupBy(i => i.PaidInto, StringComparer.CurrentCultureIgnoreCase)
-            .OrderBy(g => g.Key is null)
-            .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
-            .Select(g => ((string?)(g.Key ?? "Not set"), g.ToList()))
-        : [(null, items.ToList())];
+    /// <summary>The account it's paid into, with a pot counted in its account (BUD-99).</summary>
+    private (Guid? Id, string? Name, string? Pot) AccountOf(IncomeMonthItem item) => AccountLevel.Of(item.AccountId, item.PaidInto, _accounts);
+
+    /// <summary>One group per account it's paid into, by name, with "Not set" last (BUD-90, BUD-99).</summary>
+    private IEnumerable<(string Name, List<IncomeMonthItem> Items)> Groups(IReadOnlyList<IncomeMonthItem> items) => items
+        .GroupBy(i => AccountOf(i) is { Id: { } id } ? id.ToString() : AccountOf(i).Name?.Trim().ToUpperInvariant() ?? string.Empty)
+        .Select(g => (Name: g.Key.Length == 0 ? "Not set" : AccountOf(g.First()).Name ?? "Not set", Empty: g.Key.Length == 0, Items: g.ToList()))
+        .OrderBy(g => g.Empty)
+        .ThenBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase)
+        .Select(g => (g.Name, g.Items));
+
+    private static string InactiveText(int count) => count == 1 ? "1 income hasn't started yet or has ended." : $"{count} incomes haven't started yet or have ended.";
 
     private string PeriodName => IsYear
         ? $"{ShortMonth(new DateOnly(_year, _month, 1))} – {ShortMonth(new DateOnly(_year, _month, 1).AddMonths(11))}"
@@ -172,6 +176,11 @@
         _household = await Session.GetActiveHouseholdAsync();
         _canEdit = _household is not null && _household.Role != "Viewer";
         _months = (await Settings.GetAsync()).IncomePeriod == ListPeriodDto.Year ? 12 : 1;
+        if (_household is not null)
+        {
+            _accounts = await AccountsApi.ListAsync(_household.HouseholdId);
+        }
+
         _loaded = true;
         await LoadAsync();
     }

@@ -130,7 +130,8 @@ public sealed record DeleteEntryRequest
 /// The income for <see cref="Months"/> months starting with <see cref="Year"/>-<see cref="Month"/>: 1 for a month,
 /// or 12 for a year (BUD-80), when each item's amount and the total cover all 12 months.
 /// </summary>
-public sealed record IncomeMonthResponse(int Year, int Month, IReadOnlyList<IncomeMonthItem> Items, decimal Total, string CurrencyCode, int Months = 1);
+/// <param name="Inactive">How many incomes haven't started by, or ended before, the period (BUD-99). Listed only when asked for "all".</param>
+public sealed record IncomeMonthResponse(int Year, int Month, IReadOnlyList<IncomeMonthItem> Items, decimal Total, string CurrencyCode, int Months = 1, int Inactive = 0);
 
 /// <summary>
 /// One income in a month. <see cref="Notes"/> explain why the month differs from the usual amount,
@@ -151,7 +152,8 @@ public sealed record IncomeMonthItem(
     IReadOnlyList<string> Notes,
     DateOnly StartsOn,
     DateOnly? EndsOn,
-    string? PaidInto = null);
+    string? PaidInto = null,
+    Guid? AccountId = null);
 
 /// <summary>An income with its full history, for its own page.</summary>
 public sealed record IncomeStreamDetails(

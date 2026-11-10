@@ -165,6 +165,7 @@ public class IncomeTimelineApiTests(BudgetApiFactory factory) : IntegrationTestB
 
         Assert.Equal(3000m, may.AmountForMonth);
         Assert.Empty(june.Items);
+        Assert.Equal(1, june.Inactive);
         var ended = Assert.Single(juneAll!.Items);
         Assert.Equal(0m, ended.AmountForMonth);
         Assert.Equal(new DateOnly(2026, 6, 1), ended.EndsOn);

@@ -151,7 +151,6 @@
     else
     {
         <div class="d-flex align-center flex-wrap gap-x-4 gap-y-1">
-            <MudSwitch T="bool" Value="_all" ValueChanged="ToggleAllAsync" Color="Color.Primary" Label="Show all, including ones not started or ended" data-testid="show-all" />
             <div class="d-flex align-center gap-2">
                 <MudText Typo="Typo.body2" id="group-by-label">Group by</MudText>
                 <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-labelledby="group-by-label" data-testid="group-toggle">
@@ -257,6 +256,15 @@
                     </ul>
                 </MudPaper>
             </section>
+        }
+
+        @* Outgoings that haven't started or have ended are out of the way, but a tap away (BUD-99). *@
+        @if (_data.Inactive > 0)
+        {
+            <div class="d-flex align-center flex-wrap gap-2 mt-4" data-testid="inactive">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@(_data.Inactive == 1 ? "1 outgoing hasn't started yet or has ended." : $"{_data.Inactive} outgoings haven't started yet or have ended.")</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="() => ToggleAllAsync(!_all)" data-testid="show-all">@(_all ? "Hide" : "Show")</MudButton>
+            </div>
         }
     }
 </MudContainer>

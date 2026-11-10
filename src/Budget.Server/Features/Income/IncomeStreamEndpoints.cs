@@ -96,12 +96,14 @@ public static class IncomeStreamEndpoints
                 Notes(x.Stream, first, last, currency),
                 x.Stream.StartsOn,
                 x.Stream.EndsOn,
-                accounts.DisplayName(x.Stream.AccountId)))
+                accounts.DisplayName(x.Stream.AccountId),
+                x.Stream.AccountId))
             .ToList();
 
         // Rounded once, from the unrounded amounts.
         var total = IncomeTimeline.RoundForDisplay(shown.Sum(x => x.Amount));
-        return Results.Ok(new IncomeMonthResponse(year, monthNumber, items, total, currency, count));
+        var inactive = streams.Count(s => !(s.StartsOn <= last && !(s.EndsOn <= first)));
+        return Results.Ok(new IncomeMonthResponse(year, monthNumber, items, total, currency, count, inactive));
     }
 
     private static async Task<IResult> GetDetailsAsync(Guid householdId, Guid incomeStreamId, BudgetDbContext db, TimeProvider time)

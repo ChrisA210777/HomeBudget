@@ -391,6 +391,7 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var all = (await client.GetFromJsonAsync<OutgoingMonthResponse>(Url(OutgoingRoutes.ForMonth(householdId, 2026, 11, all: true))))!;
 
         Assert.Empty(usual.Items);
+        Assert.Equal((2, 2), (usual.Inactive, all.Inactive));
         Assert.Equal(new[] { "Gym", "Old phone" }, all.Items.Select(i => i.Name));
         Assert.Equal(new[] { "Starts 1 Jan 2027" }, all.Items[0].Notes);
         Assert.Equal(new[] { "Ended from 1 Jun 2026" }, all.Items[1].Notes);
