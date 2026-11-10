@@ -1,0 +1,287 @@
+@page "/cash-flow"
+@attribute [Authorize]
+@using System.Globalization
+@using Budget.Client.CashFlow
+@using Budget.Client.Income
+@using Budget.Client.Outgoings
+@using Budget.Shared.CashFlow
+@using Budget.Shared.Income
+@inject UserSession Session
+@inject ICashFlowApi CashFlowApi
+@inject UserSettingsStore Settings
+@inject TimeProvider Clock
+
+<PageTitle>Cash flow · Home Budget</PageTitle>
+
+@* Money in and out of each account, with its pots (BUD-92, ADR-014): monthly budget amounts, or day by day. *@
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-2 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/accounts" Class="mb-1">Accounts</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-1">Cash flow</h1>
+    <MudText Typo="Typo.body2" Class="mb-3">
+        Money into and out of each account, with its pots counted in. Transfers between an account and its own pots aren't shown, as the money stays in the account.
+    </MudText>
+
+    @if (_loaded && _household is not { TransfersEnabled: true })
+    {
+        <MudAlert Severity="Severity.Info" data-testid="cash-flow-off">
+            Cash flow needs transfers turned on. An Admin can turn them on from the <MudLink Href="/accounts">Accounts</MudLink> page.
+        </MudAlert>
+    }
+    else
+    {
+        <div class="d-flex align-center flex-wrap gap-x-4 gap-y-2 mb-2">
+            <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show" data-testid="view-toggle">
+                <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_daily ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_daily ? "false" : "true")"
+                           OnClick="() => SetDailyAsync(false)" data-testid="show-monthly">Monthly</MudButton>
+                <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_daily ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_daily ? "true" : "false")"
+                           OnClick="() => SetDailyAsync(true)" data-testid="show-daily">Day by day</MudButton>
+            </MudButtonGroup>
+            @if (_daily)
+            {
+                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Period" data-testid="period-toggle">
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_month ? "false" : "true")"
+                               OnClick="() => SetMonthAsync(false)" data-testid="show-week">Week</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_month ? "true" : "false")"
+                               OnClick="() => SetMonthAsync(true)" data-testid="show-month">Month</MudButton>
+                </MudButtonGroup>
+                @if (_days is { Accounts.Count: > 0 })
+                {
+                    <div style="width: 13rem">
+                        <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="DayAccountName" Label="Account" Margin="Margin.Dense" Variant="Variant.Outlined" data-testid="day-account">
+                            @foreach (var account in _days.Accounts)
+                            {
+                                <MudSelectItem T="Guid?" Value="account.AccountId">@account.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                }
+            }
+        </div>
+
+        <div class="d-flex align-center justify-space-between mb-2">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@(Monthly ? "Previous month" : "Previous week")" OnClick="() => MoveAsync(-1)" data-testid="previous-period" />
+            <MudText Typo="Typo.h6" data-testid="period-name">@PeriodName</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@(Monthly ? "Next month" : "Next week")" OnClick="() => MoveAsync(1)" data-testid="next-period" />
+        </div>
+
+        @if (!_daily)
+        {
+            @if (_monthData is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_monthData.Accounts.Count == 0)
+            {
+                <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="cash-flow-empty">
+                    <MudText Typo="Typo.body1">Nothing goes in or out this month.</MudText>
+                </MudPaper>
+            }
+            else
+            {
+                @foreach (var account in _monthData.Accounts)
+                {
+                    <MudPaper Outlined="true" Class="pa-3 mb-3" data-testid="cash-flow-account">
+                        <div class="d-flex align-center flex-wrap gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
+                            <h2 class="mud-typography mud-typography-subtitle1 flex-grow-1 ma-0" style="font-weight: 600" data-testid="account-name">@account.Name</h2>
+                            @Net(account.Net, _monthData.CurrencyCode)
+                        </div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="account-totals">
+                            In @Format(account.TotalIn, _monthData.CurrencyCode) · Out @Format(account.TotalOut, _monthData.CurrencyCode)
+                        </MudText>
+                        <div class="cash-flow-lines mt-2">
+                            @foreach (var entry in account.In.Concat(account.Out))
+                            {
+                                <div class="d-flex align-center gap-2" data-testid="cash-flow-line">
+                                    <MudIcon Icon="@(entry.IsIn ? Icons.Material.Filled.ArrowDownward : Icons.Material.Filled.ArrowUpward)" Size="Size.Small"
+                                             Color="@(entry.IsIn ? Color.Success : Color.Default)" aria-hidden="true" />
+                                    <MudLink Href="@Link(entry)" Typo="Typo.body2" Class="flex-grow-1" data-testid="line-name">@Label(entry)</MudLink>
+                                    <MudText Typo="Typo.body2" Class="text-nowrap" data-testid="line-amount">@(entry.IsIn ? "+" : "−")@Format(entry.Amount, _monthData.CurrencyCode)</MudText>
+                                </div>
+                            }
+                        </div>
+                    </MudPaper>
+                }
+            }
+        }
+        else
+        {
+            @if (_days is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (SelectedDays is not { } account)
+            {
+                <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="cash-flow-empty">
+                    <MudText Typo="Typo.body1">Nothing goes in or out @(_month ? "this month" : "this week").</MudText>
+                </MudPaper>
+            }
+            else
+            {
+                <MudPaper Outlined="true" Class="pa-3 mb-3">
+                    <div class="d-flex align-center flex-wrap gap-2">
+                        <MudText Typo="Typo.body2" Class="flex-grow-1" data-testid="day-totals">
+                            In @Format(account.TotalIn, _days.CurrencyCode) · Out @Format(account.TotalOut, _days.CurrencyCode)
+                        </MudText>
+                        @Net(account.Net, _days.CurrencyCode)
+                    </div>
+                    @if (account.Days.FirstOrDefault(d => d.IsShort) is { } firstShort)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" data-testid="timing-gap">
+                            More goes out than has come in by @IncomeDates.Format(firstShort.Date). Money will need to be in the account before then.
+                        </MudAlert>
+                    }
+                </MudPaper>
+
+                @foreach (var day in account.Days)
+                {
+                    <section class="mb-3" data-testid="cash-flow-day" aria-label="@day.Date.ToString("dddd d MMMM", Display)">
+                        <h2 class="mud-typography mud-typography-subtitle2 d-flex align-center gap-2 mb-1" style="font-weight: 600">
+                            <span class="flex-grow-1" data-testid="day-name">@day.Date.ToString("ddd d MMM", Display)</span>
+                            @if (day.IsShort)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" aria-hidden="true" />
+                                <span data-testid="day-short">Short by @Format(-day.RunningTotal, _days.CurrencyCode)</span>
+                            }
+                            else
+                            {
+                                <span style="font-weight: 400" data-testid="day-running">@Format(day.RunningTotal, _days.CurrencyCode) so far</span>
+                            }
+                        </h2>
+                        <MudPaper Outlined="true" Class="px-3 py-1">
+                            @foreach (var entry in day.Entries)
+                            {
+                                <div class="d-flex align-center gap-2 py-1" data-testid="cash-flow-line">
+                                    <MudIcon Icon="@(entry.IsIn ? Icons.Material.Filled.ArrowDownward : Icons.Material.Filled.ArrowUpward)" Size="Size.Small"
+                                             Color="@(entry.IsIn ? Color.Success : Color.Default)" aria-hidden="true" />
+                                    <MudLink Href="@Link(entry)" Typo="Typo.body2" Class="flex-grow-1" data-testid="line-name">@Label(entry)</MudLink>
+                                    <MudText Typo="Typo.body2" Class="text-nowrap" data-testid="line-amount">@(entry.IsIn ? "+" : "−")@Format(entry.Amount, _days.CurrencyCode)</MudText>
+                                </div>
+                            }
+                        </MudPaper>
+                    </section>
+                }
+            }
+        }
+    }
+</MudContainer>
+
+@code {
+    private static readonly CultureInfo Display = CultureInfo.InvariantCulture;
+
+    private HouseholdMembershipSummary? _household;
+    private bool _loaded;
+    private bool _daily;
+    private bool _month = true;
+    private DayOfWeek _firstDay = DayOfWeek.Sunday;
+    private DateOnly _from;
+    private DateOnly _to;
+    private Guid? _account;
+    private CashFlowMonthResponse? _monthData;
+    private CashFlowDaysResponse? _days;
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    /// <summary>The monthly view, or day by day over a month: both move a month at a time.</summary>
+    private bool Monthly => !_daily || _month;
+
+    private string PeriodName => Monthly
+        ? _from.ToString("MMMM yyyy", Display)
+        : _from.Year == _to.Year
+            ? $"{_from.ToString("d MMM", Display)} – {_to.ToString("d MMM yyyy", Display)}"
+            : $"{_from.ToString("d MMM yyyy", Display)} – {_to.ToString("d MMM yyyy", Display)}";
+
+    private CashFlowDaysAccount? SelectedDays =>
+        _days?.Accounts.FirstOrDefault(a => a.AccountId == _account) ?? _days?.Accounts.FirstOrDefault();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _firstDay = (await Settings.GetAsync()).FirstDayOfWeek;
+        (_from, _to) = PaymentPeriods.MonthOf(Today);
+        _household = await Session.GetActiveHouseholdAsync();
+        _loaded = true;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_household is not { TransfersEnabled: true } household)
+        {
+            return;
+        }
+
+        if (_daily)
+        {
+            _days = await CashFlowApi.GetDaysAsync(household.HouseholdId, _from, _to);
+            if (_days.Accounts.All(a => a.AccountId != _account))
+            {
+                _account = _days.Accounts.FirstOrDefault()?.AccountId;
+            }
+        }
+        else
+        {
+            _monthData = await CashFlowApi.GetMonthAsync(household.HouseholdId, _from.Year, _from.Month);
+        }
+    }
+
+    private async Task SetDailyAsync(bool daily)
+    {
+        if (daily == _daily)
+        {
+            return;
+        }
+
+        _daily = daily;
+        (_from, _to) = PaymentPeriods.MonthOf(_from);
+        _month = true;
+        await LoadAsync();
+    }
+
+    private async Task SetMonthAsync(bool month)
+    {
+        if (month == _month)
+        {
+            return;
+        }
+
+        _month = month;
+        var anchor = month ? _from : (_from <= Today && Today <= _to ? Today : _from);
+        (_from, _to) = month ? PaymentPeriods.MonthOf(anchor) : PaymentPeriods.WeekOf(anchor, _firstDay);
+        await LoadAsync();
+    }
+
+    private async Task MoveAsync(int step)
+    {
+        (_from, _to) = Monthly ? PaymentPeriods.MonthOf(_from.AddMonths(step)) : PaymentPeriods.WeekOf(_from.AddDays(7 * step), _firstDay);
+        await LoadAsync();
+    }
+
+    private string DayAccountName(Guid? id) => _days?.Accounts.FirstOrDefault(a => a.AccountId == id)?.Name ?? string.Empty;
+
+    private static string Format(decimal amount, string currency) => Money.Format(amount, currency);
+
+    /// <summary>e.g. "Mortgage · Bills pot".</summary>
+    private static string Label(CashFlowEntry entry) => entry.Pot is { } pot ? $"{entry.Name} · {pot} pot" : entry.Name;
+
+    private static string Link(CashFlowEntry entry) => entry.Kind switch
+    {
+        CashFlowKindDto.Income => $"/income/{entry.Id}",
+        CashFlowKindDto.Outgoing => $"/outgoings/{entry.Id}",
+        _ => $"/transfers/{entry.Id}",
+    };
+
+    /// <summary>A surplus or shortfall, in words and with an icon, not colour alone.</summary>
+    private RenderFragment Net(decimal net, string currency) =>
+        @<span class="d-inline-flex align-center gap-1" data-testid="account-net">
+            @if (net < 0m)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" aria-hidden="true" />
+                <MudText Typo="Typo.body1" Style="font-weight: 600">Short by @Format(-net, currency)</MudText>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" aria-hidden="true" />
+                <MudText Typo="Typo.body1" Style="font-weight: 600">Surplus @Format(net, currency)</MudText>
+            }
+        </span>;
+}

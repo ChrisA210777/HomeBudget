@@ -34,6 +34,7 @@
         @if (Active.TransfersEnabled)
         {
             <MudMenuItem Icon="@Icons.Material.Filled.SwapHoriz" Href="/transfers" data-testid="household-transfers">Transfers</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Filled.Timeline" Href="/cash-flow" data-testid="household-cash-flow">Cash flow</MudMenuItem>
         }
         @if (Active.Role == "Admin")
         {
