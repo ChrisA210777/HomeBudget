@@ -415,4 +415,54 @@ public class OutgoingTests
         category.Show();
         Assert.False(category.IsHidden);
     }
+
+    // ---- Scheduled payments (BUD-82, ADR-013) ----
+
+    private static string[] Payments(Outgoing outgoing, DateOnly from, DateOnly to) =>
+        outgoing.PaymentsBetween(from, to).Select(p => $"{p.Date:yyyy-MM-dd} {p.Amount}").ToArray();
+
+    [Fact]
+    public void Monthly_payments_on_the_31st_fall_on_the_last_day_of_short_months()
+    {
+        var rent = Create(800m, PaymentSchedule.Monthly, new DateOnly(2026, 1, 31));
+
+        Assert.Equal(
+            new[] { "2027-01-31 800", "2027-02-28 800", "2027-03-31 800" },
+            Payments(rent, new DateOnly(2027, 1, 1), new DateOnly(2027, 3, 31)));
+    }
+
+    [Fact]
+    public void A_yearly_bill_is_only_due_in_its_month_and_weekly_ones_every_week()
+    {
+        var insurance = Create(480m, PaymentSchedule.Yearly, new DateOnly(2026, 3, 14));
+        var food = Create(120m, PaymentSchedule.Weekly, new DateOnly(2026, 11, 2));
+
+        Assert.Empty(Payments(insurance, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)));
+        Assert.Equal(new[] { "2027-03-14 480" }, Payments(insurance, new DateOnly(2027, 3, 1), new DateOnly(2027, 3, 31)));
+        Assert.Equal(
+            new[] { "2026-11-02 120", "2026-11-09 120", "2026-11-16 120", "2026-11-23 120", "2026-11-30 120" },
+            Payments(food, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)));
+    }
+
+    [Fact]
+    public void Payments_use_the_amount_in_force_and_skip_pauses_and_anything_after_the_end()
+    {
+        var gym = Create(30m, PaymentSchedule.Monthly, new DateOnly(2026, 6, 5));
+        gym.ChangeAmount(new DateOnly(2026, 12, 5), 35m, PaymentSchedule.Monthly, "Price rise");
+        gym.PauseFor(new DateOnly(2027, 1, 5), payments: 1, "Injured");
+        gym.End(new DateOnly(2027, 4, 5), "Cancelled");
+
+        Assert.Equal(
+            new[] { "2026-11-05 30", "2026-12-05 35", "2027-02-05 35", "2027-03-05 35" },
+            Payments(gym, new DateOnly(2026, 11, 1), new DateOnly(2027, 6, 30)));
+    }
+
+    [Fact]
+    public void Nothing_is_due_before_it_starts()
+    {
+        var car = Create(250m, PaymentSchedule.Monthly, new DateOnly(2027, 1, 15));
+
+        Assert.Empty(Payments(car, new DateOnly(2026, 11, 1), new DateOnly(2026, 12, 31)));
+        Assert.Equal(new[] { "2027-01-15 250" }, Payments(car, new DateOnly(2026, 12, 1), new DateOnly(2027, 1, 31)));
+    }
 }

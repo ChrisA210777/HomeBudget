@@ -1,0 +1,263 @@
+@page "/outgoings/upcoming"
+@attribute [Authorize]
+@using System.Globalization
+@using Budget.Client.Outgoings
+@using Budget.Shared.Outgoings
+@inject UserSession Session
+@inject IUpcomingPaymentsApi PaymentsApi
+@inject UserSettingsStore Settings
+@inject TimeProvider Clock
+
+<PageTitle>Upcoming payments · Home Budget</PageTitle>
+
+@* What's actually due each day (BUD-82, ADR-013): real amounts on their dates, not monthly averages. *@
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-2 mb-16">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings" Class="mb-1">Outgoings</MudButton>
+    <h1 class="mud-typography mud-typography-h4 mb-1">Upcoming payments</h1>
+    <MudText Typo="Typo.body2" Class="mb-3">
+        What's due each day, at the amount actually paid. Unlike the budget, a yearly bill only shows on the day it's paid.
+    </MudText>
+
+    <div class="d-flex align-center flex-wrap gap-x-4 gap-y-2 mb-2">
+        <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show payments for" data-testid="period-toggle">
+            <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_month ? "false" : "true")"
+                       OnClick="() => SetMonthAsync(false)" data-testid="show-week">Week</MudButton>
+            <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_month ? "true" : "false")"
+                       OnClick="() => SetMonthAsync(true)" data-testid="show-month">Month</MudButton>
+        </MudButtonGroup>
+        <div class="d-flex align-center gap-2">
+            <MudText Typo="Typo.body2" id="payments-group-by-label">Group by</MudText>
+            <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-labelledby="payments-group-by-label" data-testid="group-toggle">
+                @foreach (var (grouping, label, testId) in Groupings)
+                {
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_grouping == grouping ? Variant.Filled : Variant.Outlined)"
+                               aria-pressed="@(_grouping == grouping ? "true" : "false")" OnClick="() => _grouping = grouping" data-testid="@testId">@label</MudButton>
+                }
+            </MudButtonGroup>
+        </div>
+    </div>
+
+    <div class="d-flex align-center justify-space-between mb-2">
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@(_month ? "Previous month" : "Previous week")" OnClick="() => MoveAsync(-1)" data-testid="previous-period" />
+        <div class="d-flex align-center flex-wrap justify-center gap-2">
+            <MudText Typo="Typo.h6" data-testid="period-name">@PeriodName</MudText>
+            @if (!(_from <= Today && Today <= _to))
+            {
+                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary" OnClick="GoToTodayAsync" data-testid="go-to-today">Today</MudButton>
+            }
+        </div>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@(_month ? "Next month" : "Next week")" OnClick="() => MoveAsync(1)" data-testid="next-period" />
+    </div>
+
+    @if (_loaded && _household is null)
+    {
+        <MudAlert Severity="Severity.Info">You're not in a household yet.</MudAlert>
+    }
+    else if (_data is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudPaper Class="pa-4 mb-3" Elevation="1">
+            <MudText Typo="Typo.overline">Due @(_month ? "this month" : "this week")</MudText>
+            <MudText Typo="Typo.h4" data-testid="period-total">@Format(_data.Payments.Sum(p => p.Amount))</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="payment-count">@Count(_data.Payments.Count)</MudText>
+        </MudPaper>
+
+        @if (_data.Payments.Count == 0)
+        {
+            <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="payments-empty">
+                <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.body1" Class="mt-2">Nothing is due @(_month ? "this month" : "this week").</MudText>
+            </MudPaper>
+        }
+        else if (_grouping == Grouping.None)
+        {
+            @Days(_data.Payments)
+        }
+        else
+        {
+            @foreach (var group in Grouped(_data.Payments))
+            {
+                <section class="mt-4" data-testid="payment-group" aria-label="@group.Name">
+                    <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2 mb-1 category-heading" style="font-weight: 600">
+                        <MudIcon Icon="@group.Icon" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
+                        <span data-testid="payment-group-name">@group.Name</span>
+                        <span class="flex-grow-1"></span>
+                        <span style="font-weight: 400" data-testid="payment-group-total">@Format(group.Payments.Sum(p => p.Amount))</span>
+                    </h2>
+                    @Days(group.Payments)
+                </section>
+            }
+        }
+    }
+</MudContainer>
+
+@code {
+    private enum Grouping
+    {
+        None,
+        PaidFrom,
+        Category,
+    }
+
+    private static readonly (Grouping Grouping, string Label, string TestId)[] Groupings =
+    [
+        (Grouping.None, "None", "group-none"),
+        (Grouping.PaidFrom, "Paid from", "group-paid-from"),
+        (Grouping.Category, "Category", "group-category"),
+    ];
+
+    private static readonly CultureInfo Display = CultureInfo.InvariantCulture;
+
+    private HouseholdMembershipSummary? _household;
+    private UpcomingPaymentsResponse? _data;
+    private bool _loaded;
+    private bool _month;
+    private Grouping _grouping;
+    private DayOfWeek _firstDay = DayOfWeek.Sunday;
+    private DateOnly _from;
+    private DateOnly _to;
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    private string PeriodName => _month
+        ? _from.ToString("MMMM yyyy", Display)
+        : _from.Year == _to.Year
+            ? $"{_from.ToString("d MMM", Display)} – {_to.ToString("d MMM yyyy", Display)}"
+            : $"{_from.ToString("d MMM yyyy", Display)} – {_to.ToString("d MMM yyyy", Display)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The week starts on the day chosen in Settings (BUD-87); Sunday unless changed.
+        _firstDay = (await Settings.GetAsync()).FirstDayOfWeek;
+        (_from, _to) = PaymentPeriods.WeekOf(Today, _firstDay);
+        _household = await Session.GetActiveHouseholdAsync();
+        _loaded = true;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_household is not null)
+        {
+            _data = await PaymentsApi.GetAsync(_household.HouseholdId, _from, _to);
+        }
+    }
+
+    private async Task SetMonthAsync(bool month)
+    {
+        if (month == _month)
+        {
+            return;
+        }
+
+        // Keep looking at the same time: the month containing the week's first day, or this week if it's in the month.
+        _month = month;
+        var anchor = month ? _from : (_from <= Today && Today <= _to ? Today : _from);
+        (_from, _to) = month ? PaymentPeriods.MonthOf(anchor) : PaymentPeriods.WeekOf(anchor, _firstDay);
+        await LoadAsync();
+    }
+
+    private async Task MoveAsync(int step)
+    {
+        (_from, _to) = _month ? PaymentPeriods.MonthOf(_from.AddMonths(step)) : PaymentPeriods.WeekOf(_from.AddDays(7 * step), _firstDay);
+        await LoadAsync();
+    }
+
+    private async Task GoToTodayAsync()
+    {
+        (_from, _to) = _month ? PaymentPeriods.MonthOf(Today) : PaymentPeriods.WeekOf(Today, _firstDay);
+        await LoadAsync();
+    }
+
+    private sealed record PaymentGroup(string Name, string Icon, List<UpcomingPayment> Payments);
+
+    /// <summary>Paid From groups by name (ignoring case and spaces), "Not set" last; categories in the household's order.</summary>
+    private IEnumerable<PaymentGroup> Grouped(IReadOnlyList<UpcomingPayment> payments) => _grouping == Grouping.PaidFrom
+        ? payments
+            .GroupBy(p => string.IsNullOrWhiteSpace(p.PaidFrom) ? null : p.PaidFrom.Trim(), StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(g => g.Key is null)
+            .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
+            .Select(g => new PaymentGroup(g.Key ?? "Not set", Icons.Material.Filled.AccountBalance, g.ToList()))
+        : payments
+            .GroupBy(p => p.CategoryId)
+            .OrderBy(g => g.First().CategorySortOrder)
+            .ThenBy(g => g.First().CategoryName, StringComparer.CurrentCultureIgnoreCase)
+            .Select(g => new PaymentGroup(g.First().CategoryName, CategoryIconSvg.For(g.First().CategoryIcon), g.ToList()));
+
+    /// <summary>The days with something due, each with its payments and total; days with nothing are left out.</summary>
+    private RenderFragment Days(IEnumerable<UpcomingPayment> payments) =>
+        @<div>
+        @foreach (var day in payments.GroupBy(p => p.Date).OrderBy(g => g.Key))
+        {
+            var isToday = day.Key == Today;
+            <div class="mb-3" data-testid="payment-day" data-date="@day.Key.ToString("yyyy-MM-dd", Display)">
+                <div class="d-flex align-center gap-2 mb-1 category-heading">
+                    <MudText Typo="Typo.subtitle2" data-testid="payment-day-name">@day.Key.ToString("ddd d MMM", Display)</MudText>
+                    @if (isToday)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ma-0" data-testid="payment-today">Today</MudChip>
+                    }
+                    <span class="flex-grow-1"></span>
+                    <MudText Typo="Typo.subtitle2" data-testid="payment-day-total">@Format(day.Sum(p => p.Amount))</MudText>
+                </div>
+                <MudPaper Outlined="true">
+                    <ul class="plain-list">
+                        @foreach (var payment in day)
+                        {
+                            <li class="plain-list-item" data-testid="payment">
+                                <div class="d-flex align-start gap-2">
+                                    <MudIcon Icon="@CategoryIconSvg.For(payment.CategoryIcon)" Size="Size.Small" Color="Color.Secondary" Class="mt-1" aria-hidden="true" />
+                                    <div class="flex-grow-1" style="min-width: 0">
+                                        <MudLink Href="@($"/outgoings/{payment.OutgoingId}")" Typo="Typo.body1" data-testid="payment-name">@payment.Name</MudLink>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="payment-details">@Details(payment)</MudText>
+                                    </div>
+                                    <MudText Typo="Typo.subtitle1" Class="text-right text-nowrap" data-testid="payment-amount">@Format(payment.Amount)</MudText>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </MudPaper>
+            </div>
+        }
+        </div>;
+
+    private string Details(UpcomingPayment payment)
+    {
+        var parts = new List<string> { Schedule(payment.Every, payment.Unit) };
+        if (_grouping != Grouping.Category)
+        {
+            parts.Add(payment.CategoryName);
+        }
+
+        if (_grouping != Grouping.PaidFrom && !string.IsNullOrWhiteSpace(payment.PaidFrom))
+        {
+            parts.Add($"from {payment.PaidFrom.Trim()}");
+        }
+
+        if (payment.PersonName is { } person)
+        {
+            parts.Add(person);
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>e.g. "Monthly", "Every 4 weeks".</summary>
+    private static string Schedule(int every, PaymentUnitDto unit)
+    {
+        var name = unit switch
+        {
+            PaymentUnitDto.Week => "week",
+            PaymentUnitDto.Month => "month",
+            _ => "year",
+        };
+        return every == 1 ? $"{(unit == PaymentUnitDto.Month ? "Month" : unit == PaymentUnitDto.Week ? "Week" : "Year")}ly" : $"Every {every} {name}s";
+    }
+
+    private static string Count(int count) => count == 1 ? "1 payment" : $"{count} payments";
+
+    private string Format(decimal amount) => Money.Format(amount, _data?.CurrencyCode ?? "GBP");
+}

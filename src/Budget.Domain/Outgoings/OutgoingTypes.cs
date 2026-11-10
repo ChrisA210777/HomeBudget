@@ -145,6 +145,9 @@ public readonly record struct PaymentSchedule(int Every, PaymentUnit Unit)
     }
 }
 
+/// <summary>A payment due on <see cref="Date"/> of <see cref="Amount"/>, on <see cref="Schedule"/> (BUD-82).</summary>
+public readonly record struct ScheduledPayment(DateOnly Date, decimal Amount, PaymentSchedule Schedule);
+
 internal static class Dates
 {
     /// <summary>

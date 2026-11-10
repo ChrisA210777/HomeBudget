@@ -25,6 +25,10 @@
     <div class="list-head" data-testid="list-head">
         <div class="list-head-title d-flex align-center gap-2" data-testid="list-head-title">
             <h1 class="mud-typography mud-typography-h4 flex-grow-1 list-head-heading">Outgoings</h1>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Event" Href="/outgoings/upcoming"
+                       Class="icon-only-xs" aria-label="Upcoming payments" title="Upcoming payments" data-testid="go-to-upcoming">
+                <span class="button-label">Upcoming</span>
+            </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Category" Href="/outgoings/categories"
                        Class="icon-only-xs" aria-label="Categories" title="Categories" data-testid="go-to-categories">
                 <span class="button-label">Categories</span>

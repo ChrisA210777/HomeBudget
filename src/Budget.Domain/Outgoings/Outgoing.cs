@@ -305,6 +305,24 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         return null;
     }
 
+    /// <summary>
+    /// The payments actually due from <paramref name="from"/> to <paramref name="to"/> inclusive (ADR-013,
+    /// BUD-82): on the schedule in force on each date, anchored on the first payment date (clamped to short
+    /// months), at the amount in force that day. Paused payments are skipped and there are none before it
+    /// starts or once it has ended. Weekends and bank holidays aren't moved.
+    /// </summary>
+    public IReadOnlyList<ScheduledPayment> PaymentsBetween(DateOnly from, DateOnly to)
+    {
+        var payments = new List<ScheduledPayment>();
+        for (var next = NextPaymentOnOrAfter(from); next is { } date && date <= to; next = NextPaymentOnOrAfter(date.AddDays(1)))
+        {
+            var change = AmountChangeOn(date)!;
+            payments.Add(new ScheduledPayment(date, change.Amount, change.Schedule));
+        }
+
+        return payments;
+    }
+
     /// <summary>The next renewal on or after a date, rolling the renewal date forward by the renewal cycle.</summary>
     public DateOnly? NextRenewalOnOrAfter(DateOnly date) =>
         RenewalDate is { } renewal ? Dates.NextMonthlyOnOrAfter(renewal, RenewalEveryMonths, date) : null;
