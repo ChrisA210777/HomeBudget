@@ -2,6 +2,7 @@ using Budget.Client.Account;
 using Budget.Client.Budgeting;
 using Budget.Client.Pages.Budgeting;
 using Budget.Client.Tests.TestDoubles;
+using Budget.Shared.Budgeting;
 using Bunit.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
@@ -89,6 +90,61 @@ public sealed class BudgetPageTests : IDisposable
     }
 
     public void Dispose() => _context.Dispose();
+
+    [Fact]
+    public void What_changed_since_last_month_is_a_one_line_summary_that_opens_into_the_reasons()
+    {
+        var carId = Guid.NewGuid();
+        var salaryId = Guid.NewGuid();
+        _api.Month = FakeBudgetApi.Sample(2026, 12, income: 3000m, essential: 1340m, preferred: 520m, optional: 100m) with
+        {
+            Comparison = new BudgetComparison(2026, 11, 1265m, -225m,
+            [
+                new(false, carId, "New car", 0m, 250m, -250m, BudgetChangeReasonDto.New, null),
+                new(true, salaryId, "Salary", 3000m, 3030m, 30m, BudgetChangeReasonDto.AmountChanged, "1% pay rise"),
+                new(false, Guid.NewGuid(), "Gym", 30m, 35m, -5m, BudgetChangeReasonDto.AmountChanged, "Price rise"),
+            ]),
+        };
+
+        var cut = _context.RenderComponent<BudgetPage>();
+
+        Assert.Equal("£225.00 worse than November", Text(cut, "what-changed-summary"));
+        Assert.Empty(cut.FindAll("[data-testid=change]"));
+        Assert.Equal("false", cut.Find("[data-testid=what-changed-toggle]").GetAttribute("aria-expanded"));
+
+        cut.Find("[data-testid=what-changed-toggle]").Click();
+
+        Assert.Equal("true", cut.Find("[data-testid=what-changed-toggle]").GetAttribute("aria-expanded"));
+        Assert.Equal(new[] { "New car", "Salary", "Gym" }, cut.FindAll("[data-testid=change-name]").Select(e => e.TextContent.Trim()));
+        Assert.Equal(new[] { "New", "Went up · 1% pay rise", "Price went up · Price rise" }, cut.FindAll("[data-testid=change-reason]").Select(e => e.TextContent.Trim()));
+        Assert.Equal(new[] { "£250.00 less left", "£30.00 more left", "£5.00 less left" }, cut.FindAll("[data-testid=change-effect]").Select(e => e.TextContent.Trim()));
+        Assert.Equal($"/outgoings/{carId}", cut.FindAll("[data-testid=change-name]")[0].GetAttribute("href"));
+        Assert.Equal($"/income/{salaryId}", cut.FindAll("[data-testid=change-name]")[1].GetAttribute("href"));
+    }
+
+    [Fact]
+    public void Nothing_is_said_when_nothing_changed()
+    {
+        _api.Month = FakeBudgetApi.Sample(2026, 11, income: 3000m, essential: 1090m, preferred: 520m, optional: 100m) with
+        {
+            Comparison = new BudgetComparison(2026, 10, 1290m, 0m, []),
+        };
+
+        var cut = _context.RenderComponent<BudgetPage>();
+
+        Assert.Empty(cut.FindAll("[data-testid=what-changed]"));
+    }
+
+    [Theory]
+    [InlineData(BudgetChangeReasonDto.Reduced, false, "Sick leave · Statutory sick pay")]
+    [InlineData(BudgetChangeReasonDto.BackToUsual, true, "Back to usual after sick leave · Statutory sick pay")]
+    public void Income_reductions_name_the_reason(BudgetChangeReasonDto reason, bool up, string expected)
+    {
+        var change = new BudgetChangeLine(true, Guid.NewGuid(), "Jane – salary", up ? 500m : 2000m, up ? 2000m : 500m, up ? 1500m : -1500m,
+            reason, "Statutory sick pay", Budget.Shared.Income.IncomeStatusReasonDto.SickLeave);
+
+        Assert.Equal(expected, BudgetPage.Explain(change));
+    }
 
     private static string Text(IRenderedComponent<BudgetPage> cut, string testId) => cut.Find($"[data-testid={testId}]").TextContent.Trim();
 }

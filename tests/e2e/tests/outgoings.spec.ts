@@ -70,6 +70,14 @@ test('the budget shows what is left and links to a category', async ({ page }) =
   await expect(page.getByTestId('budget-optional')).toHaveText('− £150.00');
   await expect(page.getByTestId('left-everything')).toHaveText('Short by £150.00');
 
+  // BUD-83: it started this month, so the budget is £150 worse than last month, and says why.
+  await expect(page.getByTestId('what-changed-summary')).toContainText('£150.00 worse than');
+  await page.getByTestId('what-changed-toggle').click();
+  const change = page.getByTestId('change');
+  await expect(change.getByTestId('change-name')).toHaveText('Council tax');
+  await expect(change.getByTestId('change-reason')).toHaveText('New');
+  await expect(change.getByTestId('change-effect')).toHaveText('£150.00 less left');
+
   await page.getByTestId('category-link').filter({ hasText: 'Housing' }).click();
   await expect(page.getByTestId('category-filter')).toContainText('Housing');
   await expect(page.getByTestId('outgoing-name')).toHaveText(['Council tax']);

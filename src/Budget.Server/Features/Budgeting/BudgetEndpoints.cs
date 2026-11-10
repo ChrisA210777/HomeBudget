@@ -1,10 +1,13 @@
 using System.Globalization;
+using Budget.Domain.Budgeting;
 using Budget.Domain.Common;
+using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Households;
 using Budget.Shared.Budgeting;
 using Budget.Shared.Households;
+using Budget.Shared.Income;
 using Budget.Shared.Outgoings;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,17 +44,13 @@ public static class BudgetEndpoints
         var categories = await db.OutgoingCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).Select(c => new { c.Id, c.Name, c.Icon }).ToListAsync();
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
-        // The same rules as the Income and Outgoings pages: unrounded amounts, each total rounded once.
-        var income = Values.RoundForDisplay(streams.Sum(s => s.AmountForMonth(year, monthNumber)));
+        var budget = TotalsFor(streams, outgoings, year, monthNumber);
+
         var amounts = outgoings
             .Select(o => (Outgoing: o, Amount: o.MonthlyEquivalentForMonth(year, monthNumber)))
             .Where(x => x.Amount != 0m)
             .ToList();
         decimal Total(Func<Outgoing, bool> include) => Values.RoundForDisplay(amounts.Where(x => include(x.Outgoing)).Sum(x => x.Amount));
-
-        var essential = Total(o => o.Priority == OutgoingPriority.Essential);
-        var preferred = Total(o => o.Priority == OutgoingPriority.Preferred);
-        var optional = Total(o => o.Priority == OutgoingPriority.Optional);
 
         var byKind = Enum.GetValues<OutgoingKind>()
             .Select(kind => new BudgetKindLine((OutgoingKindDto)kind, Total(o => o.Kind == kind)))
@@ -61,18 +60,49 @@ public static class BudgetEndpoints
             .Where(line => amounts.Any(x => x.Outgoing.CategoryId == line.CategoryId))
             .ToList();
 
+        // What changed since the month before, and why (BUD-83, ADR-013).
+        var previousMonth = new DateOnly(year, monthNumber, 1).AddMonths(-1);
+        var previous = TotalsFor(streams, outgoings, previousMonth.Year, previousMonth.Month);
+        var changes = MonthComparison.Changes(outgoings, streams, year, monthNumber)
+            .Select(c => new BudgetChangeLine(
+                c.IsIncome, c.Id, c.Name, c.Previous, c.Current, c.Effect, (BudgetChangeReasonDto)c.Reason, c.Comment, (IncomeStatusReasonDto?)c.Status))
+            .ToList();
+        var comparison = new BudgetComparison(
+            previousMonth.Year, previousMonth.Month, previous.Left, budget.Left - previous.Left, changes);
+
         return Results.Ok(new BudgetMonthResponse(
             year,
             monthNumber,
             currency,
-            income,
-            essential,
-            preferred,
-            optional,
-            income - essential,
-            income - essential - preferred,
-            income - essential - preferred - optional,
+            budget.Income,
+            budget.Essential,
+            budget.Preferred,
+            budget.Optional,
+            budget.Income - budget.Essential,
+            budget.Income - budget.Essential - budget.Preferred,
+            budget.Left,
             byKind,
-            byCategory));
+            byCategory,
+            comparison));
+    }
+
+    private readonly record struct Totals(decimal Income, decimal Essential, decimal Preferred, decimal Optional)
+    {
+        public decimal Left => Income - Essential - Preferred - Optional;
+    }
+
+    /// <summary>
+    /// The same rules as the Income and Outgoings pages: unrounded amounts, each total rounded once.
+    /// </summary>
+    private static Totals TotalsFor(List<IncomeStream> streams, List<Outgoing> outgoings, int year, int month)
+    {
+        decimal Total(OutgoingPriority priority) =>
+            Values.RoundForDisplay(outgoings.Where(o => o.Priority == priority).Sum(o => o.MonthlyEquivalentForMonth(year, month)));
+
+        return new Totals(
+            Values.RoundForDisplay(streams.Sum(s => s.AmountForMonth(year, month))),
+            Total(OutgoingPriority.Essential),
+            Total(OutgoingPriority.Preferred),
+            Total(OutgoingPriority.Optional));
     }
 }
