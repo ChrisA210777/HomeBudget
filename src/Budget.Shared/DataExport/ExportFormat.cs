@@ -61,6 +61,10 @@ public static class DataRoutes
     public static string Export(Guid householdId, bool includeHistory, bool includeAudit) =>
         $"/api/households/{householdId}/export?history={(includeHistory ? "true" : "false")}&audit={(includeAudit ? "true" : "false")}";
 
+    /// <summary>GET (Admins): download the household's data as a zip of CSV files for Excel (BUD-66).</summary>
+    public static string ExportCsv(Guid householdId, bool includeHistory, bool includeAudit) =>
+        $"/api/households/{householdId}/export/csv?history={(includeHistory ? "true" : "false")}&audit={(includeAudit ? "true" : "false")}";
+
     /// <summary>POST (Admins) the file's bytes: checks it and says what's in it, without saving anything (BUD-67).</summary>
     public static string Preview(Guid householdId) => $"/api/households/{householdId}/import/preview";
 

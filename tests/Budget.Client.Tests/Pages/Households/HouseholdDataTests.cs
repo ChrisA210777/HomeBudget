@@ -49,6 +49,7 @@ public sealed class HouseholdDataTests : IDisposable
         await cut.InvokeAsync(() => boxes[1].Instance.ValueChanged.InvokeAsync(true));
 
         Assert.EndsWith("/export?history=true&audit=true", cut.Find("a[data-testid=download-json]").GetAttribute("href"), StringComparison.Ordinal);
+        Assert.EndsWith("/export/csv?history=true&audit=true", cut.Find("a[data-testid=download-csv]").GetAttribute("href"), StringComparison.Ordinal);
     }
 
     [Theory]
