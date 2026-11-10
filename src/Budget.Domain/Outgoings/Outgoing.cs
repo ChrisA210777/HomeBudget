@@ -29,8 +29,11 @@ public sealed record OutgoingDetails
 
     public AlertPeriod AlertPeriod { get; init; }
 
-    /// <summary>Who it's paid to, or the savings pot it goes into.</summary>
+    /// <summary>Who it's paid to. Not used for savings, which go into <see cref="SavingsAccountId"/>.</summary>
     public string? Recipient { get; init; }
+
+    /// <summary>For savings, the account or pot the money goes into (BUD-100).</summary>
+    public Guid? SavingsAccountId { get; init; }
 
     public PaymentMethod? PaymentMethod { get; init; }
 
@@ -106,6 +109,9 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
 
     /// <summary>The account or pot it's paid from (BUD-89).</summary>
     public Guid? AccountId { get; private set; }
+
+    /// <summary>For savings, the account or pot the money goes into (BUD-100).</summary>
+    public Guid? SavingsAccountId { get; private set; }
 
     public string? ReferenceLabel { get; private set; }
 
@@ -201,7 +207,10 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         RenewalEveryMonths = details.RenewalEveryMonths;
         AutoRenews = details.RenewalDate is not null && details.AutoRenews;
         AlertPeriod = details.RenewalDate is null ? AlertPeriod.None : details.AlertPeriod;
-        Recipient = Values.Optional(details.Recipient, nameof(details.Recipient), RecipientMaxLength);
+        // Savings go into one of the household's accounts; anything else is paid to someone (BUD-100).
+        var savings = details.Kind == OutgoingKind.Savings;
+        Recipient = savings ? null : Values.Optional(details.Recipient, nameof(details.Recipient), RecipientMaxLength);
+        SavingsAccountId = savings ? details.SavingsAccountId : null;
         PaymentMethod = details.PaymentMethod;
         AccountId = details.AccountId;
         ReferenceLabel = Values.Optional(details.ReferenceLabel, nameof(details.ReferenceLabel), ReferenceLabelMaxLength);

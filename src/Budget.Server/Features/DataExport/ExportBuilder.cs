@@ -158,7 +158,8 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                         : null,
                     Details = new ExportedOutgoingDetails
                     {
-                        Recipient = o.Recipient,
+                        // A savings outgoing's recipient is the account it goes into (BUD-100).
+                        Recipient = o.Kind == OutgoingKind.Savings ? AccountName(o.SavingsAccountId) : o.Recipient,
                         PaymentMethod = o.PaymentMethod?.ToString(),
                         PaidFrom = AccountName(o.AccountId),
                         ReferenceLabel = o.ReferenceLabel,

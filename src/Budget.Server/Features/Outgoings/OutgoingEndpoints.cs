@@ -356,6 +356,9 @@ public static class OutgoingEndpoints
             Recipient = request.Kind == OutgoingKindDto.Allowance ? null : request.Recipient,
             PaymentMethod = (PaymentMethod?)request.PaymentMethod,
             AccountId = accounts.Resolve(request.PaidFrom)?.Id,
+
+            // Savings go into an account or pot, picked or typed like "Paid from" (BUD-100).
+            SavingsAccountId = request.Kind == OutgoingKindDto.Savings ? accounts.Resolve(request.Recipient)?.Id : null,
             ReferenceLabel = request.ReferenceLabel,
             ReferenceValue = request.ReferenceValue,
             Website = request.Website,

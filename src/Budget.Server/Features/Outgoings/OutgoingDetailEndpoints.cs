@@ -78,6 +78,7 @@ internal static class OutgoingDetailEndpoints
                 Recipient = request.Kind == OutgoingKindDto.Allowance ? null : request.Recipient,
                 PaymentMethod = (PaymentMethod?)request.PaymentMethod,
                 AccountId = accounts.Resolve(request.PaidFrom)?.Id,
+                SavingsAccountId = request.Kind == OutgoingKindDto.Savings ? accounts.Resolve(request.Recipient)?.Id : null,
                 ReferenceLabel = request.ReferenceLabel,
                 ReferenceValue = request.ReferenceValue,
                 Website = request.Website,
@@ -268,6 +269,7 @@ internal static class OutgoingDetailEndpoints
             : null;
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
         var version = db.Entry(outgoing).Property<byte[]>(OutgoingConfiguration.RowVersion).CurrentValue;
+        var accounts = await AccountDirectory.LoadAsync(db, householdId);
 
         var current = outgoing.AmountChangeOn(today) ?? outgoing.AmountChanges.MinBy(c => c.EffectiveFrom)!;
         var statusNow = outgoing.StatusPeriods.FirstOrDefault(p => p.Covers(today));
@@ -302,9 +304,9 @@ internal static class OutgoingDetailEndpoints
             outgoing.NextRenewalOnOrAfter(today),
             outgoing.IsComingUp(today),
             status,
-            outgoing.Recipient,
+            outgoing.Kind == OutgoingKind.Savings ? accounts.DisplayName(outgoing.SavingsAccountId) : outgoing.Recipient,
             (PaymentMethodDto?)outgoing.PaymentMethod,
-            (await AccountDirectory.LoadAsync(db, householdId)).DisplayName(outgoing.AccountId),
+            accounts.DisplayName(outgoing.AccountId),
             outgoing.ReferenceLabel,
             outgoing.ReferenceValue,
             outgoing.Website,

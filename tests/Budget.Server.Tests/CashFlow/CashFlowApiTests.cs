@@ -58,6 +58,47 @@ public class CashFlowApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     }
 
     [Fact]
+    public async Task Savings_go_into_an_account_picked_or_typed_and_arrive_there_in_the_cash_flow()
+    {
+        var (client, householdId) = await HouseholdAsync();
+        var category = Guid.Empty;
+        await ExecuteDbContextAsync(async db => category = await db.OutgoingCategories.IgnoreQueryFilters()
+            .Where(c => c.HouseholdId == householdId).Select(c => c.Id).FirstAsync());
+
+        using var created = await client.PostAsJsonAsync(Url(Budget.Shared.Outgoings.OutgoingRoutes.Outgoings(householdId)), new Budget.Shared.Outgoings.CreateOutgoingRequest
+        {
+            Name = "House deposit",
+            Kind = Budget.Shared.Outgoings.OutgoingKindDto.Savings,
+            Priority = Budget.Shared.Outgoings.OutgoingPriorityDto.Preferred,
+            CategoryId = category,
+            Amount = 200m,
+            Every = 1,
+            Unit = Budget.Shared.Outgoings.PaymentUnitDto.Month,
+            FirstPaymentDate = new DateOnly(2026, 1, 28),
+            PaidFrom = "Current",
+            Recipient = "Deposit ISA",
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var id = (await created.Content.ReadFromJsonAsync<Budget.Shared.Outgoings.OutgoingCreatedResponse>())!.Id;
+
+        // A new name adds the account, and the outgoing shows it as where the money goes.
+        var details = (await client.GetFromJsonAsync<Budget.Shared.Outgoings.OutgoingDetailsResponse>(Url(Budget.Shared.Outgoings.OutgoingRoutes.Outgoing(householdId, id))))!;
+        Assert.Equal("Deposit ISA", details.Recipient);
+        await ExecuteDbContextAsync(async db =>
+        {
+            var outgoing = await db.Outgoings.IgnoreQueryFilters().SingleAsync(o => o.Id == id);
+            Assert.Equal((string?)null, outgoing.Recipient);
+            Assert.Equal("Deposit ISA", (await db.Accounts.IgnoreQueryFilters().SingleAsync(a => a.Id == outgoing.SavingsAccountId)).Name);
+        });
+
+        var month = (await client.GetFromJsonAsync<CashFlowMonthResponse>(Url(CashFlowRoutes.Month(householdId, 2026, 11))))!;
+        Assert.Contains(month.Accounts.Single(a => a.Name == "Current").Out, e => e is { Kind: CashFlowKindDto.Outgoing, Name: "House deposit", Amount: 200m });
+        var isa = month.Accounts.Single(a => a.Name == "Deposit ISA");
+        Assert.Equal((200m, 0m), (isa.TotalIn, isa.TotalOut));
+        Assert.Equal(CashFlowKindDto.SavingsIn, isa.In.Single().Kind);
+    }
+
+    [Fact]
     public async Task Only_while_transfers_are_on_and_for_the_household()
     {
         var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
