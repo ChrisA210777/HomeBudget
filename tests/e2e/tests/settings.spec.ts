@@ -14,9 +14,13 @@ test('settings are reached from the account menu and kept after reloading', asyn
   await choose(page, 'first-day-of-week', 'Monday');
   await expect(page.getByText('Saved.')).toBeVisible();
 
+  // Saved with the account: it's what the server now returns, and the page shows it after reloading.
+  const saved = await page.request.get('/bff/user/settings');
+  expect((await saved.json()).firstDayOfWeek).toBe('Monday');
   await page.reload();
   await settled(page);
-  await expect(page.getByTestId('first-day-of-week')).toHaveValue('Monday');
+  const day = page.locator('.mud-select').filter({ has: page.getByTestId('first-day-of-week') });
+  await expect(day.locator('input').first()).toHaveValue('Monday');
 });
 
 test('outgoings open in the view chosen last time', async ({ page }) => {
