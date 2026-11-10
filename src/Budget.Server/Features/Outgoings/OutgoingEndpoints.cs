@@ -161,7 +161,8 @@ public static class OutgoingEndpoints
                     category?.SortOrder ?? int.MaxValue,
                     category?.Icon ?? CategoryIcons.Default,
                     accounts.DisplayName(o.AccountId),
-                    o.PersonId is { } personId ? people.GetValueOrDefault(personId) : null);
+                    o.PersonId is { } personId ? people.GetValueOrDefault(personId) : null,
+                    o.AccountId);
             }))
             .OrderBy(p => p.Date)
             .ThenBy(p => p.CategorySortOrder)

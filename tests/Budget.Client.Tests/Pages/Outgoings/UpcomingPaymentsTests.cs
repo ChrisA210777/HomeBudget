@@ -15,6 +15,9 @@ public sealed class UpcomingPaymentsTests : IDisposable
 {
     private static readonly Guid HousingId = Guid.NewGuid();
     private static readonly Guid FoodId = Guid.NewGuid();
+    private static readonly Guid JointId = Guid.NewGuid();
+    private static readonly Guid MortgagePotId = Guid.NewGuid();
+    private static readonly Guid ChrisId = Guid.NewGuid();
 
     private readonly TestContext _context = new();
     private readonly FakePaymentsApi _api = new();
@@ -25,6 +28,7 @@ public sealed class UpcomingPaymentsTests : IDisposable
         _context.Services.AddMudServices();
         _context.Services.AddSingleton<IUpcomingPaymentsApi>(_api);
         _context.Services.AddSingleton<IUserSettingsApi>(_settings);
+        _context.Services.AddSingleton<Budget.Client.Accounts.IAccountsApi>(new FakeAccountsApi());
         _context.Services.AddScoped<UserSettingsStore>();
         _context.Services.AddSingleton<IAccountApi>(new FakeAccountApi("Viewer", isOwner: false));
         _context.Services.AddSingleton<TimeProvider>(new FixedClock(new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero)));
@@ -53,12 +57,14 @@ public sealed class UpcomingPaymentsTests : IDisposable
     {
         var cut = _context.RenderComponent<UpcomingPayments>();
 
-        Assert.Equal(new[] { "Mon 2 Nov", "Thu 5 Nov" }, Texts(cut, "payment-day-name"));
-        Assert.Equal(new[] { "£120.00", "£930.00" }, Texts(cut, "payment-day-total"));
-        Assert.Equal("£1,050.00", Text(cut, "period-total"));
-        Assert.Equal("3 payments", Text(cut, "payment-count"));
+        Assert.Equal(new[] { "Mon 2 Nov", "Thu 5 Nov", "Fri 6 Nov" }, Texts(cut, "payment-day-name"));
+        Assert.Equal(new[] { "£120.00", "£930.00", "£25.00" }, Texts(cut, "payment-day-total"));
+        Assert.Equal("£1,075.00", Text(cut, "period-total"));
+        Assert.Equal("4 payments", Text(cut, "payment-count"));
         Assert.Single(cut.FindAll("[data-testid=payment-today]"));
-        Assert.Equal(new[] { "Weekly · Food & household", "Monthly · Housing · from Joint bills", "Monthly · Housing · from joint BILLS" }, Texts(cut, "payment-details"));
+        Assert.Equal(
+            new[] { "Weekly · Food & household", "Monthly · Housing · from Joint bills", "Monthly · Housing · from Joint bills › Mortgage", "Monthly · Utilities · from Chris current" },
+            Texts(cut, "payment-details"));
     }
 
     [Fact]
@@ -83,16 +89,35 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     [Fact]
-    public void Payments_can_be_grouped_by_the_account_they_are_paid_from()
+    public void Shows_what_each_account_needs_with_its_pots_and_not_set_last()
     {
         var cut = _context.RenderComponent<UpcomingPayments>();
 
-        cut.Find("[data-testid=group-paid-from]").Click();
+        Assert.Equal(new[] { "Chris current £25.00", "Joint bills £930.00", "Not set £120.00" }, Texts(cut, "account-total"));
+        Assert.NotNull(cut.Find("[data-testid=filter-account]"));
+        Assert.Empty(cut.FindAll("[data-testid=group-toggle]"));
+    }
 
-        Assert.Equal(new[] { "Joint bills", "Not set" }, Texts(cut, "payment-group-name"));
-        Assert.Equal(new[] { "£930.00", "£120.00" }, Texts(cut, "payment-group-total"));
-        Assert.Equal(new[] { "Council tax", "Mortgage", "Food shopping" }, Texts(cut, "payment-name"));
-        Assert.Equal("£1,050.00", Text(cut, "period-total"));
+    [Fact]
+    public void Tapping_an_account_total_shows_only_that_accounts_payments_including_its_pots()
+    {
+        var cut = _context.RenderComponent<UpcomingPayments>();
+
+        cut.FindAll("[data-testid=account-total]")[1].Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "payment-name")));
+        Assert.Equal("£930.00", Text(cut, "period-total"));
+        Assert.Equal("2 payments", Text(cut, "payment-count"));
+        Assert.Equal("true", cut.FindAll("[data-testid=account-total]")[1].GetAttribute("aria-pressed"));
+        // The totals still show every account, so another can be picked.
+        Assert.Equal(3, cut.FindAll("[data-testid=account-total]").Count);
+
+        cut.FindAll("[data-testid=account-total]")[2].Click();
+        cut.WaitForAssertion(() => Assert.Equal(new[] { "Food shopping" }, Texts(cut, "payment-name")));
+
+        // Tapping the selected one again shows everything.
+        cut.FindAll("[data-testid=account-total]")[2].Click();
+        cut.WaitForAssertion(() => Assert.Equal("4 payments", Text(cut, "payment-count")));
     }
 
     [Fact]
@@ -111,7 +136,7 @@ public sealed class UpcomingPaymentsTests : IDisposable
     private static string Text(IRenderedComponent<UpcomingPayments> cut, string testId) => cut.Find($"[data-testid={testId}]").TextContent.Trim();
 
     private static string[] Texts(IRenderedComponent<UpcomingPayments> cut, string testId) =>
-        cut.FindAll($"[data-testid={testId}]").Select(e => e.TextContent.Trim()).ToArray();
+        cut.FindAll($"[data-testid={testId}]").Select(e => string.Join(' ', e.TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))).ToArray();
 
     private sealed class FakePaymentsApi : IUpcomingPaymentsApi
     {
@@ -124,15 +149,36 @@ public sealed class UpcomingPaymentsTests : IDisposable
             Requests.Add((from, to));
             IReadOnlyList<UpcomingPayment> payments = Empty ? [] :
             [
-                Payment(new DateOnly(2026, 11, 2), "Food shopping", 120m, PaymentUnitDto.Week, FoodId, "Food & household", 90, null),
-                Payment(new DateOnly(2026, 11, 5), "Council tax", 30m, PaymentUnitDto.Month, HousingId, "Housing", 10, "Joint bills"),
-                Payment(new DateOnly(2026, 11, 5), "Mortgage", 900m, PaymentUnitDto.Month, HousingId, "Housing", 10, " joint BILLS "),
+                Payment(new DateOnly(2026, 11, 2), "Food shopping", 120m, PaymentUnitDto.Week, FoodId, "Food & household", 90, null, null),
+                Payment(new DateOnly(2026, 11, 5), "Council tax", 30m, PaymentUnitDto.Month, HousingId, "Housing", 10, "Joint bills", JointId),
+                Payment(new DateOnly(2026, 11, 5), "Mortgage", 900m, PaymentUnitDto.Month, HousingId, "Housing", 10, "Joint bills › Mortgage", MortgagePotId),
+                Payment(new DateOnly(2026, 11, 6), "Phone", 25m, PaymentUnitDto.Month, Guid.NewGuid(), "Utilities", 20, "Chris current", ChrisId),
             ];
             return Task.FromResult(new UpcomingPaymentsResponse(from, to, "GBP", payments));
         }
 
         private static UpcomingPayment Payment(
-            DateOnly date, string name, decimal amount, PaymentUnitDto unit, Guid categoryId, string category, int sortOrder, string? paidFrom) =>
-            new(date, Guid.NewGuid(), name, amount, 1, unit, OutgoingKindDto.Bill, OutgoingPriorityDto.Essential, categoryId, category, sortOrder, "home", paidFrom, null);
+            DateOnly date, string name, decimal amount, PaymentUnitDto unit, Guid categoryId, string category, int sortOrder, string? paidFrom, Guid? accountId) =>
+            new(date, Guid.NewGuid(), name, amount, 1, unit, OutgoingKindDto.Bill, OutgoingPriorityDto.Essential, categoryId, category, sortOrder, "home", paidFrom, null, accountId);
+    }
+
+    private sealed class FakeAccountsApi : Budget.Client.Accounts.IAccountsApi
+    {
+        public Task<IReadOnlyList<Budget.Shared.Accounts.AccountSummary>> ListAsync(Guid householdId) =>
+            Task.FromResult<IReadOnlyList<Budget.Shared.Accounts.AccountSummary>>(
+            [
+                new(ChrisId, "Chris current", null, null, null, null, false, "Chris current", 1),
+                new(JointId, "Joint bills", null, null, null, null, false, "Joint bills", 1),
+                new(MortgagePotId, "Mortgage", null, null, null, JointId, false, "Joint bills › Mortgage", 1),
+            ]);
+
+        public Task<Budget.Client.Accounts.AccountsResult> AddAsync(Guid householdId, Budget.Shared.Accounts.SaveAccountRequest request) => throw new NotSupportedException();
+
+        public Task<Budget.Client.Accounts.AccountsResult> UpdateAsync(Guid householdId, Guid accountId, Budget.Shared.Accounts.SaveAccountRequest request) =>
+            throw new NotSupportedException();
+
+        public Task<Budget.Client.Accounts.AccountsResult> SetArchivedAsync(Guid householdId, Guid accountId, bool archived) => throw new NotSupportedException();
+
+        public Task<Budget.Client.Accounts.AccountsResult> MergeAsync(Guid householdId, Guid accountId, Guid intoAccountId) => throw new NotSupportedException();
     }
 }

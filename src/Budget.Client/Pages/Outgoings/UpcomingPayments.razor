@@ -1,12 +1,15 @@
 @page "/outgoings/upcoming"
 @attribute [Authorize]
 @using System.Globalization
+@using Budget.Client.Accounts
 @using Budget.Client.Outgoings
+@using Budget.Shared.Accounts
 @using Budget.Shared.Income
 @using Budget.Shared.Outgoings
 @inject UserSession Session
 @inject IUpcomingPaymentsApi PaymentsApi
 @inject UserSettingsStore Settings
+@inject IAccountsApi AccountsApi
 @inject TimeProvider Clock
 
 <PageTitle>Upcoming payments · Home Budget</PageTitle>
@@ -29,15 +32,16 @@
             <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_month ? "true" : "false")"
                        OnClick="() => SetMonthAsync(true)" data-testid="show-month">Month</MudButton>
         </MudButtonGroup>
-        <div class="d-flex align-center gap-2">
-            <MudText Typo="Typo.body2" id="payments-group-by-label">Group by</MudText>
-            <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-labelledby="payments-group-by-label" data-testid="group-toggle">
-                @foreach (var (grouping, label, testId) in Groupings)
+        @* By account, including its pots: budgeting is done by account (BUD-96). *@
+        <div style="width: 13rem">
+            <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="AccountName" Label="Paid from" Margin="Margin.Dense" Variant="Variant.Outlined" data-testid="filter-account">
+                <MudSelectItem T="Guid?" Value="null">@AccountName(null)</MudSelectItem>
+                <MudSelectItem T="Guid?" Value="Guid.Empty">@AccountName(Guid.Empty)</MudSelectItem>
+                @foreach (var account in _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)))
                 {
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_grouping == grouping ? Variant.Filled : Variant.Outlined)"
-                               aria-pressed="@(_grouping == grouping ? "true" : "false")" OnClick="() => _grouping = grouping" data-testid="@testId">@label</MudButton>
+                    <MudSelectItem T="Guid?" Value="account.Id">@account.Name</MudSelectItem>
                 }
-            </MudButtonGroup>
+            </MudSelect>
         </div>
     </div>
 
@@ -63,63 +67,73 @@
     }
     else
     {
+        var shown = Shown.ToList();
+        var totals = AccountTotals().ToList();
         <MudPaper Class="pa-4 mb-3" Elevation="1">
-            <MudText Typo="Typo.overline">Due @(_month ? "this month" : "this week")</MudText>
-            <MudText Typo="Typo.h4" data-testid="period-total">@Format(_data.Payments.Sum(p => p.Amount))</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="payment-count">@Count(_data.Payments.Count)</MudText>
+            <MudText Typo="Typo.overline">Due @(_month ? "this month" : "this week")@(_account is null ? string.Empty : $" from {AccountName(_account)}")</MudText>
+            <MudText Typo="Typo.h4" data-testid="period-total">@Format(shown.Sum(p => p.Amount))</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="payment-count">@Count(shown.Count)</MudText>
+            @if (totals.Count > 1 || (totals.Count == 1 && totals[0].Id != Guid.Empty))
+            {
+                @* What each account needs, side by side; tap one to see just its payments (BUD-96). *@
+                <div class="d-flex flex-wrap align-center gap-x-1 mt-2" role="group" aria-label="Due from each account" data-testid="account-totals">
+                    @foreach (var total in totals)
+                    {
+                        var selected = _account == total.Id;
+                        <MudButton Variant="@(selected ? Variant.Filled : Variant.Text)" Color="Color.Primary" Size="Size.Small" Class="px-2"
+                                   aria-pressed="@(selected ? "true" : "false")" OnClick="() => _account = selected ? null : total.Id" data-testid="account-total">
+                            @total.Name @Format(total.Amount)
+                        </MudButton>
+                    }
+                </div>
+            }
         </MudPaper>
 
-        @if (_data.Payments.Count == 0)
+        @if (shown.Count == 0)
         {
             <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="payments-empty">
                 <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Size="Size.Large" Color="Color.Secondary" />
-                <MudText Typo="Typo.body1" Class="mt-2">Nothing is due @(_month ? "this month" : "this week").</MudText>
+                <MudText Typo="Typo.body1" Class="mt-2">Nothing is due @(_month ? "this month" : "this week")@(_account is null ? string.Empty : $" from {AccountName(_account)}").</MudText>
             </MudPaper>
-        }
-        else if (_grouping == Grouping.None)
-        {
-            @Days(_data.Payments)
         }
         else
         {
-            @foreach (var group in Grouped(_data.Payments))
-            {
-                <section class="mt-4" data-testid="payment-group" aria-label="@group.Name">
-                    <h2 class="mud-typography mud-typography-subtitle1 d-flex align-center gap-2 mb-1 category-heading" style="font-weight: 600">
-                        <MudIcon Icon="@group.Icon" Size="Size.Small" Color="Color.Primary" aria-hidden="true" />
-                        <span data-testid="payment-group-name">@group.Name</span>
-                        <span class="flex-grow-1"></span>
-                        <span style="font-weight: 400" data-testid="payment-group-total">@Format(group.Payments.Sum(p => p.Amount))</span>
-                    </h2>
-                    @Days(group.Payments)
-                </section>
-            }
+            @Days(shown)
         }
     }
 </MudContainer>
 
 @code {
-    private enum Grouping
-    {
-        None,
-        PaidFrom,
-        Category,
-    }
-
-    private static readonly (Grouping Grouping, string Label, string TestId)[] Groupings =
-    [
-        (Grouping.None, "None", "group-none"),
-        (Grouping.PaidFrom, "Paid from", "group-paid-from"),
-        (Grouping.Category, "Category", "group-category"),
-    ];
-
     private static readonly CultureInfo Display = CultureInfo.InvariantCulture;
 
     private HouseholdMembershipSummary? _household;
     private UpcomingPaymentsResponse? _data;
     private bool _loaded;
     private bool _month;
-    private Grouping _grouping;
+
+    /// <summary>An account (with its pots), <see cref="Guid.Empty"/> for none recorded, or <c>null</c> for all (BUD-96).</summary>
+    private Guid? _account;
+    private IReadOnlyList<AccountSummary> _accounts = [];
+
+    private (Guid? Id, string? Name, string? Pot) AccountOf(UpcomingPayment payment) => AccountLevel.Of(payment.AccountId, payment.PaidFrom, _accounts);
+
+    private IEnumerable<UpcomingPayment> Shown =>
+        (_data?.Payments ?? []).Where(p => _account is null || (AccountOf(p).Id ?? Guid.Empty) == _account);
+
+    /// <summary>The period's total from each account, by name, with "Not set" last.</summary>
+    private IEnumerable<(Guid Id, string Name, decimal Amount)> AccountTotals() =>
+        (_data?.Payments ?? [])
+            .GroupBy(p => AccountOf(p).Id ?? Guid.Empty)
+            .Select(g => (Id: g.Key, Name: g.Key == Guid.Empty ? "Not set" : AccountOf(g.First()).Name ?? "Not set", Amount: g.Sum(p => p.Amount)))
+            .OrderBy(t => t.Id == Guid.Empty)
+            .ThenBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase);
+
+    private string AccountName(Guid? id) => id switch
+    {
+        null => "All",
+        var none when none == Guid.Empty => "Not set",
+        _ => _accounts.FirstOrDefault(a => a.Id == id)?.Name ?? (_data?.Payments.Select(AccountOf).FirstOrDefault(a => a.Id == id).Name ?? "That account"),
+    };
     private DayOfWeek _firstDay = DayOfWeek.Sunday;
     private DateOnly _from;
     private DateOnly _to;
@@ -138,6 +152,11 @@
         _firstDay = (await Settings.GetAsync()).FirstDayOfWeek;
         (_from, _to) = PaymentPeriods.WeekOf(Today, _firstDay);
         _household = await Session.GetActiveHouseholdAsync();
+        if (_household is not null)
+        {
+            _accounts = await AccountsApi.ListAsync(_household.HouseholdId);
+        }
+
         _loaded = true;
         await LoadAsync();
     }
@@ -175,21 +194,6 @@
         (_from, _to) = _month ? PaymentPeriods.MonthOf(Today) : PaymentPeriods.WeekOf(Today, _firstDay);
         await LoadAsync();
     }
-
-    private sealed record PaymentGroup(string Name, string Icon, List<UpcomingPayment> Payments);
-
-    /// <summary>Paid From groups by name (ignoring case and spaces), "Not set" last; categories in the household's order.</summary>
-    private IEnumerable<PaymentGroup> Grouped(IReadOnlyList<UpcomingPayment> payments) => _grouping == Grouping.PaidFrom
-        ? payments
-            .GroupBy(p => string.IsNullOrWhiteSpace(p.PaidFrom) ? null : p.PaidFrom.Trim(), StringComparer.CurrentCultureIgnoreCase)
-            .OrderBy(g => g.Key is null)
-            .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
-            .Select(g => new PaymentGroup(g.Key ?? "Not set", Icons.Material.Filled.AccountBalance, g.ToList()))
-        : payments
-            .GroupBy(p => p.CategoryId)
-            .OrderBy(g => g.First().CategorySortOrder)
-            .ThenBy(g => g.First().CategoryName, StringComparer.CurrentCultureIgnoreCase)
-            .Select(g => new PaymentGroup(g.First().CategoryName, CategoryIconSvg.For(g.First().CategoryIcon), g.ToList()));
 
     /// <summary>The days with something due, each with its payments and total; days with nothing are left out.</summary>
     private RenderFragment Days(IEnumerable<UpcomingPayment> payments) =>
@@ -230,13 +234,8 @@
 
     private string Details(UpcomingPayment payment)
     {
-        var parts = new List<string> { PaymentPeriods.Frequency(payment.Every, payment.Unit) };
-        if (_grouping != Grouping.Category)
-        {
-            parts.Add(payment.CategoryName);
-        }
-
-        if (_grouping != Grouping.PaidFrom && !string.IsNullOrWhiteSpace(payment.PaidFrom))
+        var parts = new List<string> { PaymentPeriods.Frequency(payment.Every, payment.Unit), payment.CategoryName };
+        if (!string.IsNullOrWhiteSpace(payment.PaidFrom))
         {
             parts.Add($"from {payment.PaidFrom.Trim()}");
         }
