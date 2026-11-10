@@ -173,7 +173,7 @@
                             <MudDatePicker @bind-Date="_date" Label="Applies from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
                                            HelperText="The first payment at the new amount. Can be in the future once you know about it."
                                            Error="Has(nameof(SaveOutgoingAmountRequest.EffectiveFrom))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.EffectiveFrom))" data-testid="date" />
-                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. Annual price rise" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
+                            <MudTextField @bind-Value="_comment" Label="Why is the amount changing?" HelperText="Shown in the history" Placeholder="e.g. Annual price rise" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
                                           Error="Has(nameof(SaveOutgoingAmountRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveOutgoingAmountRequest.Comment))" data-testid="comment" />
                             break;
 
@@ -198,7 +198,7 @@
                                     <MudText Typo="Typo.body2" Color="Color.Primary" aria-live="polite" data-testid="resumes-preview">Payments resume on @IncomeDates.Format(resumes).</MudText>
                                 }
                             }
-                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. Mortgage payment holiday" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
+                            <MudTextField @bind-Value="_comment" Label="Why is it paused?" HelperText="Shown in the history" Placeholder="e.g. Mortgage payment holiday" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
                                           Error="Has(nameof(SaveOutgoingStatusRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveOutgoingStatusRequest.Comment))" data-testid="comment" />
                             break;
 
@@ -207,7 +207,7 @@
                             <MudText Typo="Typo.body2">No payments are due from this date. It stays in the history for earlier months.</MudText>
                             <MudDatePicker @bind-Date="_date" Label="Ends from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
                                            Error="Has(nameof(SaveOutgoingStatusRequest.StartDate))" ErrorText="@ErrorFor(nameof(SaveOutgoingStatusRequest.StartDate))" data-testid="date" />
-                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. Cancelled" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
+                            <MudTextField @bind-Value="_comment" Label="Why is it stopping?" HelperText="Shown in the history" Placeholder="e.g. Cancelled" MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined"
                                           Error="Has(nameof(SaveOutgoingStatusRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveOutgoingStatusRequest.Comment))" data-testid="comment" />
                             break;
 

@@ -112,7 +112,7 @@
                             <MudDatePicker @bind-Date="_date" Label="Applies from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
                                            HelperText="Can be in the future once you know about it."
                                            Error="Has(nameof(SaveAmountChangeRequest.EffectiveFrom))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.EffectiveFrom))" data-testid="date" />
-                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. 3% pay rise" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
+                            <MudTextField @bind-Value="_comment" Label="Why is the amount changing?" HelperText="Shown in the history" Placeholder="e.g. 3% pay rise" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
                                           Error="Has(nameof(SaveAmountChangeRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveAmountChangeRequest.Comment))" data-testid="comment" />
                             break;
 
@@ -135,7 +135,7 @@
                                                  InputMode="@(InputMode.@decimal)" HideSpinButtons="true" Min="0" Variant="Variant.Outlined" Clearable="true"
                                                  Error="Has(nameof(SaveStatusPeriodRequest.ReducedMonthlyAmount))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.ReducedMonthlyAmount))" data-testid="amount" />
                             }
-                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. Statutory sick pay" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
+                            <MudTextField @bind-Value="_comment" Label="Why is it changing?" HelperText="Shown in the history" Placeholder="e.g. Statutory sick pay" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
                                           Error="Has(nameof(SaveStatusPeriodRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.Comment))" data-testid="comment" />
                             break;
 
@@ -143,7 +143,7 @@
                             <MudText Typo="Typo.body2">The income stops from this date. It stays in the history for earlier months.</MudText>
                             <MudDatePicker @bind-Date="_date" Label="Ends from" DateFormat="d MMM yyyy" Variant="Variant.Outlined"
                                            Error="Has(nameof(SaveStatusPeriodRequest.StartDate))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.StartDate))" data-testid="date" />
-                            <MudTextField @bind-Value="_comment" Label="Comment" Placeholder="e.g. Left the job" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
+                            <MudTextField @bind-Value="_comment" Label="Why is it ending?" HelperText="Shown in the history" Placeholder="e.g. Left the job" MaxLength="IncomeValidator.CommentMaxLength" Variant="Variant.Outlined"
                                           Error="Has(nameof(SaveStatusPeriodRequest.Comment))" ErrorText="@ErrorFor(nameof(SaveStatusPeriodRequest.Comment))" data-testid="comment" />
                             break;
 

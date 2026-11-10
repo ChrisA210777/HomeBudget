@@ -149,9 +149,6 @@
                                    HelperText="Later payments follow on from this date"
                                    Error="Has(nameof(CreateOutgoingRequest.FirstPaymentDate))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.FirstPaymentDate))"
                                    Variant="Variant.Outlined" data-testid="first-payment" />
-
-                    <MudTextField @bind-Value="_comment" Label="Comment (optional)" Placeholder="@OutgoingValidator.DefaultStartingComment"
-                                  MaxLength="OutgoingValidator.CommentMaxLength" Variant="Variant.Outlined" data-testid="comment" />
                 }
 
                 @if (_kind != OutgoingKindDto.Allowance)
@@ -280,7 +277,6 @@
     private int _every = 1;
     private PaymentUnitDto _unit = PaymentUnitDto.Month;
     private DateTime? _firstPaymentDate;
-    private string? _comment;
 
     private bool _renews;
     private DateTime? _renewalDate;
@@ -470,7 +466,6 @@
             Every = _every,
             Unit = _unit,
             FirstPaymentDate = IncomeDates.ToDateOnly(_firstPaymentDate),
-            Comment = _comment,
             Recipient = _kind == OutgoingKindDto.Allowance ? null : _recipient,
             PaymentMethod = _paymentMethod,
             PaidFrom = _paidFrom,
