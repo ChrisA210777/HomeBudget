@@ -16,6 +16,18 @@ updates:
           - "bunit"
           - "coverlet.*"
           - "Microsoft.NET.Test.Sdk"
+    ignore:
+      # A new major version of ASP.NET Core or EF Core needs a new .NET version, which is planned separately
+      # (BUD-132). Patches and minor versions still come through.
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dotnet-ef"
+        update-types: ["version-update:semver-major"]
+      # bUnit 2 needs every component test changing (BUD-133).
+      - dependency-name: "bunit"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
