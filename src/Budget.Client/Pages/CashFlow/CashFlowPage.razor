@@ -32,7 +32,8 @@
     }
     else
     {
-        <div class="d-flex align-center flex-wrap gap-x-4 gap-y-2 mb-2">
+        @* One toolbar, as on Upcoming payments (BUD-130). *@
+        <div class="page-toolbar flex-wrap mb-2">
             <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show" data-testid="view-toggle">
                 <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_daily ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_daily ? "false" : "true")"
                            OnClick="() => SetDailyAsync(false)" data-testid="show-monthly">Monthly</MudButton>
@@ -47,25 +48,33 @@
                     <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_month ? "true" : "false")"
                                OnClick="() => SetMonthAsync(true)" data-testid="show-month">Month</MudButton>
                 </MudButtonGroup>
-                @if (_days is { Accounts.Count: > 0 })
+                @if (_days is { Accounts.Count: > 0 } days)
                 {
-                    <div style="width: 13rem">
-                        <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="DayAccountName" Label="Account" Margin="Margin.Dense" Variant="Variant.Outlined" data-testid="day-account">
-                            @foreach (var account in _days.Accounts)
-                            {
-                                <MudSelectItem T="Guid?" Value="account.AccountId">@account.Name</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </div>
+                    <MudMenu Label="@(SelectedDays?.Name ?? "Account")"
+                             StartIcon="@Icons.Material.Filled.AccountBalance"
+                             EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                             Variant="Variant.Outlined"
+                             Color="Color.Primary"
+                             Size="Size.Small"
+                             AnchorOrigin="Origin.BottomRight"
+                             TransformOrigin="Origin.TopRight"
+                             AriaLabel="@($"Account: {SelectedDays?.Name}. Change the account")"
+                             Class="toolbar-menu"
+                             data-testid="day-account">
+                        <MudText Typo="Typo.overline" Class="px-4 pt-2">Account</MudText>
+                        @foreach (var account in days.Accounts)
+                        {
+                            <MudMenuItem Icon="@(account.AccountId == SelectedDays?.AccountId ? Icons.Material.Filled.Check : null)" OnClick="() => _account = account.AccountId"
+                                         data-testid="day-account-option">@account.Name</MudMenuItem>
+                        }
+                    </MudMenu>
                 }
             }
         </div>
 
-        <div class="d-flex align-center justify-space-between mb-2">
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@(Monthly ? "Previous month" : "Previous week")" OnClick="() => MoveAsync(-1)" data-testid="previous-period" />
-            <MudText Typo="Typo.h6" data-testid="period-name">@PeriodName</MudText>
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@(Monthly ? "Next month" : "Next week")" OnClick="() => MoveAsync(1)" data-testid="next-period" />
-        </div>
+        <PeriodNavigator Name="@PeriodName" IsCurrent="@(_from <= Today && Today <= _to)" Class="mb-2"
+                         PreviousLabel="@(Monthly ? "Previous month" : "Previous week")" NextLabel="@(Monthly ? "Next month" : "Next week")"
+                         OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="GoToTodayAsync" />
 
         @if (!_daily)
         {
@@ -188,11 +197,7 @@
     /// <summary>The monthly view, or day by day over a month: both move a month at a time.</summary>
     private bool Monthly => !_daily || _month;
 
-    private string PeriodName => Monthly
-        ? _from.ToString("MMMM yyyy", Display)
-        : _from.Year == _to.Year
-            ? $"{_from.ToString("d MMM", Display)} – {_to.ToString("d MMM yyyy", Display)}"
-            : $"{_from.ToString("d MMM yyyy", Display)} – {_to.ToString("d MMM yyyy", Display)}";
+    private string PeriodName => Monthly ? PeriodNames.Month(_from.Year, _from.Month, Today) : PeriodNames.Days(_from, _to, Today);
 
     private CashFlowDaysAccount? SelectedDays =>
         _days?.Accounts.FirstOrDefault(a => a.AccountId == _account) ?? _days?.Accounts.FirstOrDefault();
@@ -253,13 +258,17 @@
         await LoadAsync();
     }
 
+    private async Task GoToTodayAsync()
+    {
+        (_from, _to) = Monthly ? PaymentPeriods.MonthOf(Today) : PaymentPeriods.WeekOf(Today, _firstDay);
+        await LoadAsync();
+    }
+
     private async Task MoveAsync(int step)
     {
         (_from, _to) = Monthly ? PaymentPeriods.MonthOf(_from.AddMonths(step)) : PaymentPeriods.WeekOf(_from.AddDays(7 * step), _firstDay);
         await LoadAsync();
     }
-
-    private string DayAccountName(Guid? id) => _days?.Accounts.FirstOrDefault(a => a.AccountId == id)?.Name ?? string.Empty;
 
     private static string Format(decimal amount, string currency) => Money.Format(amount, currency);
 

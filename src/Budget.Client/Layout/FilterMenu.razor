@@ -1,0 +1,46 @@
+@* A compact filter, e.g. "Kind: All ▾" (BUD-131). Outlined while it shows everything, filled while it's narrowing the
+   list, so active filters stand out. The choices open in a menu with the current one ticked. *@
+@typeparam TValue
+
+<MudMenu Label="@($"{Label}: {NameOf(Value)}")"
+         EndIcon="@Icons.Material.Filled.ArrowDropDown"
+         Variant="@(IsActive ? Variant.Filled : Variant.Outlined)"
+         Color="Color.Primary"
+         Size="Size.Small"
+         AnchorOrigin="Origin.BottomLeft"
+         TransformOrigin="Origin.TopLeft"
+         AriaLabel="@($"{Label}: {NameOf(Value)}. Change the filter")"
+         Class="filter-menu"
+         data-testid="@TestId">
+    @foreach (var (value, name) in Options)
+    {
+        <MudMenuItem Icon="@(Same(value, Value) ? Icons.Material.Filled.Check : null)" OnClick="() => ChooseAsync(value)" data-testid="@($"{TestId}-option")">@name</MudMenuItem>
+    }
+</MudMenu>
+
+@code {
+    /// <summary>What's filtered, e.g. "Kind".</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public TValue Value { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<TValue> ValueChanged { get; set; }
+
+    /// <summary>The choices; the first one shows everything.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<(TValue Value, string Name)> Options { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public string TestId { get; set; } = string.Empty;
+
+    private bool IsActive => Options.Count > 0 && !Same(Value, Options[0].Value);
+
+    private string NameOf(TValue value) => Options.FirstOrDefault(o => Same(o.Value, value)).Name ?? string.Empty;
+
+    private static bool Same(TValue a, TValue b) => EqualityComparer<TValue>.Default.Equals(a, b);
+
+    private Task ChooseAsync(TValue value) => ValueChanged.InvokeAsync(value);
+}

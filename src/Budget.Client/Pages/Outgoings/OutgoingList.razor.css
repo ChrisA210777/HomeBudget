@@ -1,0 +1,17 @@
+/* The filters (BUD-131): compact menu buttons that wrap only when they need to. */
+.list-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.list-filters ::deep .mud-button-root {
+    text-transform: none;
+    max-width: 100%;
+}
+
+.list-filters ::deep .mud-button-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

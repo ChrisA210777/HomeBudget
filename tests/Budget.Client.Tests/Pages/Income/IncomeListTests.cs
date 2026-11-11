@@ -32,7 +32,7 @@ public sealed class IncomeListTests : IncomeTestContext
 
         var cut = Context.RenderComponent<IncomeList>();
 
-        Assert.Equal("November 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
+        Assert.Equal("November", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal("£2,585.00", cut.Find("[data-testid=month-total]").TextContent.Trim());
         var items = cut.FindAll("[data-testid=income-item]").ToList();
         Assert.Equal(2, items.Count);
@@ -127,7 +127,7 @@ public sealed class IncomeListTests : IncomeTestContext
         var cut = Context.RenderComponent<IncomeList>();
 
         cut.Find("[data-testid=next-month]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("December 2026", cut.Find("[data-testid=month-name]").TextContent.Trim()));
+        cut.WaitForAssertion(() => Assert.Equal("December", cut.Find("[data-testid=month-name]").TextContent.Trim()));
         cut.Find("[data-testid=previous-month]").Click();
         cut.Find("[data-testid=previous-month]").Click();
 
