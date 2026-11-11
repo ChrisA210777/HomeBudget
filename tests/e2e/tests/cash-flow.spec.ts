@@ -48,7 +48,7 @@ test('cash flow shows each account in and out, and day by day', async ({ page })
   expect(account.x + account.width, 'the account menu stays on screen').toBeLessThanOrEqual(page.viewportSize()!.width);
 
   // Week or month is chosen from the period's name.
-  await choosePeriod(page, 'period-name', 'A month');
+  await choosePeriod(page, 'period-name', 'Month view');
   await expect(page.getByTestId('period-name')).toHaveText(/^[A-Z][a-z]+ \d{4}$/);
 
   // The name always has its year, and stays put when "Go to today" appears beside it.
@@ -59,6 +59,6 @@ test('cash flow shows each account in and out, and day by day', async ({ page })
   expect(Math.abs(await centre() - before), 'the name stays centred').toBeLessThanOrEqual(1);
   await page.getByTestId('go-to-today').click();
   await expect(page.getByTestId('go-to-today')).toBeHidden();
-  await choosePeriod(page, 'period-name', 'A week');
+  await choosePeriod(page, 'period-name', 'Week view');
   await expect(page.getByTestId('period-name')).toContainText('–');
 });

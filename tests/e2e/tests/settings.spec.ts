@@ -28,7 +28,7 @@ test('outgoings open in the view chosen last time', async ({ page }) => {
   await page.goto('/outgoings');
   await settled(page);
 
-  await choosePeriod(page, 'month-name', '12 months');
+  await choosePeriod(page, 'month-name', '12-month view');
   await groupOutgoingsBy(page, 'Paid from');
   await expect(page.getByTestId('month-name')).toContainText('–');
 

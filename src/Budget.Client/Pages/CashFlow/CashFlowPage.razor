@@ -193,7 +193,7 @@
     private bool Monthly => !_daily || _month;
 
     private IReadOnlyList<PeriodChoice> WeekOrMonth =>
-        [new("A week", "show-week", !_month, EventCallback.Factory.Create(this, () => SetMonthAsync(false))), new("A month", "show-month", _month, EventCallback.Factory.Create(this, () => SetMonthAsync(true)))];
+        [new("Week view", "show-week", !_month, EventCallback.Factory.Create(this, () => SetMonthAsync(false))), new("Month view", "show-month", _month, EventCallback.Factory.Create(this, () => SetMonthAsync(true)))];
 
     private string PeriodName => Monthly ? PeriodNames.Month(_from.Year, _from.Month) : PeriodNames.Days(_from, _to);
 

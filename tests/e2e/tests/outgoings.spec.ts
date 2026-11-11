@@ -161,7 +161,7 @@ test('outgoings can be shown for 12 months and grouped by the account they are p
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£20.00');
 
   // BUD-80: a year adds up the 12 monthly budget amounts, starting with the shown month.
-  await choosePeriod(page, 'month-name', '12 months');
+  await choosePeriod(page, 'month-name', '12-month view');
   await expect(page.getByTestId('month-name')).toContainText('–');
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£240.00');
   await expect(item.getByTestId('outgoing-period')).toHaveText('over 12 months');
@@ -206,7 +206,7 @@ test('upcoming payments show what is due each day, a week or a month at a time',
   await expect(today.getByTestId('payment-name')).toHaveText('Hedge trimming fund');
   await expect(today.getByTestId('payment-amount')).toHaveText('£20.00');
 
-  await choosePeriod(page, 'period-name', 'A month');
+  await choosePeriod(page, 'period-name', 'Month view');
   await expect(page.getByTestId('period-total')).toHaveText('£20.00');
   await page.getByTestId('next-period').click();
   await expect(page.getByTestId('payment-name')).toHaveText(['Hedge trimming fund']);

@@ -35,8 +35,8 @@ public sealed class PeriodNavigatorTests : IDisposable
             .Add(n => n.Name, "9 – 15 Nov 26")
             .Add(n => n.Choices, new PeriodChoice[]
             {
-                new("A week", "show-week", true, EventCallback.Factory.Create(this, () => chosen.Add("week"))),
-                new("A month", "show-month", false, EventCallback.Factory.Create(this, () => chosen.Add("month"))),
+                new("Week view", "show-week", true, EventCallback.Factory.Create(this, () => chosen.Add("week"))),
+                new("Month view", "show-month", false, EventCallback.Factory.Create(this, () => chosen.Add("month"))),
             }));
 
         var button = cut.Find("[data-testid=period-name] button");

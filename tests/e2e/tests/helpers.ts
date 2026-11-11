@@ -48,7 +48,7 @@ export async function expectToolbarTidy(controls: Locator[]): Promise<void> {
   }
 }
 
-/** Chooses the length of period from the period navigator's name, e.g. 'A week' or '12 months' (BUD-135). */
+/** Chooses the length of period from the period navigator's name, e.g. 'Week view' or '12-month view' (BUD-135). */
 export async function choosePeriod(page: Page, nameTestId: string, choice: string): Promise<void> {
   await page.getByTestId(nameTestId).getByRole('button').click();
   const item = page.locator('.mud-popover-open').getByText(choice, { exact: true });

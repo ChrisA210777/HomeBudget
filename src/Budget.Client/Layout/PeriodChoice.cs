@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace Budget.Client.Layout;
 
-/// <summary>A length of period offered by the <see cref="PeriodNavigator"/>, e.g. "A week" (BUD-135).</summary>
+/// <summary>A length of period offered by the <see cref="PeriodNavigator"/>, e.g. "Week view" (BUD-135).</summary>
 /// <param name="Name">What the menu shows.</param>
 /// <param name="TestId">The menu item's data-testid.</param>
 /// <param name="Selected">Whether this is the period shown.</param>

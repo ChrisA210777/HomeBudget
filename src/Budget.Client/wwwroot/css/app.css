@@ -536,6 +536,11 @@ h1[tabindex="-1"]:focus-visible {
     right: 6px;
 }
 
+/* The period navigator's menu (BUD-135). It opens in the popover layer, outside the navigator's scoped styles. */
+.period-menu {
+    min-width: 180px;
+}
+
 /* Text that stops at two lines with an ellipsis, e.g. a long name in a list (BUD-126). */
 .two-lines {
     display: -webkit-box;

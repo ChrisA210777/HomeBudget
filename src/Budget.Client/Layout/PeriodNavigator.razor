@@ -14,8 +14,8 @@
                      Color="Color.Inherit"
                      AnchorOrigin="Origin.BottomCenter"
                      TransformOrigin="Origin.TopCenter"
+                     PopoverClass="period-menu"
                      AriaLabel="@($"Change period, {Name}")">
-                <MudText Typo="Typo.overline" Class="px-4 pt-2">Show</MudText>
                 @foreach (var choice in Choices)
                 {
                     <MudMenuItem Icon="@(choice.Selected ? Icons.Material.Filled.Check : null)" OnClick="() => choice.Choose.InvokeAsync()" data-testid="@choice.TestId">@choice.Name</MudMenuItem>
