@@ -472,3 +472,8 @@ h1[tabindex="-1"]:focus-visible {
 .pot-heading + .plain-list .plain-list-item:first-child {
     border-top: 1px solid var(--mud-palette-lines-default);
 }
+
+/* Amounts never wrap, least of all between the sign and the number (BUD-128). */
+.text-nowrap {
+    white-space: nowrap !important;
+}

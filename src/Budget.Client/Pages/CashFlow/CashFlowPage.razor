@@ -99,7 +99,7 @@
                                     <MudIcon Icon="@(entry.IsIn ? Icons.Material.Filled.ArrowDownward : Icons.Material.Filled.ArrowUpward)" Size="Size.Small"
                                              Color="@(entry.IsIn ? Color.Success : Color.Default)" aria-hidden="true" />
                                     <MudLink Href="@Link(entry)" Typo="Typo.body2" Class="flex-grow-1" data-testid="line-name">@Label(entry)</MudLink>
-                                    <MudText Typo="Typo.body2" Class="text-nowrap" data-testid="line-amount">@(entry.IsIn ? "+" : "−")@Format(entry.Amount, _monthData.CurrencyCode)</MudText>
+                                    <MudText Typo="Typo.body2" Class="text-nowrap" data-testid="line-amount">@Money.Signed(entry.Amount, entry.IsIn, _monthData.CurrencyCode)</MudText>
                                 </div>
                             }
                         </div>
@@ -158,7 +158,7 @@
                                     <MudIcon Icon="@(entry.IsIn ? Icons.Material.Filled.ArrowDownward : Icons.Material.Filled.ArrowUpward)" Size="Size.Small"
                                              Color="@(entry.IsIn ? Color.Success : Color.Default)" aria-hidden="true" />
                                     <MudLink Href="@Link(entry)" Typo="Typo.body2" Class="flex-grow-1" data-testid="line-name">@Label(entry)</MudLink>
-                                    <MudText Typo="Typo.body2" Class="text-nowrap" data-testid="line-amount">@(entry.IsIn ? "+" : "−")@Format(entry.Amount, _days.CurrencyCode)</MudText>
+                                    <MudText Typo="Typo.body2" Class="text-nowrap" data-testid="line-amount">@Money.Signed(entry.Amount, entry.IsIn, _days.CurrencyCode)</MudText>
                                 </div>
                             }
                         </MudPaper>
