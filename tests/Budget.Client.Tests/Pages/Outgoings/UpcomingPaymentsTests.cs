@@ -70,13 +70,14 @@ public sealed class UpcomingPaymentsTests : IDisposable
     [Fact]
     public void Moving_between_weeks_and_months_asks_for_those_days()
     {
+        var popovers = _context.RenderComponent<MudBlazor.MudPopoverProvider>();
         var cut = _context.RenderComponent<UpcomingPayments>();
 
         cut.Find("[data-testid=next-period]").Click();
         cut.WaitForAssertion(() => Assert.Equal("8 – 14 Nov", Text(cut, "period-name")));
         Assert.NotNull(cut.Find("[data-testid=go-to-today]"));
 
-        cut.Find("[data-testid=show-month]").Click();
+        cut.ChoosePeriod(popovers, "period-name", "show-month");
         cut.WaitForAssertion(() => Assert.Equal("November", Text(cut, "period-name")));
         cut.Find("[data-testid=next-period]").Click();
         cut.WaitForAssertion(() => Assert.Equal("December", Text(cut, "period-name")));

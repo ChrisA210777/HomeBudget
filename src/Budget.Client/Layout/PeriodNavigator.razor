@@ -1,9 +1,32 @@
 @* Previous, the period's name, "Go to today" and next (BUD-124, BUD-130). Today is an icon beside the next arrow, so
-   the name always has the room it needs. *@
+   the name always has the room it needs. Where the page offers more than one length of period, the name opens a menu
+   of them, e.g. a week or a month (BUD-135), instead of a separate toggle. *@
 
 <div class="period-navigator @Class">
     <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@PreviousLabel" OnClick="OnPrevious" data-testid="@PreviousTestId" />
-    <MudText Typo="Typo.h6" Align="Align.Center" Class="period-name" data-testid="@NameTestId">@Name</MudText>
+    @if (Choices is { Count: > 1 })
+    {
+        <div class="period-name period-choice">
+            <MudMenu Label="@Name"
+                     EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                     Variant="Variant.Text"
+                     Color="Color.Inherit"
+                     AnchorOrigin="Origin.BottomCenter"
+                     TransformOrigin="Origin.TopCenter"
+                     AriaLabel="@($"Change period, {Name}")"
+                     data-testid="@NameTestId">
+                <MudText Typo="Typo.overline" Class="px-4 pt-2">Show</MudText>
+                @foreach (var choice in Choices)
+                {
+                    <MudMenuItem Icon="@(choice.Selected ? Icons.Material.Filled.Check : null)" OnClick="() => choice.Choose()" data-testid="@choice.TestId">@choice.Name</MudMenuItem>
+                }
+            </MudMenu>
+        </div>
+    }
+    else
+    {
+        <MudText Typo="Typo.h6" Align="Align.Center" Class="period-name" data-testid="@NameTestId">@Name</MudText>
+    }
     @if (!IsCurrent)
     {
         <MudTooltip Text="@TodayLabel">
@@ -51,4 +74,8 @@
 
     [Parameter]
     public string NameTestId { get; set; } = "period-name";
+
+    /// <summary>The lengths of period the page offers, e.g. a week or a month; with two or more, the name opens them as a menu.</summary>
+    [Parameter]
+    public IReadOnlyList<PeriodChoice>? Choices { get; set; }
 }

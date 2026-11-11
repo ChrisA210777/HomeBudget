@@ -489,6 +489,11 @@ h1[tabindex="-1"]:focus-visible {
     justify-content: flex-end;
 }
 
+/* A menu on its own, e.g. Upcoming payments' account (BUD-135), starts on the left like any other toolbar. */
+.page-toolbar .toolbar-menu:only-child {
+    justify-content: flex-start;
+}
+
 .page-toolbar .toolbar-menu .mud-button-root {
     max-width: 100%;
     text-transform: none;

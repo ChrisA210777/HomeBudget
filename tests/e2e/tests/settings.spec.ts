@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { choose, settled, signIn, groupOutgoingsBy } from './helpers';
+import { choose, choosePeriod, groupOutgoingsBy, settled, signIn } from './helpers';
 
 // BUD-87: settings are saved with the account, so they're still there after reloading.
 
@@ -28,13 +28,12 @@ test('outgoings open in the view chosen last time', async ({ page }) => {
   await page.goto('/outgoings');
   await settled(page);
 
-  await page.getByTestId('show-year').click();
+  await choosePeriod(page, 'month-name', '12 months');
   await groupOutgoingsBy(page, 'Paid from');
   await expect(page.getByTestId('month-name')).toContainText('–');
 
   await page.reload();
   await settled(page);
-  await expect(page.getByTestId('show-year')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('group-by')).toHaveText('Group: Paid from');
   await expect(page.getByTestId('month-name')).toContainText('–');
 });

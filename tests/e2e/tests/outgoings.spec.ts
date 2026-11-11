@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { addOutgoing, choose, expectToolbarTidy, settled, signIn, typeOutgoingName, groupOutgoingsBy } from './helpers';
+import { addOutgoing, choose, choosePeriod, groupOutgoingsBy, settled, signIn, typeOutgoingName } from './helpers';
 
 
 test("an outgoing added from the home page shows in this month's list", async ({ page }) => {
@@ -161,7 +161,7 @@ test('outgoings can be shown for 12 months and grouped by the account they are p
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£20.00');
 
   // BUD-80: a year adds up the 12 monthly budget amounts, starting with the shown month.
-  await page.getByTestId('show-year').click();
+  await choosePeriod(page, 'month-name', '12 months');
   await expect(page.getByTestId('month-name')).toContainText('–');
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£240.00');
   await expect(item.getByTestId('outgoing-period')).toHaveText('over 12 months');
@@ -200,13 +200,13 @@ test('upcoming payments show what is due each day, a week or a month at a time',
   await page.goto('/outgoings/upcoming');
   await expect(page.getByRole('heading', { level: 1, name: 'Upcoming payments' })).toBeVisible();
   await settled(page);
-  // BUD-124: Week | Month and the account menu line up, with space between them.
-  await expectToolbarTidy([page.getByTestId('period-toggle'), page.getByTestId('filter-account').getByRole('button')]);
+  // BUD-135: week or month is chosen from the period's name.
+  await expect(page.getByTestId('period-name').getByRole('button')).toHaveAccessibleName(/^Change period, /);
   const today = page.getByTestId('payment-day').filter({ has: page.getByTestId('payment-today') });
   await expect(today.getByTestId('payment-name')).toHaveText('Hedge trimming fund');
   await expect(today.getByTestId('payment-amount')).toHaveText('£20.00');
 
-  await page.getByTestId('show-month').click();
+  await choosePeriod(page, 'period-name', 'A month');
   await expect(page.getByTestId('period-total')).toHaveText('£20.00');
   await page.getByTestId('next-period').click();
   await expect(page.getByTestId('payment-name')).toHaveText(['Hedge trimming fund']);

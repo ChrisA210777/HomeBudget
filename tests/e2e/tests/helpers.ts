@@ -48,6 +48,14 @@ export async function expectToolbarTidy(controls: Locator[]): Promise<void> {
   }
 }
 
+/** Chooses the length of period from the period navigator's name, e.g. 'A week' or '12 months' (BUD-135). */
+export async function choosePeriod(page: Page, nameTestId: string, choice: string): Promise<void> {
+  await page.getByTestId(nameTestId).getByRole('button').click();
+  const item = page.locator('.mud-popover-open').getByText(choice, { exact: true });
+  await item.click();
+  await expect(item).toBeHidden();
+}
+
 /** Groups the Outgoings list from its Group menu (BUD-134). */
 export async function groupOutgoingsBy(page: Page, grouping: 'Category' | 'Paid from'): Promise<void> {
   await page.getByTestId('group-by').getByRole('button').click();

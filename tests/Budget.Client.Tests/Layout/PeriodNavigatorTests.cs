@@ -1,0 +1,50 @@
+using Budget.Client.Layout;
+using MudBlazor;
+using MudBlazor.Services;
+
+namespace Budget.Client.Tests.Layout;
+
+public sealed class PeriodNavigatorTests : IDisposable
+{
+    private readonly TestContext _context = new();
+
+    public PeriodNavigatorTests()
+    {
+        _context.Services.AddMudServices();
+        _context.JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    public void Dispose() => _context.Dispose();
+
+    [Fact]
+    public void Without_choices_the_name_is_plain_text()
+    {
+        var cut = _context.RenderComponent<PeriodNavigator>(p => p.Add(n => n.Name, "November"));
+
+        Assert.Equal("November", cut.Find("[data-testid=period-name]").TextContent.Trim());
+        Assert.Empty(cut.FindAll("[data-testid=period-name] button"));
+    }
+
+    [Fact]
+    public void With_choices_the_name_opens_them_as_a_menu()
+    {
+        var popovers = _context.RenderComponent<MudPopoverProvider>();
+        var chosen = new List<string>();
+        var cut = _context.RenderComponent<PeriodNavigator>(p => p
+            .Add(n => n.Name, "9 – 15 Nov")
+            .Add(n => n.Choices, new PeriodChoice[]
+            {
+                new("A week", "show-week", true, () => { chosen.Add("week"); return Task.CompletedTask; }),
+                new("A month", "show-month", false, () => { chosen.Add("month"); return Task.CompletedTask; }),
+            }));
+
+        var button = cut.Find("[data-testid=period-name] button");
+        Assert.Equal("Change period, 9 – 15 Nov", button.GetAttribute("aria-label"));
+        Assert.Equal("9 – 15 Nov", cut.Find("[data-testid=period-name]").TextContent.Trim());
+
+        button.Click();
+        popovers.WaitForElement("[data-testid=show-week]");
+        popovers.Find("[data-testid=show-month]").Click();
+        Assert.Equal(new[] { "month" }, chosen);
+    }
+}

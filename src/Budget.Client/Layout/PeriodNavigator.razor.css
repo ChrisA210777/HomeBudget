@@ -10,3 +10,39 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* The name as a menu (BUD-135): centred, the size of the plain name, ellipsis when long. */
+.period-choice {
+    display: flex;
+    justify-content: center;
+}
+
+.period-choice ::deep .mud-menu {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.period-choice ::deep .mud-button-root {
+    max-width: 100%;
+    text-transform: none;
+    font-size: var(--mud-typography-h6-size);
+    font-weight: var(--mud-typography-h6-weight);
+    line-height: var(--mud-typography-h6-lineheight);
+    letter-spacing: normal;
+    padding: 2px 4px 2px 10px;
+}
+
+.period-choice ::deep .mud-button-label {
+    min-width: 0;
+}
+
+.period-choice ::deep .mud-button-label > :not(.mud-button-icon-end) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.period-choice ::deep .mud-button-icon-end {
+    color: var(--mud-palette-primary);
+    margin-left: 0;
+}

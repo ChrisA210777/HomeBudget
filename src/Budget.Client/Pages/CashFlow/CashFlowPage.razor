@@ -32,7 +32,7 @@
     }
     else
     {
-        @* One toolbar, as on Upcoming payments (BUD-130). *@
+        @* One toolbar, as on Upcoming payments (BUD-130). Week or month is chosen from the period's name (BUD-135). *@
         <div class="page-toolbar flex-wrap mb-2">
             <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show" data-testid="view-toggle">
                 <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_daily ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_daily ? "false" : "true")"
@@ -42,12 +42,6 @@
             </MudButtonGroup>
             @if (_daily)
             {
-                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Period" data-testid="period-toggle">
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_month ? "false" : "true")"
-                               OnClick="() => SetMonthAsync(false)" data-testid="show-week">Week</MudButton>
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_month ? "true" : "false")"
-                               OnClick="() => SetMonthAsync(true)" data-testid="show-month">Month</MudButton>
-                </MudButtonGroup>
                 @if (_days is { Accounts.Count: > 0 } days)
                 {
                     <MudMenu Label="@(SelectedDays?.Name ?? "Account")"
@@ -74,7 +68,8 @@
 
         <PeriodNavigator Name="@PeriodName" IsCurrent="@(_from <= Today && Today <= _to)" Class="mb-2"
                          PreviousLabel="@(Monthly ? "Previous month" : "Previous week")" NextLabel="@(Monthly ? "Next month" : "Next week")"
-                         OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="GoToTodayAsync" />
+                         OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="GoToTodayAsync"
+                         Choices="@(_daily ? WeekOrMonth : null)" />
 
         @if (!_daily)
         {
@@ -196,6 +191,9 @@
 
     /// <summary>The monthly view, or day by day over a month: both move a month at a time.</summary>
     private bool Monthly => !_daily || _month;
+
+    private IReadOnlyList<PeriodChoice> WeekOrMonth =>
+        [new("A week", "show-week", !_month, () => SetMonthAsync(false)), new("A month", "show-month", _month, () => SetMonthAsync(true))];
 
     private string PeriodName => Monthly ? PeriodNames.Month(_from.Year, _from.Month, Today) : PeriodNames.Days(_from, _to, Today);
 

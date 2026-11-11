@@ -49,20 +49,14 @@
                          PreviousLabel="@(IsYear ? "Start a month earlier" : "Previous month")" NextLabel="@(IsYear ? "Start a month later" : "Next month")"
                          TodayLabel="@(IsYear ? "Start with this month" : "Go to this month")"
                          OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="() => MoveAsync(Today.Year * 12 + Today.Month - (_year * 12 + _month))"
-                         PreviousTestId="previous-month" NextTestId="next-month" NameTestId="month-name" />
+                         PreviousTestId="previous-month" NextTestId="next-month" NameTestId="month-name"
+                         Choices="@MonthOrYear" />
 
         @if (_data is not null)
         {
             <MudPaper Class="pa-4 mb-3" Elevation="1">
                 <div class="d-flex align-center justify-space-between gap-2">
                     <MudText Typo="Typo.overline">@(IsFiltered ? "Matching outgoings" : "Outgoings") @(IsYear ? "over 12 months" : "this month")</MudText>
-                    @* Month or year (BUD-80): a year is the 12 monthly budget amounts added up (ADR-013). *@
-                    <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show amounts for" data-testid="period-toggle">
-                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(IsYear ? Variant.Outlined : Variant.Filled)" aria-pressed="@(IsYear ? "false" : "true")"
-                                   OnClick="() => SetMonthsAsync(1)" data-testid="show-month">Month</MudButton>
-                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(IsYear ? Variant.Filled : Variant.Outlined)" aria-pressed="@(IsYear ? "true" : "false")"
-                                   OnClick="() => SetMonthsAsync(12)" data-testid="show-year">Year</MudButton>
-                    </MudButtonGroup>
                 </div>
                 <MudText Typo="Typo.h4" data-testid="month-total">@Format(totals.Total)</MudText>
                 <div class="d-flex flex-wrap gap-4 mt-2">
@@ -341,6 +335,10 @@
     private bool _byPaidFrom;
 
     private bool IsYear => _months == 12;
+
+    /// <summary>A month, or 12 months starting with it (BUD-80); chosen from the period's name (BUD-135).</summary>
+    private IReadOnlyList<PeriodChoice> MonthOrYear =>
+        [new("A month", "show-month", !IsYear, () => SetMonthsAsync(1)), new("12 months", "show-year", IsYear, () => SetMonthsAsync(12))];
 
     private string PeriodName => IsYear
         ? PeriodNames.Months(new DateOnly(_year, _month, 1), new DateOnly(_year, _month, 1).AddMonths(11), Today)

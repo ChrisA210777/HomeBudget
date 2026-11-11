@@ -21,14 +21,8 @@
         What's due each day, at the amount actually paid. Unlike the budget, a yearly bill only shows on the day it's paid.
     </MudText>
 
-    @* One toolbar line, even on a phone: the period on the left, the account filling the rest (BUD-124). *@
+    @* The account filter; week or month is chosen from the period's name (BUD-124, BUD-135). *@
     <div class="page-toolbar mb-2">
-        <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show payments for" data-testid="period-toggle">
-            <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_month ? "false" : "true")"
-                       OnClick="() => SetMonthAsync(false)" data-testid="show-week">Week</MudButton>
-            <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_month ? "true" : "false")"
-                       OnClick="() => SetMonthAsync(true)" data-testid="show-month">Month</MudButton>
-        </MudButtonGroup>
         @* By account, including its pots: budgeting is done by account (BUD-96). A compact menu, not a form field. *@
         <MudMenu Label="@(_account is null ? "All accounts" : AccountName(_account))"
                  StartIcon="@Icons.Material.Filled.AccountBalance"
@@ -51,7 +45,8 @@
 
     <PeriodNavigator Name="@PeriodName" IsCurrent="@(_from <= Today && Today <= _to)" Class="mb-2"
                      PreviousLabel="@(_month ? "Previous month" : "Previous week")" NextLabel="@(_month ? "Next month" : "Next week")"
-                     OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="GoToTodayAsync" />
+                     OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="GoToTodayAsync"
+                     Choices="@WeekOrMonth" />
 
     @if (_loaded && _household is null)
     {
@@ -136,6 +131,9 @@
     private DateOnly _to;
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    private IReadOnlyList<PeriodChoice> WeekOrMonth =>
+        [new("A week", "show-week", !_month, () => SetMonthAsync(false)), new("A month", "show-month", _month, () => SetMonthAsync(true))];
 
     private string PeriodName => _month ? PeriodNames.Month(_from.Year, _from.Month, Today) : PeriodNames.Days(_from, _to, Today);
 

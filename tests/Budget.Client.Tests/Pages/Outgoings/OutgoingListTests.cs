@@ -142,14 +142,15 @@ public sealed class OutgoingListTests : IDisposable
     [Fact]
     public void The_year_view_asks_for_12_months_from_the_shown_month_and_says_so()
     {
+        var popovers = _context.RenderComponent<MudPopoverProvider>();
         var cut = _context.RenderComponent<OutgoingList>();
-        Assert.Equal("true", cut.Find("[data-testid=show-month]").GetAttribute("aria-pressed"));
+        Assert.Equal("November", Text(cut, "month-name"));
+        Assert.Equal("Change period, November", cut.Find("[data-testid=month-name] button").GetAttribute("aria-label"));
 
-        cut.Find("[data-testid=show-year]").Click();
+        cut.ChoosePeriod(popovers, "month-name", "show-year");
 
         cut.WaitForAssertion(() => Assert.Equal(new[] { 1, 12 }, _api.MonthsRequested));
         Assert.Equal((2026, 11, false), _api.Requests[^1]);
-        Assert.Equal("true", cut.Find("[data-testid=show-year]").GetAttribute("aria-pressed"));
         Assert.Equal("Nov 2026 – Oct 2027", Text(cut, "month-name"));
         Assert.All(Texts(cut, "outgoing-period"), text => Assert.Equal("over 12 months", text));
         Assert.Equal("Start a month later", cut.Find("[data-testid=next-month]").GetAttribute("aria-label"));
