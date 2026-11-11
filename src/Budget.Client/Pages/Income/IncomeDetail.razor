@@ -15,7 +15,7 @@
 <PageTitle>@(_details?.Name ?? "Income") · Home Budget</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/income" Class="mb-2">Income</MudButton>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2" data-testid="back">@(BackLink.Name(BackHref) ?? "Back")</MudButton>
 
     @if (!_loaded)
     {
@@ -276,6 +276,12 @@
     [Parameter]
     public Guid IncomeStreamId { get; set; }
 
+    /// <summary>The page this was opened from, to go back to (BUD-117).</summary>
+    [SupplyParameterFromQuery(Name = BackLink.Param)]
+    public string? From { get; set; }
+
+    private string BackHref => BackLink.Resolve(From, "/income");
+
     private enum Mode { None, EditDetails, ChangeAmount, CorrectAmount, DeleteAmount, AddPeriod, CorrectPeriod, DeletePeriod, End, DeleteIncome }
 
     private HouseholdMembershipSummary? _household;
@@ -432,7 +438,7 @@
         {
             _saving = true;
             await IncomeApi.DeleteAsync(householdId, IncomeStreamId);
-            Navigation.NavigateTo("/income");
+            Navigation.NavigateTo(BackHref);
             return;
         }
 

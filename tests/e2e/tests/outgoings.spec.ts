@@ -16,8 +16,11 @@ test("an outgoing added from the home page shows in this month's list", async ({
 
   await page.getByTestId('save').click();
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Outgoings' })).toBeVisible();
+  // BUD-117: back to the page it was added from.
+  await expect(page.getByTestId('welcome')).toBeVisible();
   await expect(page.getByText('Insurance for the car was added.')).toBeVisible();
+  await page.goto('/outgoings');
+  await settled(page);
   const item = page.getByTestId('outgoing-item').filter({ hasText: 'Insurance for the car' });
   // It starts this month, so this month counts in full (ADR-011).
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£40.00');
@@ -207,6 +210,13 @@ test('upcoming payments show what is due each day, a week or a month at a time',
   await expect(page.getByTestId('payment-name')).toHaveText(['Hedge trimming fund']);
   await page.getByTestId('go-to-today').click();
   await expect(page.getByTestId('payment-today')).toBeVisible();
+
+  // BUD-117: back means back, to Upcoming payments rather than the Outgoings list.
+  await page.getByTestId('payment-name').first().click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Hedge trimming fund' })).toBeVisible();
+  await expect(page.getByTestId('back')).toHaveText('Upcoming payments');
+  await page.getByTestId('back').click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Upcoming payments' })).toBeVisible();
 });
 
 test('the renewals calendar is reached from outgoings, and links back to them', async ({ page }) => {

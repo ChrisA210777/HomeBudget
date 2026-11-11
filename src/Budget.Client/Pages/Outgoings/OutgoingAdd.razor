@@ -23,7 +23,7 @@
     }
     else
     {
-        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings" Class="mb-2">Outgoings</MudButton>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2" data-testid="back">@(BackLink.Name(BackHref) ?? "Back")</MudButton>
     }
     <h1 class="mud-typography mud-typography-h4 mb-4">@Title</h1>
 
@@ -260,7 +260,12 @@
 
     private string Title => IsEdit ? "Edit details" : "Add an outgoing";
 
-    private string BackHref => IsEdit ? $"/outgoings/{OutgoingId}" : "/outgoings";
+    /// <summary>The page this was opened from, to go back to (BUD-117).</summary>
+    [SupplyParameterFromQuery(Name = BackLink.Param)]
+    public string? From { get; set; }
+
+    /// <summary>An edit goes back to the outgoing, which still knows where it was opened from; a new one to where "Add" was.</summary>
+    private string BackHref => IsEdit ? BackLink.To($"/outgoings/{OutgoingId}", From) : BackLink.Resolve(From, "/outgoings");
 
     private OutgoingDetailsResponse? _existing;
     private bool _conflict;
@@ -524,7 +529,7 @@
             if (result.Succeeded)
             {
                 Snackbar.Add($"{result.Value!.Name} was added.", Severity.Success);
-                Navigation.NavigateTo("/outgoings");
+                Navigation.NavigateTo(BackHref);
                 return;
             }
 

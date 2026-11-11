@@ -38,7 +38,7 @@
             </MudButton>
             @if (_canEdit)
             {
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/outgoings/new"
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="@BackLink.To("/outgoings/new", Here)"
                            Class="icon-only-xs" aria-label="Add an outgoing" title="Add an outgoing" data-testid="add-outgoing">
                     <span class="button-label">Add an outgoing</span>
                 </MudButton>
@@ -256,6 +256,49 @@
     [SupplyParameterFromQuery(Name = "kind")]
     public string? KindQuery { get; set; }
 
+    /// <summary>Show only one priority, e.g. <c>?priority=Essential</c>.</summary>
+    [SupplyParameterFromQuery(Name = "priority")]
+    public string? PriorityQuery { get; set; }
+
+    /// <summary>Show only one person's outgoings, or "household" for the whole household's.</summary>
+    [SupplyParameterFromQuery(Name = "person")]
+    public string? PersonQuery { get; set; }
+
+    /// <summary>This list as it's shown now, month and filters included, for an outgoing's back button (BUD-117).</summary>
+    private string Here
+    {
+        get
+        {
+            var query = new List<string> { $"month={_year:D4}-{_month:D2}" };
+            if (_category is { } category)
+            {
+                query.Add($"category={category}");
+            }
+
+            if (_account is { } account)
+            {
+                query.Add($"account={account}");
+            }
+
+            if (_kind is { } kind)
+            {
+                query.Add($"kind={kind}");
+            }
+
+            if (_priority is { } priority)
+            {
+                query.Add($"priority={priority}");
+            }
+
+            if (_person != EveryoneKey)
+            {
+                query.Add($"person={Uri.EscapeDataString(_person)}");
+            }
+
+            return "/outgoings?" + string.Join('&', query);
+        }
+    }
+
     private const string EveryoneKey = "";
     private const string HouseholdKey = "household";
 
@@ -307,6 +350,8 @@
         _category = CategoryQuery;
         _account = AccountQuery;
         _kind = Enum.TryParse<OutgoingKindDto>(KindQuery, ignoreCase: true, out var kind) && Enum.IsDefined(kind) ? kind : null;
+        _priority = Enum.TryParse<OutgoingPriorityDto>(PriorityQuery, ignoreCase: true, out var priority) && Enum.IsDefined(priority) ? priority : null;
+        _person = PersonQuery is { Length: > 0 } person && (person == HouseholdKey || Guid.TryParse(person, out _)) ? person : EveryoneKey;
 
         // The view and grouping chosen last time, on any device (BUD-87).
         var settings = await Settings.GetAsync();
@@ -430,7 +475,7 @@
         @<li class="@($"plain-list-item{(item.IsComingUp ? " outgoing-coming-up" : string.Empty)}")" data-testid="outgoing-item">
             <div class="d-flex align-start gap-2">
                 <div class="flex-grow-1" style="min-width: 0">
-                    <MudLink Href="@($"/outgoings/{item.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudLink>
+                    <MudLink Href="@BackLink.To($"/outgoings/{item.Id}", Here)" Typo="Typo.body1" Style="font-weight: 500" data-testid="outgoing-name">@item.Name</MudLink>
                     <div class="d-flex flex-wrap align-center gap-1 mt-1">
                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="PriorityColour(item.Priority)" Class="ma-0" data-testid="outgoing-priority">@item.Priority</MudChip>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@KindName(item.Kind)@(item.PersonName is { } person ? $" · {person}" : string.Empty)@(_byPaidFrom ? $" · {item.CategoryName}" : string.Empty)</MudText>

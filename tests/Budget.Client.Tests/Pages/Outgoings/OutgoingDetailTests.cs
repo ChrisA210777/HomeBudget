@@ -239,6 +239,34 @@ public sealed class OutgoingDetailTests : IDisposable
     }
 
     [Fact]
+    public void Back_goes_to_the_page_it_was_opened_from_and_remembers_it_through_edit_and_delete()
+    {
+        var navigation = _context.Services.GetRequiredService<FakeNavigationManager>();
+        navigation.NavigateTo($"/outgoings/{OutgoingId}?from=%2Foutgoings%2Fupcoming");
+        var cut = _context.RenderComponent<OutgoingDetail>(p => p.Add(c => c.OutgoingId, OutgoingId));
+
+        var back = cut.Find("[data-testid=back]");
+        Assert.Equal("/outgoings/upcoming", back.GetAttribute("href"));
+        Assert.Equal("Upcoming payments", back.TextContent.Trim());
+        Assert.Equal($"/outgoings/{OutgoingId}/edit?from=%2Foutgoings%2Fupcoming", cut.Find("[data-testid=edit-details]").GetAttribute("href"));
+
+        cut.Find("[data-testid=delete-outgoing]").Click();
+        cut.Find("[data-testid=save]").Click();
+
+        cut.WaitForAssertion(() => Assert.EndsWith("/outgoings/upcoming", navigation.Uri, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Back_ignores_an_origin_on_another_site()
+    {
+        _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo($"/outgoings/{OutgoingId}?from=%2F%2Fevil.example");
+        var cut = _context.RenderComponent<OutgoingDetail>(p => p.Add(c => c.OutgoingId, OutgoingId));
+
+        Assert.Equal("/outgoings", cut.Find("[data-testid=back]").GetAttribute("href"));
+        Assert.Equal("Outgoings", cut.Find("[data-testid=back]").TextContent.Trim());
+    }
+
+    [Fact]
     public void Deleting_the_outgoing_goes_back_to_the_list()
     {
         var cut = _context.RenderComponent<OutgoingDetail>(p => p.Add(c => c.OutgoingId, OutgoingId));

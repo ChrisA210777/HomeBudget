@@ -62,7 +62,7 @@
                             <li class="plain-list-item" data-testid="transfer">
                                 <div class="d-flex align-start gap-2">
                                     <div class="flex-grow-1" style="min-width: 0">
-                                        <MudLink Href="@($"/transfers/{transfer.Id}")" Typo="Typo.body1" Style="font-weight: 500" data-testid="transfer-name">@TransferScheduleBackend.Title(transfer.Name, transfer.FromName, transfer.ToName)</MudLink>
+                                        <MudLink Href="@BackLink.To($"/transfers/{transfer.Id}", "/transfers")" Typo="Typo.body1" Style="font-weight: 500" data-testid="transfer-name">@TransferScheduleBackend.Title(transfer.Name, transfer.FromName, transfer.ToName)</MudLink>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1" data-testid="transfer-details">@Details(transfer)</MudText>
                                         @if (!(transfer.Every == 1 && transfer.Unit == PaymentUnitDto.Month))
                                         {

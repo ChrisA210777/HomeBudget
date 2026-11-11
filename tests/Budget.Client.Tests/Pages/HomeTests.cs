@@ -142,8 +142,8 @@ public sealed class HomeTests : IDisposable
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=getting-started]")));
         var steps = cut.FindAll("[data-testid=getting-started] li").Select(li => li.GetAttribute("data-testid")).ToArray();
         Assert.Equal(new[] { "setup-add-people", "setup-add-income", "setup-add-outgoing" }, steps);
-        Assert.Equal("/income/new", cut.Find("[data-testid=setup-add-income-go]").GetAttribute("href"));
-        Assert.Equal("/outgoings/new", cut.Find("[data-testid=setup-add-outgoing-go]").GetAttribute("href"));
+        Assert.Equal("/income/new?from=%2F", cut.Find("[data-testid=setup-add-income-go]").GetAttribute("href"));
+        Assert.Equal("/outgoings/new?from=%2F", cut.Find("[data-testid=setup-add-outgoing-go]").GetAttribute("href"));
         Assert.Equal("/people", cut.Find("[data-testid=setup-add-people-go]").GetAttribute("href"));
     }
 

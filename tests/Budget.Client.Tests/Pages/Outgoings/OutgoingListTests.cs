@@ -352,6 +352,18 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
+    public void Each_outgoing_links_back_to_the_list_as_shown_with_its_month_and_filters()
+    {
+        _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo("/outgoings?month=2027-01&kind=Allowance&priority=Preferred&person=household");
+
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        Assert.Equal(new[] { "Food shopping" }, Texts(cut, "outgoing-name"));
+        var href = cut.Find("[data-testid=outgoing-name]").GetAttribute("href")!;
+        Assert.Equal("/outgoings?month=2027-01&kind=Allowance&priority=Preferred&person=household", Uri.UnescapeDataString(href[(href.IndexOf("from=", StringComparison.Ordinal) + 5)..]));
+    }
+
+    [Fact]
     public void An_empty_month_explains_how_to_add_one()
     {
         _api.Empty = true;

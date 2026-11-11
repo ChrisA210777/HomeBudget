@@ -116,10 +116,10 @@
     {
         var payments = (_data?.Payments ?? [])
             .Where(p => Matches(AccountOf(p).Id))
-            .Select(p => new Row(p.Date, false, p.Name, p.Amount, Details(p), CategoryIconSvg.For(p.CategoryIcon), $"/outgoings/{p.OutgoingId}", p.CategorySortOrder));
+            .Select(p => new Row(p.Date, false, p.Name, p.Amount, Details(p), CategoryIconSvg.For(p.CategoryIcon), BackLink.To($"/outgoings/{p.OutgoingId}", "/outgoings/upcoming"), p.CategorySortOrder));
         var income = (_data?.Income ?? [])
             .Where(i => Matches(AccountLevel.Of(i.AccountId, i.PaidInto, _accounts).Id))
-            .Select(i => new Row(i.Date, true, i.Name, i.Amount, Details(i), Icons.Material.Filled.ArrowDownward, $"/income/{i.IncomeStreamId}", -1));
+            .Select(i => new Row(i.Date, true, i.Name, i.Amount, Details(i), Icons.Material.Filled.ArrowDownward, BackLink.To($"/income/{i.IncomeStreamId}", "/outgoings/upcoming"), -1));
         return income.Concat(payments).OrderBy(r => r.Date).ThenBy(r => r.Sort).ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase);
     }
 

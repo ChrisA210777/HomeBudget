@@ -11,7 +11,7 @@
 <PageTitle>@(_details?.Name ?? "Outgoing") · Home Budget</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/outgoings" Class="mb-2">Outgoings</MudButton>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2" data-testid="back">@(BackLink.Name(BackHref) ?? "Back")</MudButton>
 
     @if (!_loaded)
     {
@@ -113,13 +113,19 @@
 
 
         <ScheduleHistory TDetails="OutgoingDetailsResponse" Details="d" DetailsChanged="(OutgoingDetailsResponse changed) => _details = changed" View="OutgoingScheduleBackend.View" Backend="_backend!" CanEdit="_canEdit"
-                         Noun="outgoing" EditHref="@($"/outgoings/{OutgoingId}/edit")" ListHref="/outgoings" />
+                         Noun="outgoing" EditHref="@BackLink.To($"/outgoings/{OutgoingId}/edit", From)" ListHref="@BackHref" />
     }
 </MudContainer>
 
 @code {
     [Parameter]
     public Guid OutgoingId { get; set; }
+
+    /// <summary>The page this was opened from, to go back to (BUD-117).</summary>
+    [SupplyParameterFromQuery(Name = BackLink.Param)]
+    public string? From { get; set; }
+
+    private string BackHref => BackLink.Resolve(From, "/outgoings");
 
     private HouseholdMembershipSummary? _household;
     private OutgoingDetailsResponse? _details;

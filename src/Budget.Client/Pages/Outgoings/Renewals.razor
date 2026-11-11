@@ -56,7 +56,7 @@
                                     <div class="flex-grow-1" style="min-width: 0">
                                         <div class="d-flex align-center gap-2">
                                             <MudIcon Icon="@CategoryIconSvg.For(renewal.CategoryIcon)" Size="Size.Small" Color="Color.Secondary" aria-hidden="true" />
-                                            <MudLink Href="@($"/outgoings/{renewal.OutgoingId}")" Typo="Typo.body1" data-testid="renewal-name">@renewal.Name</MudLink>
+                                            <MudLink Href="@BackLink.To($"/outgoings/{renewal.OutgoingId}", "/outgoings/renewals")" Typo="Typo.body1" data-testid="renewal-name">@renewal.Name</MudLink>
                                             @* Who it's for, so two with the same name can be told apart (BUD-97). *@
                                             @if (renewal.PersonName is { } person)
                                             {

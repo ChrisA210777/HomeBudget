@@ -15,7 +15,7 @@
 <PageTitle>Add income · Home Budget</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/income" Class="mb-2">Income</MudButton>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2" data-testid="back">@(BackLink.Name(BackHref) ?? "Back")</MudButton>
     <h1 class="mud-typography mud-typography-h4 mb-4">Add income</h1>
 
     @if (!_loaded)
@@ -79,7 +79,7 @@
                                HelperText="The account or pot it lands in, e.g. “Chris current”" TestId="paid-into" />
 
                 <div class="d-flex justify-end gap-2 mt-2">
-                    <MudButton Variant="Variant.Text" Href="/income">Cancel</MudButton>
+                    <MudButton Variant="Variant.Text" Href="@BackHref">Cancel</MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || !Online)" data-testid="save">Add income</MudButton>
                 </div>
             </MudStack>
@@ -88,6 +88,12 @@
 </MudContainer>
 
 @code {
+    /// <summary>The page this was opened from, to go back to (BUD-117).</summary>
+    [SupplyParameterFromQuery(Name = BackLink.Param)]
+    public string? From { get; set; }
+
+    private string BackHref => BackLink.Resolve(From, "/income");
+
     /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
     [CascadingParameter(Name = "Online")]
     public bool Online { get; set; } = true;
@@ -150,7 +156,7 @@
             var result = await IncomeApi.CreateAsync(_household!.HouseholdId, request);
             if (result.Succeeded)
             {
-                Navigation.NavigateTo($"/income/{result.Value!.Id}");
+                Navigation.NavigateTo(BackLink.To($"/income/{result.Value!.Id}", From));
                 return;
             }
 
