@@ -85,6 +85,7 @@ app.MapOutgoingCategoryEndpoints();
 app.MapOutgoingEndpoints();
 app.MapTransferEndpoints();
 app.MapCashFlowEndpoints();
+app.MapInvitationEndpoints();
 app.MapHouseholdAccountEndpoints();
 app.MapBudgetEndpoints();
 app.MapDataExportEndpoints();

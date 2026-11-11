@@ -36,6 +36,9 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
 
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
 
+    /// <summary>Invitations to join a household (ADR-015). Not filtered by household: they're found by their link.</summary>
+    public DbSet<Invitation> Invitations => Set<Invitation>();
+
     /// <summary>Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
     public DbSet<Person> People => Set<Person>();
 

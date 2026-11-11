@@ -91,6 +91,13 @@ public static class HouseholdEndpoints
     /// </summary>
     private static async Task<IResult> DeleteAsync(Guid householdId, BudgetDbContext db)
     {
+        await DeleteHouseholdAsync(db, householdId);
+        return Results.NoContent();
+    }
+
+    /// <summary>Deletes a household and everything in it, in one transaction.</summary>
+    public static async Task DeleteHouseholdAsync(BudgetDbContext db, Guid householdId)
+    {
         // Children first: income and outgoings refer to people and categories without cascading.
         // Their own history (amounts, pauses, corrections) cascades in the database.
         var strategy = db.Database.CreateExecutionStrategy();
@@ -107,14 +114,13 @@ public static class HouseholdEndpoints
             await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.ParentAccountId != null).ExecuteDeleteAsync();
             await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.OutgoingCategories.IgnoreQueryFilters().Where(c => c.HouseholdId == householdId).ExecuteDeleteAsync();
+            await db.Invitations.Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.HouseholdMembers.Where(m => m.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.Households.Where(h => h.Id == householdId).ExecuteDeleteAsync();
 
             await transaction.CommitAsync();
         });
-
-        return Results.NoContent();
     }
 
     private static async Task<IResult> ChangeRoleAsync(Guid householdId, Guid userId, ChangeRoleRequest request, BudgetDbContext db)

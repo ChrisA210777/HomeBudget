@@ -228,6 +228,8 @@ public static class DataExportEndpoints
             await db.Accounts.Where(a => a.HouseholdId == householdId && a.ParentAccountId != null).ExecuteDeleteAsync();
             await db.Accounts.Where(a => a.HouseholdId == householdId).ExecuteDeleteAsync();
             await db.OutgoingCategories.Where(c => c.HouseholdId == householdId).ExecuteDeleteAsync();
+            // Pending invitations for people being replaced would point at someone who's gone (ADR-015).
+            await db.Invitations.Where(i => i.HouseholdId == householdId && i.PersonId != null).ExecuteDeleteAsync();
             await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId == null).ExecuteDeleteAsync();
 
             if (useFileName == true)
