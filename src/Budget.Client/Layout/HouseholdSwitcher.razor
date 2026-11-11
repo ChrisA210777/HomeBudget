@@ -1,4 +1,5 @@
-@* The active household's name in the app bar, as a menu to switch household (BUD-20) or create one (BUD-21). *@
+@* The active household's name in the app bar, as a menu to switch household (BUD-20) or create one (BUD-21).
+   Only households: the pages are in the main navigation (BUD-115). *@
 @using Budget.Client.Households
 @inject IHouseholdApi HouseholdApi
 @inject NavigationManager Navigation
@@ -30,16 +31,6 @@
             </MudMenuItem>
         }
         <MudDivider Class="my-1" />
-        <MudMenuItem Icon="@Icons.Material.Filled.AccountBalance" Href="/accounts" data-testid="household-accounts">Accounts</MudMenuItem>
-        @if (Active.TransfersEnabled)
-        {
-            <MudMenuItem Icon="@Icons.Material.Filled.SwapHoriz" Href="/transfers" data-testid="household-transfers">Transfers</MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Filled.Timeline" Href="/cash-flow" data-testid="household-cash-flow">Cash flow</MudMenuItem>
-        }
-        @if (Active.Role == "Admin")
-        {
-            <MudMenuItem Icon="@Icons.Material.Filled.ImportExport" Href="/household/data" data-testid="household-data">Download or import data</MudMenuItem>
-        }
         <MudMenuItem Icon="@Icons.Material.Filled.AddHome" Href="/households/new" data-testid="create-household">Create household</MudMenuItem>
     </ChildContent>
 </MudMenu>

@@ -1,14 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from './fixtures';
-import { addOutgoing, settled, signIn } from './helpers';
+import { addOutgoing, openFromNav, settled, signIn } from './helpers';
 
-test('an admin can download the household as a JSON file', async ({ page }) => {
+test('an admin can download the household as a JSON file', async ({ page }, testInfo) => {
   await signIn(page);
   await addOutgoing(page, 'Council tax', 'Housing', '150');
 
   await page.goto('/');
-  await page.getByTestId('appbar-household').getByRole('button').click();
-  await page.getByTestId('household-data').click();
+  await openFromNav(page, testInfo, 'Download or import data');
   await expect(page).toHaveURL(/\/household\/data$/);
   await settled(page);
   await expect(page.getByTestId('export-warning')).toBeVisible();

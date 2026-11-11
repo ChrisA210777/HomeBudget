@@ -43,14 +43,36 @@ public sealed class MainLayoutTests : IDisposable
     }
 
     [Fact]
-    public void Has_the_same_sections_in_the_side_drawer_and_the_phone_bottom_bar()
+    public void Groups_the_side_drawer_and_keeps_the_phone_bar_to_the_main_sections()
     {
         var cut = Render();
 
-        var expected = new[] { "/", "/budget", "/income", "/outgoings", "/people" };
-        Assert.Equal(expected, cut.FindAll("[data-testid=side-nav] a").Select(a => a.GetAttribute("href")).ToArray());
-        Assert.Equal(expected, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.GetAttribute("href")).ToArray());
-        Assert.Equal(new[] { "Home", "Budget", "Income", "Outgoings", "People" }, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.TextContent.Trim()).ToArray());
+        cut.WaitForAssertion(() => Assert.Equal(
+            new[] { "/", "/budget", "/outgoings/upcoming", "/income", "/outgoings", "/outgoings/renewals", "/outgoings/categories", "/accounts", "/people", "/members", "/household/data" },
+            cut.FindAll("[data-testid=side-nav] a").Select(a => a.GetAttribute("href")).ToArray()));
+        Assert.Equal(new[] { "/", "/budget", "/income", "/outgoings", "/more" }, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.GetAttribute("href")).ToArray());
+        Assert.Equal(new[] { "Home", "Budget", "Income", "Outgoings", "More" }, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.TextContent.Trim()).ToArray());
+    }
+
+    [Fact]
+    public void Highlights_where_you_are_in_both_navigations()
+    {
+        var navigation = _context.Services.GetRequiredService<Bunit.TestDoubles.FakeNavigationManager>();
+        var cut = Render();
+
+        navigation.NavigateTo("/outgoings/renewals");
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal("/outgoings/renewals", cut.Find("[data-testid=side-nav] a[aria-current=page]").GetAttribute("href"));
+            Assert.Equal("/more", cut.Find("[data-testid=bottom-nav] a[aria-current=page]").GetAttribute("href"));
+        });
+
+        navigation.NavigateTo("/outgoings/" + Guid.NewGuid());
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal("/outgoings", cut.Find("[data-testid=side-nav] a[aria-current=page]").GetAttribute("href"));
+            Assert.Equal("/outgoings", cut.Find("[data-testid=bottom-nav] a[aria-current=page]").GetAttribute("href"));
+        });
     }
 
     [Fact]

@@ -1,11 +1,36 @@
-@* Bottom navigation for phones (BUD-36). Hidden from 600px up, where the side drawer is used instead. *@
+@* Bottom navigation for phones (BUD-36, BUD-116). Hidden from 600px up, where the side drawer is used instead.
+   "More" is highlighted on any page it lists. *@
+@implements IDisposable
+@inject NavigationManager Navigation
 
 <nav class="bottom-nav d-flex d-sm-none" aria-label="Main" data-testid="bottom-nav">
-    @foreach (var item in NavItems.All)
+    @foreach (var item in NavItems.PhoneBar)
     {
-        <NavLink href="@item.Href" Match="item.Match" class="bottom-nav-item" ActiveClass="active">
+        var active = item.Href == _active;
+        <a href="@item.Href" class="bottom-nav-item @(active ? "active" : "")" aria-current="@(active ? "page" : null)">
             <MudIcon Icon="@item.Icon" Size="Size.Medium" aria-hidden="true" />
             <span>@item.Label</span>
-        </NavLink>
+        </a>
     }
 </nav>
+
+@code {
+    [Parameter]
+    public HouseholdMembershipSummary? Household { get; set; }
+
+    private string? _active;
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    protected override void OnParametersSet() => _active = ActiveFor(Navigation.Uri);
+
+    private string? ActiveFor(string uri) => NavItems.ActivePhoneHref(Navigation.ToBaseRelativePath(uri), Household);
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _active = ActiveFor(e.Location);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}
