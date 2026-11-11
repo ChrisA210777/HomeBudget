@@ -108,18 +108,20 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     [Fact]
-    public async Task Filtering_by_account_shows_what_goes_out_of_it_and_comes_into_it_including_pots()
+    public void Filtering_by_account_shows_what_goes_out_of_it_and_comes_into_it_including_pots()
     {
         _api.Income = true;
+        var popovers = _context.RenderComponent<MudBlazor.MudPopoverProvider>();
         var cut = _context.RenderComponent<UpcomingPayments>();
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<Guid?>>().Instance.ValueChanged.InvokeAsync(JointId));
+        Choose(cut, popovers, "Joint bills");
 
+        Assert.Equal("Joint bills", Text(cut, "filter-account"));
         Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "payment-name"));
         Assert.Empty(cut.FindAll("[data-testid=income-name]"));
         Assert.Equal("£930.00", Text(cut, "period-total"));
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<Guid?>>().Instance.ValueChanged.InvokeAsync(ChrisId));
+        Choose(cut, popovers, "Chris current");
 
         Assert.Equal(new[] { "Phone" }, Texts(cut, "payment-name"));
         Assert.Equal(new[] { "Salary" }, Texts(cut, "income-name"));
@@ -137,6 +139,13 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     public void Dispose() => _context.Dispose();
+
+    /// <summary>Picks an account from the Paid from menu (BUD-124).</summary>
+    private static void Choose(IRenderedComponent<UpcomingPayments> cut, IRenderedComponent<MudBlazor.MudPopoverProvider> popovers, string account)
+    {
+        cut.Find("[data-testid=filter-account] button").Click();
+        popovers.WaitForElements("[data-testid=filter-account-option]").Single(o => o.TextContent.Trim() == account).Click();
+    }
 
     private static string Text(IRenderedComponent<UpcomingPayments> cut, string testId) => cut.Find($"[data-testid={testId}]").TextContent.Trim();
 
