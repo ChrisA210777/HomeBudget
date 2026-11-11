@@ -476,4 +476,26 @@ h1[tabindex="-1"]:focus-visible {
 /* Amounts never wrap, least of all between the sign and the number (BUD-128). */
 .text-nowrap {
     white-space: nowrap !important;
+/* An item's actions (BUD-125): matching buttons, icon over a short label, sharing one row even on a phone. */
+.action-tiles {
+    display: flex;
+    gap: 8px;
+}
+
+.action-tiles .action-tile {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 112px;
+    padding: 6px 4px;
+    text-transform: none;
+}
+
+.action-tiles .action-tile .mud-button-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    white-space: nowrap;
 }

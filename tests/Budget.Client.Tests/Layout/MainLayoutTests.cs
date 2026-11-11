@@ -149,6 +149,19 @@ public sealed class MainLayoutTests : IDisposable
 
         Assert.Contains("Something went wrong loading this page.", cut.Find("[data-testid=page-error]").TextContent, StringComparison.Ordinal);
         Assert.NotNull(cut.Find("[data-testid=page-retry]"));
+        Assert.Empty(cut.FindAll("[data-testid=error-reference]"));
+    }
+
+    [Fact]
+    public void A_server_error_shows_its_reference_to_quote()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<ServerFailingPage>(0);
+            builder.CloseComponent();
+        });
+
+        Assert.Contains("4bf92f3577b34da6a3ce929d0e0e4736", cut.Find("[data-testid=error-reference]").TextContent, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -202,5 +215,11 @@ public sealed class MainLayoutTests : IDisposable
     private sealed class FailingPage : ComponentBase
     {
         protected override void OnInitialized() => throw new HttpRequestException("offline");
+    }
+
+    private sealed class ServerFailingPage : ComponentBase
+    {
+        protected override void OnInitialized() =>
+            throw new ServerErrorException(System.Net.HttpStatusCode.InternalServerError, "4bf92f3577b34da6a3ce929d0e0e4736");
     }
 }

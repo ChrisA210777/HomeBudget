@@ -132,19 +132,20 @@ jobs:
           app-name: ${{ steps.infra.outputs.app }}
           package: artifacts/app
 
-      # The free tier sleeps when idle, so give it a few minutes to start.
+      # The free tier sleeps when idle, so give it a few minutes to start. /health/ready also checks the database,
+      # which may take a minute to wake (BUD-12).
       - name: Smoke test
         run: |
           url="https://${{ steps.infra.outputs.host }}"
           for i in $(seq 1 30); do
-            if curl -fsS --max-time 30 "$url/health" > /dev/null; then
-              echo "Healthy: $url"
+            if curl -fsS --max-time 60 "$url/health/ready" > /dev/null; then
+              echo "Healthy, with the database: $url"
               curl -fsS --max-time 30 "$url/" | grep -q '<div id="app">' && echo "App shell served"
               exit 0
             fi
             sleep 10
           done
-          echo "::error::$url/health didn't respond"; exit 1
+          echo "::error::$url/health/ready didn't respond"; exit 1
 
       - name: Show why the app didn't start
         if: failure() && steps.infra.outputs.app != ''
