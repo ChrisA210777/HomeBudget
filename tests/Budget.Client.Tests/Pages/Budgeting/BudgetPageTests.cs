@@ -61,6 +61,9 @@ public sealed class BudgetPageTests : IDisposable
         var cut = _context.RenderComponent<BudgetPage>();
 
         Assert.Equal(new[] { "£1,090.00", "£100.00", "£520.00" }, cut.FindAll("[data-testid=kind-amount]").Select(e => e.TextContent.Trim()));
+        Assert.Equal(
+            new[] { "/outgoings?month=2026-11&kind=Bill", "/outgoings?month=2026-11&kind=Savings", "/outgoings?month=2026-11&kind=Allowance" },
+            cut.FindAll("[data-testid=kind-link]").Select(e => e.GetAttribute("href")));
         var links = cut.FindAll("[data-testid=category-link]").ToList();
         Assert.Equal(new[] { "Housing", "Food & household", "Savings & set-asides" }, links.Select(e => e.TextContent.Trim()));
         Assert.Equal("/outgoings?month=2026-11&category=eeeeeeee-0000-0000-0000-000000000001", links[0].GetAttribute("href"));

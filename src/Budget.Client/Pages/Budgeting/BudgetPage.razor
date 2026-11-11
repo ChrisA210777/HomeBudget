@@ -132,7 +132,7 @@
                             @foreach (var line in b.ByKind)
                             {
                                 <li class="d-flex justify-space-between py-1" data-testid="kind-line">
-                                    <span>@KindName(line.Kind)</span>
+                                    <MudLink Href="@($"/outgoings?month={_year:D4}-{_month:D2}&kind={line.Kind}")" data-testid="kind-link">@KindName(line.Kind)</MudLink>
                                     <span data-testid="kind-amount">@Format(line.Amount)</span>
                                 </li>
                             }

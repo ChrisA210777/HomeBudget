@@ -341,6 +341,17 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
+    public void A_kind_can_come_from_the_link()
+    {
+        _context.Services.GetRequiredService<FakeNavigationManager>().NavigateTo("/outgoings?month=2027-01&kind=Allowance");
+
+        var cut = _context.RenderComponent<OutgoingList>();
+
+        Assert.Equal(new[] { "Food shopping" }, Texts(cut, "outgoing-name"));
+        Assert.Equal("£520.00", Text(cut, "month-total"));
+    }
+
+    [Fact]
     public void An_empty_month_explains_how_to_add_one()
     {
         _api.Empty = true;
