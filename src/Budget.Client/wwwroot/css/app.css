@@ -473,33 +473,11 @@ h1[tabindex="-1"]:focus-visible {
     border-top: 1px solid var(--mud-palette-lines-default);
 }
 
-/* An item's actions (BUD-125): matching buttons, icon over a short label, sharing one row even on a phone. */
-.action-tiles {
-    display: flex;
-    gap: 8px;
-}
-
-.action-tiles .action-tile {
-    flex: 1 1 0;
-    min-width: 0;
-    max-width: 112px;
-    padding: 6px 4px;
-    text-transform: none;
-}
-
-.action-tiles .action-tile .mud-button-label {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    font-size: 0.8rem;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-
 /* Amounts never wrap, least of all between the sign and the number (BUD-128). */
 .text-nowrap {
     white-space: nowrap !important;
+}
+
 /* A page's toolbar (BUD-124): toggles on the left, a menu filling the rest, all on one line even on a phone. */
 .page-toolbar {
     display: flex;
@@ -544,24 +522,5 @@ h1[tabindex="-1"]:focus-visible {
     min-width: 0;
 }
 
-/* Renewals (BUD-126): on phones the person's chip goes under the name, lined up with it. */
-.renewal-title-break {
-    display: none;
-}
-
-@media (max-width: 599.98px) {
-    .renewal-title {
-        flex-wrap: wrap;
-        row-gap: 4px !important;
-    }
-
-    .renewal-title-break {
-        display: block;
-        flex-basis: 100%;
-        height: 0;
-    }
-
-    .renewal-title .renewal-person {
-        margin-left: 28px !important;
-    }
-}
+/* Styles for one page or component live beside it in a .razor.css file (scoped), not here, so features don't all
+   add to the end of this file. */

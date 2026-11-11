@@ -1,0 +1,39 @@
+/* A renewal coming up (BUD-123, BUD-129). */
+.coming-up-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "name chip"
+        "text chip";
+    column-gap: 16px;
+    align-items: start;
+}
+
+.coming-up-row ::deep .coming-up-name {
+    grid-area: name;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.coming-up-row ::deep .coming-up-days {
+    grid-area: chip;
+    align-self: center;
+}
+
+.coming-up-row ::deep .coming-up-text {
+    grid-area: text;
+}
+
+/* Phones: what to do takes the full width under the name and chip. */
+@media (max-width: 599.98px) {
+    .coming-up-row {
+        grid-template-areas:
+            "name chip"
+            "text text";
+        column-gap: 12px;
+    }
+
+    .coming-up-row ::deep .coming-up-days {
+        align-self: start;
+    }
+}

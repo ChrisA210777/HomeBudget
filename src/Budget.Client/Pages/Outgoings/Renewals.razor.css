@@ -1,0 +1,37 @@
+/* A renewal's icon, name and person (BUD-126, BUD-129). The name wraps word by word beside the icon. */
+.renewal-title {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "icon name person";
+    column-gap: 8px;
+    row-gap: 4px;
+    align-items: center;
+}
+
+.renewal-title ::deep .renewal-icon {
+    grid-area: icon;
+    align-self: start;
+    margin-top: 2px;
+}
+
+.renewal-title ::deep .renewal-name {
+    grid-area: name;
+}
+
+.renewal-title ::deep .renewal-person {
+    grid-area: person;
+}
+
+/* Phones: the person goes on the next line, lined up with the start of the name. */
+@media (max-width: 599.98px) {
+    .renewal-title {
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "icon name"
+            ". person";
+    }
+
+    .renewal-title ::deep .renewal-person {
+        justify-self: start;
+    }
+}
