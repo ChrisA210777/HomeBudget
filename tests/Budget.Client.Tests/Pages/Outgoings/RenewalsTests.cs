@@ -40,6 +40,8 @@ public sealed class RenewalsTests : IDisposable
         Assert.Equal(new[] { "November 2026", "March 2027" }, Texts(cut, "renewal-month-name"));
         Assert.Equal(new[] { "Car insurance", "Phone contract", "Mortgage" }, Texts(cut, "renewal-name"));
         Assert.Equal(new[] { "20", "28", "15" }, Texts(cut, "renewal-day"));
+        // The weekday and date are centred in their column.
+        Assert.All(cut.FindAll("[data-testid=renewal-day], [data-testid=renewal-weekday]"), e => Assert.Contains("mud-typography-align-center", e.ClassName, StringComparison.Ordinal));
         Assert.Equal(new[] { "£480.00", "£25.00", "£900.00" }, Texts(cut, "renewal-amount"));
         Assert.Equal("Yearly · Insurance · from Joint bills", Texts(cut, "renewal-details")[0]);
         Assert.Equal("Monthly · Insurance", Texts(cut, "renewal-details")[1]);
