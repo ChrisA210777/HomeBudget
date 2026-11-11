@@ -1,17 +1,38 @@
-/* The filters (BUD-131): compact menu buttons that wrap only when they need to. */
-.list-filters {
+/* The toolbar (BUD-131, BUD-134): compact menu buttons in one line, collapse/expand on the right. */
+.outgoings-toolbar {
     display: flex;
+    align-items: center;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.list-filters ::deep .mud-button-root {
+.outgoings-toolbar .filter-menus {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.outgoings-toolbar ::deep .mud-button-root:not(.mud-icon-button) {
     text-transform: none;
     max-width: 100%;
 }
 
-.list-filters ::deep .mud-button-label {
+.outgoings-toolbar ::deep .mud-button-label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* The filters panel on phones (BUD-134): above the bottom bar, below MudBlazor's pop-up lists. */
+.filter-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1150;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    background-color: var(--mud-palette-surface);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.2);
 }

@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { addOutgoing, choose, expectToolbarTidy, settled, signIn, typeOutgoingName } from './helpers';
+import { addOutgoing, choose, expectToolbarTidy, settled, signIn, typeOutgoingName, groupOutgoingsBy } from './helpers';
 
 
 test("an outgoing added from the home page shows in this month's list", async ({ page }) => {
@@ -166,7 +166,7 @@ test('outgoings can be shown for 12 months and grouped by the account they are p
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£240.00');
   await expect(item.getByTestId('outgoing-period')).toHaveText('over 12 months');
 
-  await page.getByTestId('group-paid-from').click();
+  await groupOutgoingsBy(page, 'Paid from');
   await expect(page.getByTestId('paid-from-name')).toHaveText(['Not set']);
 });
 
@@ -185,12 +185,12 @@ test('groups close to their header, one at a time or all at once', async ({ page
   await expect(group.getByTestId('category-subtotal')).toHaveText('£20.00');
 
   await page.getByTestId('toggle-all-groups').click();
-  await expect(page.getByTestId('toggle-all-groups')).toHaveText('Collapse all');
+  await expect(page.getByTestId('toggle-all-groups')).toHaveAccessibleName('Collapse all groups');
   await expect(group.getByTestId('outgoing-name')).toBeVisible();
 
   await page.getByTestId('toggle-all-groups').click();
   await expect(group.getByTestId('outgoing-name')).toBeHidden();
-  await expect(page.getByTestId('toggle-all-groups')).toHaveText('Expand all');
+  await expect(page.getByTestId('toggle-all-groups')).toHaveAccessibleName('Expand all groups');
 });
 
 test('upcoming payments show what is due each day, a week or a month at a time', async ({ page }) => {

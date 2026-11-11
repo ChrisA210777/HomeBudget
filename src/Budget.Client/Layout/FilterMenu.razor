@@ -1,4 +1,4 @@
-@* A compact filter, e.g. "Kind: All ▾" (BUD-131). Outlined while it shows everything, filled while it's narrowing the
+@* A compact filter or choice, e.g. "Kind: All ▾" or "Group: Category ▾" (BUD-131, BUD-134). Outlined while it shows everything, filled while it's narrowing the
    list, so active filters stand out. The choices open in a menu with the current one ticked. *@
 @typeparam TValue
 
@@ -36,7 +36,11 @@
     [Parameter, EditorRequired]
     public string TestId { get; set; } = string.Empty;
 
-    private bool IsActive => Options.Count > 0 && !Same(Value, Options[0].Value);
+    /// <summary>Filled while a choice other than the first is made. Off for menus that aren't filters, e.g. grouping.</summary>
+    [Parameter]
+    public bool HighlightWhenSet { get; set; } = true;
+
+    private bool IsActive => HighlightWhenSet && Options.Count > 0 && !Same(Value, Options[0].Value);
 
     private string NameOf(TValue value) => Options.FirstOrDefault(o => Same(o.Value, value)).Name ?? string.Empty;
 

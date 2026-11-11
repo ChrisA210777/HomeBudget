@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { addOutgoing, isPhone, settled, signIn } from './helpers';
+import { addOutgoing, choose, expectToolbarTidy, isPhone, settled, signIn } from './helpers';
 import type { Locator, Page } from '@playwright/test';
 
 // BUD-79: on the Outgoings and Income lists the title and actions stay at the top while the list
@@ -50,7 +50,7 @@ test('the outgoings title, actions and (on larger screens) summary stay at the t
   }
 });
 
-test('on a phone the outgoings actions shrink to icons and the filters fit in two lines', async ({ page }, testInfo) => {
+test('on a phone the outgoings actions shrink to icons and the filters are one tidy line', async ({ page }, testInfo) => {
   test.skip(!isPhone(testInfo), 'Phone layout only');
   await page.setViewportSize({ width: 360, height: 740 });
   await signIn(page);
@@ -68,13 +68,23 @@ test('on a phone the outgoings actions shrink to icons and the filters fit in tw
     expect(middle, `${testId} should be on the title's line`).toBeLessThan(heading.y + heading.height);
   }
 
-  // Four compact filters, wrapping onto a second line at most (BUD-79, BUD-95, BUD-131).
-  const filters = await Promise.all(['filter-kind', 'filter-priority', 'filter-person', 'filter-account'].map(id => box(page.getByTestId(id))));
-  const lines = new Set(filters.map(f => Math.round(f.y)));
-  expect(lines.size, 'the filters should fit in two lines').toBeLessThanOrEqual(2);
-  for (const filter of filters) {
-    expect(filter.x + filter.width).toBeLessThanOrEqual(360);
+  // BUD-134: one Filter button, the Group menu and the expand/collapse icon on one line; the filters open in a panel.
+  await expect(page.getByTestId('filter-kind')).toBeHidden();
+  const controls = [page.getByTestId('open-filters'), page.getByTestId('group-by').getByRole('button'), page.getByTestId('toggle-all-groups')];
+  await expectToolbarTidy(controls);
+  const boxes = await Promise.all(controls.map(c => box(c)));
+  expect(new Set(boxes.map(b => Math.round(b.y + b.height / 2))).size, 'the toolbar should fit on one line').toBe(1);
+  for (const control of boxes) {
+    expect(control.x + control.width).toBeLessThanOrEqual(360);
   }
+
+  await page.getByTestId('open-filters').click();
+  await expect(page.getByTestId('filter-sheet')).toBeVisible();
+  await choose(page, 'panel-priority', 'Optional');
+  await page.getByTestId('close-filters').click();
+  await expect(page.getByTestId('filter-sheet')).toBeHidden();
+  await expect(page.getByTestId('open-filters')).toHaveText('Filter (1)');
+  await expect(page.getByTestId('active-filter')).toHaveText(['Optional']);
 });
 
 test('the income title and action stay at the top while scrolling', async ({ page }, testInfo) => {

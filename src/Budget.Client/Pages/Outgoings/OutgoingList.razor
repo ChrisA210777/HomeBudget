@@ -81,18 +81,57 @@
                 </div>
             </MudPaper>
 
-            @* Compact filters that wrap onto a second line only if they need to (BUD-79, BUD-95, BUD-131). *@
-            <div class="list-filters pb-1" data-testid="list-filters">
-                <FilterMenu TValue="OutgoingKindDto?" Label="Kind" @bind-Value="_kind" TestId="filter-kind"
-                            Options="@([(null, KindFilterName(null)), .. Enum.GetValues<OutgoingKindDto>().Select(k => ((OutgoingKindDto?)k, KindFilterName(k)))])" />
-                <FilterMenu TValue="OutgoingPriorityDto?" Label="Priority" @bind-Value="_priority" TestId="filter-priority"
-                            Options="@([(null, PriorityFilterName(null)), .. Enum.GetValues<OutgoingPriorityDto>().Select(p => ((OutgoingPriorityDto?)p, PriorityFilterName(p)))])" />
-                <FilterMenu TValue="string" Label="For" @bind-Value="_person" TestId="filter-person"
-                            Options="@([(EveryoneKey, PersonFilterName(EveryoneKey)), (HouseholdKey, PersonFilterName(HouseholdKey)), .. _people.Select(p => (p.Id.ToString(), p.DisplayName))])" />
-                @* By the account it's paid from, including its pots (BUD-95). *@
-                <FilterMenu TValue="Guid?" Label="Paid from" @bind-Value="_account" TestId="filter-account"
-                            Options="@([(null, AccountFilterName(null)), (Guid.Empty, AccountFilterName(Guid.Empty)), .. _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)).Select(a => ((Guid?)a.Id, a.DisplayName))])" />
+            @* One toolbar (BUD-134): on larger screens the four filter menus; on phones a Filter button that opens a panel,
+               with active filters as removable chips. Then grouping, and collapse/expand all on the right. *@
+            <div class="outgoings-toolbar pb-1" data-testid="list-filters">
+                <MudButton Variant="@(ActiveFilterCount > 0 ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.FilterList" Class="d-sm-none" OnClick="() => _filtersOpen = true"
+                           aria-haspopup="dialog" data-testid="open-filters">
+                    @(ActiveFilterCount > 0 ? $"Filter ({ActiveFilterCount})" : "Filter")
+                </MudButton>
+                <div class="filter-menus d-none d-sm-flex">
+                    <FilterMenu TValue="OutgoingKindDto?" Label="Kind" @bind-Value="_kind" TestId="filter-kind" Options="@KindOptions" />
+                    <FilterMenu TValue="OutgoingPriorityDto?" Label="Priority" @bind-Value="_priority" TestId="filter-priority" Options="@PriorityOptions" />
+                    <FilterMenu TValue="string" Label="For" @bind-Value="_person" TestId="filter-person" Options="@PersonOptions" />
+                    @* By the account it's paid from, including its pots (BUD-95). *@
+                    <FilterMenu TValue="Guid?" Label="Paid from" @bind-Value="_account" TestId="filter-account" Options="@AccountOptions" />
+                </div>
+                <FilterMenu TValue="bool" Label="Group" Value="_byPaidFrom" ValueChanged="SetGroupingAsync" TestId="group-by" HighlightWhenSet="false"
+                            Options="@([(false, "Category"), (true, "Paid from")])" />
+                <span class="flex-grow-1"></span>
+                @if (shown.Count > 0)
+                {
+                    var allCollapsed = AllCollapsed(shown);
+                    var toggleName = allCollapsed ? "Expand all groups" : "Collapse all groups";
+                    @* Collapse or expand every group at once (BUD-88). *@
+                    <MudTooltip Text="@toggleName">
+                        <MudIconButton Icon="@(allCollapsed ? Icons.Material.Filled.UnfoldMore : Icons.Material.Filled.UnfoldLess)" Color="Color.Primary"
+                                       aria-label="@toggleName" OnClick="() => SetAllCollapsed(shown, !allCollapsed)" data-testid="toggle-all-groups" />
+                    </MudTooltip>
+                }
             </div>
+
+            @if (ActiveFilterCount > 0)
+            {
+                <div class="d-flex d-sm-none flex-wrap gap-1 pb-1" data-testid="active-filters" aria-label="Filters on">
+                    @if (_kind is { } kind)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Class="ma-0" OnClose="@(_ => _kind = null)" CloseIcon="@Icons.Material.Filled.Close" data-testid="active-filter">@KindFilterName(kind)</MudChip>
+                    }
+                    @if (_priority is { } priority)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Class="ma-0" OnClose="@(_ => _priority = null)" CloseIcon="@Icons.Material.Filled.Close" data-testid="active-filter">@PriorityFilterName(priority)</MudChip>
+                    }
+                    @if (_person != EveryoneKey)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Class="ma-0" OnClose="@(_ => _person = EveryoneKey)" CloseIcon="@Icons.Material.Filled.Close" data-testid="active-filter">For: @PersonFilterName(_person)</MudChip>
+                    }
+                    @if (_account is { } account)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Class="ma-0" OnClose="@(_ => _account = null)" CloseIcon="@Icons.Material.Filled.Close" data-testid="active-filter">Paid from: @AccountFilterName(account)</MudChip>
+                    }
+                </div>
+            }
 
             @if (_category is { } categoryId)
             {
@@ -116,28 +155,6 @@
     }
     else
     {
-        <div class="d-flex align-center flex-wrap gap-x-4 gap-y-1">
-            <div class="d-flex align-center gap-2">
-                <MudText Typo="Typo.body2" id="group-by-label">Group by</MudText>
-                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-labelledby="group-by-label" data-testid="group-toggle">
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byPaidFrom ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_byPaidFrom ? "false" : "true")"
-                               OnClick="() => SetGroupingAsync(false)" data-testid="group-category">Category</MudButton>
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_byPaidFrom ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_byPaidFrom ? "true" : "false")"
-                               OnClick="() => SetGroupingAsync(true)" data-testid="group-paid-from">Paid from</MudButton>
-                </MudButtonGroup>
-            </div>
-            @if (shown.Count > 0)
-            {
-                var allCollapsed = AllCollapsed(shown);
-                @* Collapse or expand every group at once (BUD-88). *@
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                           StartIcon="@(allCollapsed ? Icons.Material.Filled.UnfoldMore : Icons.Material.Filled.UnfoldLess)"
-                           OnClick="() => SetAllCollapsed(shown, !allCollapsed)" data-testid="toggle-all-groups">
-                    @(allCollapsed ? "Expand all" : "Collapse all")
-                </MudButton>
-            }
-        </div>
-
         @if (_data.Items.Count == 0)
         {
             <MudPaper Class="pa-6 mt-2 text-center" Elevation="0" Outlined="true" data-testid="outgoings-empty">
@@ -202,6 +219,48 @@
                 <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="() => ToggleAllAsync(!_all)" data-testid="show-all">@(_all ? "Hide" : "Show")</MudButton>
             </div>
         }
+    }
+    @* The filters on phones (BUD-134): a panel from the bottom of the screen. The list updates as you choose. *@
+    @if (_filtersOpen)
+    {
+        <MudOverlay Visible="true" DarkBackground="true" ZIndex="1140" OnClick="() => _filtersOpen = false" />
+        <div class="filter-sheet" role="dialog" aria-modal="true" aria-labelledby="filter-sheet-title" @onkeydown="CloseFiltersOnEscape" data-testid="filter-sheet">
+            <div class="d-flex align-center mb-3">
+                <h2 class="mud-typography mud-typography-h6 flex-grow-1 ma-0" id="filter-sheet-title">Filter</h2>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ClearFilters" Disabled="ActiveFilterCount == 0" data-testid="clear-filters">Clear all</MudButton>
+            </div>
+            <MudStack Spacing="3">
+                <MudSelect T="OutgoingKindDto?" @bind-Value="_kind" ToStringFunc="KindFilterName" Label="Kind" Variant="Variant.Outlined" data-testid="panel-kind">
+                    @foreach (var (value, name) in KindOptions)
+                    {
+                        <MudSelectItem T="OutgoingKindDto?" Value="value">@name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="OutgoingPriorityDto?" @bind-Value="_priority" ToStringFunc="PriorityFilterName" Label="Priority" Variant="Variant.Outlined" data-testid="panel-priority">
+                    @foreach (var (value, name) in PriorityOptions)
+                    {
+                        <MudSelectItem T="OutgoingPriorityDto?" Value="value">@name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_person" ToStringFunc="PersonFilterName" Label="For" Variant="Variant.Outlined" data-testid="panel-person">
+                    @foreach (var (value, name) in PersonOptions)
+                    {
+                        <MudSelectItem T="string" Value="value">@name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="AccountFilterName" Label="Paid from" Variant="Variant.Outlined" data-testid="panel-account">
+                    @foreach (var (value, name) in AccountOptions)
+                    {
+                        <MudSelectItem T="Guid?" Value="value">@name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+            <div class="d-flex justify-end mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _filtersOpen = false" data-testid="close-filters">
+                    @(Filtered().Count() == 1 ? "Show 1 outgoing" : $"Show {Filtered().Count()} outgoings")
+                </MudButton>
+            </div>
+        </div>
     }
 </MudContainer>
 
@@ -504,6 +563,33 @@
     {
         _all = value;
         await LoadAsync();
+    }
+
+    private bool _filtersOpen;
+
+    /// <summary>How many of Kind, Priority, For and Paid from are narrowing the list (BUD-134).</summary>
+    private int ActiveFilterCount =>
+        (_kind is null ? 0 : 1) + (_priority is null ? 0 : 1) + (_person == EveryoneKey ? 0 : 1) + (_account is null ? 0 : 1);
+
+    private IReadOnlyList<(OutgoingKindDto? Value, string Name)> KindOptions =>
+        [(null, KindFilterName(null)), .. Enum.GetValues<OutgoingKindDto>().Select(k => ((OutgoingKindDto?)k, KindFilterName(k)))];
+
+    private IReadOnlyList<(OutgoingPriorityDto? Value, string Name)> PriorityOptions =>
+        [(null, PriorityFilterName(null)), .. Enum.GetValues<OutgoingPriorityDto>().Select(p => ((OutgoingPriorityDto?)p, PriorityFilterName(p)))];
+
+    private IReadOnlyList<(string Value, string Name)> PersonOptions =>
+        [(EveryoneKey, PersonFilterName(EveryoneKey)), (HouseholdKey, PersonFilterName(HouseholdKey)), .. _people.Select(p => (p.Id.ToString(), p.DisplayName))];
+
+    private IReadOnlyList<(Guid? Value, string Name)> AccountOptions =>
+        [(null, AccountFilterName(null)), (Guid.Empty, AccountFilterName(Guid.Empty)),
+         .. _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)).Select(a => ((Guid?)a.Id, a.DisplayName))];
+
+    private void CloseFiltersOnEscape(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            _filtersOpen = false;
+        }
     }
 
     private void ClearFilters()

@@ -161,11 +161,37 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
+    public void On_phones_the_filters_open_in_a_panel_and_show_as_chips_while_on()
+    {
+        _context.RenderComponent<MudPopoverProvider>();
+        var cut = _context.RenderComponent<OutgoingList>();
+        Assert.Equal("Filter", Text(cut, "open-filters"));
+        Assert.Empty(cut.FindAll("[data-testid=active-filters]"));
+
+        cut.Find("[data-testid=open-filters]").Click();
+        Assert.NotNull(cut.Find("[data-testid=filter-sheet]"));
+        cut.InvokeAsync(() => cut.FindComponent<MudSelect<OutgoingKindDto?>>().Instance.ValueChanged.InvokeAsync(OutgoingKindDto.Allowance));
+
+        Assert.Equal("Show 1 outgoing", Text(cut, "close-filters"));
+        cut.Find("[data-testid=close-filters]").Click();
+        Assert.Empty(cut.FindAll("[data-testid=filter-sheet]"));
+        Assert.Equal("Filter (1)", Text(cut, "open-filters"));
+        Assert.Equal(new[] { "Allowances" }, Texts(cut, "active-filter"));
+        Assert.Equal(new[] { "Food shopping" }, Texts(cut, "outgoing-name"));
+
+        // Removing the chip removes the filter.
+        var chip = cut.FindComponents<MudChip<string>>().Single(c => c.Markup.Contains("data-testid=\"active-filter\"", StringComparison.Ordinal)).Instance;
+        cut.InvokeAsync(() => chip.OnClose.InvokeAsync(chip));
+        Assert.Equal("Filter", Text(cut, "open-filters"));
+        Assert.Equal(4, Texts(cut, "outgoing-name").Length);
+    }
+
+    [Fact]
     public void Outgoings_can_be_grouped_by_the_account_they_are_paid_from()
     {
         var cut = _context.RenderComponent<OutgoingList>();
 
-        cut.Find("[data-testid=group-paid-from]").Click();
+        GroupBy(cut, paidFrom: true);
 
         // By name, ignoring case and spaces, with "Not set" last.
         Assert.Equal(new[] { "Chris current", "Joint bills", "Not set" }, Texts(cut, "paid-from-name"));
@@ -174,7 +200,7 @@ public sealed class OutgoingListTests : IDisposable
         Assert.Equal(new[] { "Car insurance", "Council tax", "Mortgage", "Food shopping" }, Texts(cut, "outgoing-name"));
         Assert.Equal("£710.00", Text(cut, "month-total"));
 
-        cut.Find("[data-testid=group-category]").Click();
+        GroupBy(cut, paidFrom: false);
         Assert.Equal(new[] { "Housing", "Insurance", "Food & household" }, Texts(cut, "category-name"));
 
         // Each choice is remembered for next time (BUD-87).
@@ -199,7 +225,7 @@ public sealed class OutgoingListTests : IDisposable
         Assert.Equal("£150.00", housing.QuerySelector("[data-testid=category-subtotal]")!.TextContent.Trim());
         Assert.False(Group(cut, "Insurance").QuerySelector(".mud-paper")!.HasAttribute("hidden"));
         Assert.Equal("£710.00", Text(cut, "month-total"));
-        Assert.Equal("Collapse all", Text(cut, "toggle-all-groups"));
+        Assert.Equal("Collapse all groups", cut.Find("[data-testid=toggle-all-groups]").GetAttribute("aria-label"));
 
         cut.FindAll("[data-testid=group-header]").ToList()[0].Click();
         Assert.False(Group(cut, "Housing").QuerySelector(".mud-paper")!.HasAttribute("hidden"));
@@ -213,18 +239,18 @@ public sealed class OutgoingListTests : IDisposable
         cut.Find("[data-testid=toggle-all-groups]").Click();
 
         Assert.All(cut.FindAll("[data-testid=category-group]"), g => Assert.Equal("true", g.GetAttribute("data-collapsed")));
-        Assert.Equal("Expand all", Text(cut, "toggle-all-groups"));
+        Assert.Equal("Expand all groups", cut.Find("[data-testid=toggle-all-groups]").GetAttribute("aria-label"));
 
         // Still collapsed in another month; switching how they're grouped starts open again.
         cut.Find("[data-testid=next-month]").Click();
         cut.WaitForAssertion(() => Assert.All(cut.FindAll("[data-testid=category-group]"), g => Assert.Equal("true", g.GetAttribute("data-collapsed"))));
-        cut.Find("[data-testid=group-paid-from]").Click();
+        GroupBy(cut, paidFrom: true);
         Assert.All(cut.FindAll("[data-testid=paid-from-group]"), g => Assert.Equal("false", g.GetAttribute("data-collapsed")));
 
         cut.Find("[data-testid=toggle-all-groups]").Click();
         cut.Find("[data-testid=toggle-all-groups]").Click();
         Assert.All(cut.FindAll("[data-testid=paid-from-group]"), g => Assert.Equal("false", g.GetAttribute("data-collapsed")));
-        Assert.Equal("Collapse all", Text(cut, "toggle-all-groups"));
+        Assert.Equal("Collapse all groups", cut.Find("[data-testid=toggle-all-groups]").GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -285,7 +311,7 @@ public sealed class OutgoingListTests : IDisposable
         Assert.Equal(new[] { "Food shopping", "Holiday fund" }, Texts(cut, "outgoing-name"));
         Assert.Equal("£500.00", Text(cut, "month-total"));
 
-        cut.Find("[data-testid=group-paid-from]").Click();
+        GroupBy(cut, paidFrom: true);
         Assert.Equal(new[] { "Joint Monzo" }, Texts(cut, "paid-from-name"));
 
         // Within the account, what's not in a pot comes first, then each pot, each with a subtotal (BUD-101).
@@ -305,7 +331,7 @@ public sealed class OutgoingListTests : IDisposable
     {
         var cut = _context.RenderComponent<OutgoingList>();
 
-        cut.Find("[data-testid=group-paid-from]").Click();
+        GroupBy(cut, paidFrom: true);
 
         Assert.Empty(cut.FindAll("[data-testid=pot-group]"));
     }
@@ -394,6 +420,10 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     public void Dispose() => _context.Dispose();
+
+    /// <summary>Chooses the grouping from the Group menu (BUD-134).</summary>
+    private static void GroupBy(IRenderedComponent<OutgoingList> cut, bool paidFrom) =>
+        cut.InvokeAsync(() => cut.FindComponent<Budget.Client.Layout.FilterMenu<bool>>().Instance.ValueChanged.InvokeAsync(paidFrom)).GetAwaiter().GetResult();
 
     private static void Choose(IRenderedComponent<OutgoingList> cut, IRenderedComponent<MudPopoverProvider> popovers, string filter, string option)
     {
