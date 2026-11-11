@@ -12,3 +12,5 @@ param sqlAdminObjectId = readEnvironmentVariable('AZURE_DEPLOYER_OBJECT_ID', '00
 param sqlAdminName = 'github-homebudget-deploy'
 param microsoftClientId = readEnvironmentVariable('MICROSOFT_CLIENT_ID', '')
 param microsoftClientSecret = readEnvironmentVariable('MICROSOFT_CLIENT_SECRET', '')
+param googleClientId = readEnvironmentVariable('GOOGLE_CLIENT_ID', '')
+param googleClientSecret = readEnvironmentVariable('GOOGLE_CLIENT_SECRET', '')

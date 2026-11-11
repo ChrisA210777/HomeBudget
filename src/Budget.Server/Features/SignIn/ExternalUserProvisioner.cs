@@ -31,6 +31,21 @@ public sealed partial class ExternalUserProvisioner(
             return existing;
         }
 
+        // One user per email (ADR-015): a login whose provider has verified the email joins the user who already
+        // has it. Only verified emails count, so nobody can claim someone else's account with an unchecked address.
+        if (VerifiedEmail(login) is { } email && await users.FindByEmailAsync(email) is { } sameEmail)
+        {
+            var added = await users.AddLoginAsync(sameEmail, new UserLoginInfo(login.LoginProvider, login.ProviderKey, login.ProviderDisplayName));
+            if (added.Succeeded)
+            {
+                LogLoginAdded(logger, sameEmail.Id, login.LoginProvider);
+                return sameEmail;
+            }
+
+            LogIdentityFailure(logger, "add login to the user with the same email", login.LoginProvider, Describe(added));
+            return null;
+        }
+
         try
         {
             // Connections to Azure SQL are retried on transient failures, so a transaction must run
@@ -105,10 +120,21 @@ public sealed partial class ExternalUserProvisioner(
         };
     }
 
+    /// <summary>The login's email, if its provider says it has verified it.</summary>
+    private static string? VerifiedEmail(ExternalLoginInfo login)
+    {
+        var email = login.Principal.FindFirstValue(ClaimTypes.Email);
+        var verified = login.Principal.FindFirstValue(AuthenticationSetup.EmailVerifiedClaim);
+        return !string.IsNullOrWhiteSpace(email) && string.Equals(verified, "true", StringComparison.OrdinalIgnoreCase) ? email : null;
+    }
+
     private static string Describe(IdentityResult result) => string.Join("; ", result.Errors.Select(e => e.Code));
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Created user {UserId} with household {HouseholdId} on first sign-in with {Provider}")]
     private static partial void LogUserCreated(ILogger logger, Guid userId, Guid householdId, string provider);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Added a {Provider} login to user {UserId}, who has the same verified email")]
+    private static partial void LogLoginAdded(ILogger logger, Guid userId, string provider);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not {Action} for sign-in with {Provider}: {Errors}")]
     private static partial void LogIdentityFailure(ILogger logger, string action, string provider, string errors);

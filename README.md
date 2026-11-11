@@ -56,6 +56,21 @@ Sign-in needs a Microsoft Entra app registration. Without one, the sign-in page 
 
 The first time someone signs in, a user is created for them.
 
+### Google sign-in (optional)
+
+"Sign in with Google" appears once a Google OAuth client is configured (ADR-015).
+
+1. In the [Google Cloud console](https://console.cloud.google.com), create a project, then go to **APIs & Services → OAuth consent screen**. Choose **External**, fill in the app name and your email, and add the scopes `openid`, `email` and `profile`. While it's in **Testing**, add the Google accounts that may sign in as test users, or publish it.
+2. Go to **Credentials → Create credentials → OAuth client ID**. Choose **Web application** and add the redirect URI `https://localhost:7180/signin-google` (and `https://<your app>/signin-google` once deployed).
+3. Store the client ID and secret as user secrets:
+
+   ```bash
+   dotnet user-secrets set "Authentication:Google:ClientId" "<client id>" --project src/Budget.Server
+   dotnet user-secrets set "Authentication:Google:ClientSecret" "<secret>" --project src/Budget.Server
+   ```
+
+Google verifies email addresses, so someone signing in with Google whose email already belongs to a user (say, from Microsoft sign-in) joins that user rather than becoming a new one. Microsoft emails aren't treated as verified, so the reverse doesn't happen automatically.
+
 ### Try it on your phone
 
 Sign-in needs HTTPS and a redirect URI registered in Entra, so a phone can't just browse to your PC's IP address. Use a tunnel instead:
