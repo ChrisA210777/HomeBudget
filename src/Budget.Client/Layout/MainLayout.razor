@@ -62,12 +62,19 @@
                 <ChildContent>
                     @Body
                 </ChildContent>
-                <ErrorContent>
+                <ErrorContent Context="error">
                     <MudContainer MaxWidth="MaxWidth.Small" Class="mt-6">
                         <MudAlert Severity="Severity.Error" data-testid="page-error">
                             @(Connectivity.IsOnline
                                 ? "Something went wrong loading this page."
                                 : "This page couldn't load because you're offline.")
+                            @if (CorrelationIdOf(error) is { } reference)
+                            {
+                                @* BUD-12: quoted when reporting the problem, to find it in the logs. *@
+                                <span class="d-block mt-1" style="font-size: 0.8rem" data-testid="error-reference">
+                                    If it keeps happening, quote this reference: <code style="overflow-wrap: anywhere">@reference</code>
+                                </span>
+                            }
                         </MudAlert>
                         <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-2" OnClick="Retry" data-testid="page-retry">Try again</MudButton>
                     </MudContainer>
@@ -138,6 +145,20 @@
     }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    /// <summary>The server's correlation id, if a server error caused this one.</summary>
+    private static string? CorrelationIdOf(Exception? error)
+    {
+        for (var e = error; e is not null; e = e.InnerException)
+        {
+            if (e is ServerErrorException { CorrelationId: { Length: > 0 } id })
+            {
+                return id;
+            }
+        }
+
+        return null;
+    }
 
     private void ApplyTheme() => _isDarkMode = ThemePreference.Mode switch
     {
