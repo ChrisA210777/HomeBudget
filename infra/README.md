@@ -33,7 +33,7 @@ The app reaches the database with its managed identity; there are no database pa
 
 2. **GitHub variables.** Go to **Settings → Secrets and variables → Actions → Variables** and add the repository variables the script prints (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_DEPLOYER_OBJECT_ID`, `BUDGET_EMAIL`, `MICROSOFT_CLIENT_ID`).
 
-3. **GitHub environment and secret.** Go to **Settings → Environments → New environment**, name it `dev`. In it, add the secret `MICROSOFT_CLIENT_SECRET` with your "Sign in with Microsoft" client secret (the same value as in your local user secrets). For Google sign-in, also add the variable `GOOGLE_CLIENT_ID` and the secret `GOOGLE_CLIENT_SECRET`; without them, Google sign-in is simply off.
+3. **GitHub environment and secret.** Go to **Settings → Environments → New environment**, name it `dev`. In it, add the secret `MICROSOFT_CLIENT_SECRET` with your "Sign in with Microsoft" client secret (the same value as in your local user secrets). For Google sign-in, also add the secret `GOOGLE_CLIENT_SECRET` here and the repository variable `GOOGLE_CLIENT_ID` (step 2); without them, Google sign-in is simply off. Creating the Google OAuth client is described in the main README's *Google sign-in* section.
 
 4. **First deploy.** Run **Actions → Deploy → Run workflow**. The summary shows the app's address, e.g. `https://app-homebudget-dev-abc123.azurewebsites.net`.
 
