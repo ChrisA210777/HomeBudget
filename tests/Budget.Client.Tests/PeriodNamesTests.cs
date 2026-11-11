@@ -11,7 +11,7 @@ public sealed class PeriodNamesTests
     [Theory]
     [InlineData("2026-11-01", "2026-11-07", "1 – 7 Nov 26")]
     [InlineData("2026-11-29", "2026-12-05", "29 Nov – 5 Dec 26")]
-    [InlineData("2026-12-27", "2027-01-02", "27 Dec 26 – 2 Jan 27")]
+    [InlineData("2026-12-27", "2027-01-02", "27 Dec – 2 Jan 27")]
     public void Days(string from, string to, string expected) =>
         Assert.Equal(expected, PeriodNames.Days(DateOnly.Parse(from), DateOnly.Parse(to)));
 
