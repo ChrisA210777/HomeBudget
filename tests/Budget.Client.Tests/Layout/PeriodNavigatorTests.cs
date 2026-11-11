@@ -1,4 +1,5 @@
 using Budget.Client.Layout;
+using Microsoft.AspNetCore.Components;
 using MudBlazor;
 using MudBlazor.Services;
 
@@ -34,8 +35,8 @@ public sealed class PeriodNavigatorTests : IDisposable
             .Add(n => n.Name, "9 – 15 Nov")
             .Add(n => n.Choices, new PeriodChoice[]
             {
-                new("A week", "show-week", true, () => { chosen.Add("week"); return Task.CompletedTask; }),
-                new("A month", "show-month", false, () => { chosen.Add("month"); return Task.CompletedTask; }),
+                new("A week", "show-week", true, EventCallback.Factory.Create(this, () => chosen.Add("week"))),
+                new("A month", "show-month", false, EventCallback.Factory.Create(this, () => chosen.Add("month"))),
             }));
 
         var button = cut.Find("[data-testid=period-name] button");

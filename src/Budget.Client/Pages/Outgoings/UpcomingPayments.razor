@@ -133,7 +133,7 @@
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
     private IReadOnlyList<PeriodChoice> WeekOrMonth =>
-        [new("A week", "show-week", !_month, () => SetMonthAsync(false)), new("A month", "show-month", _month, () => SetMonthAsync(true))];
+        [new("A week", "show-week", !_month, EventCallback.Factory.Create(this, () => SetMonthAsync(false))), new("A month", "show-month", _month, EventCallback.Factory.Create(this, () => SetMonthAsync(true)))];
 
     private string PeriodName => _month ? PeriodNames.Month(_from.Year, _from.Month, Today) : PeriodNames.Days(_from, _to, Today);
 
