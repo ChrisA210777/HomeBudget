@@ -43,7 +43,8 @@
     text-overflow: ellipsis;
 }
 
-/* The name as a menu: the size of the plain name, and cut short with an ellipsis like it. */
+/* The name as a menu: the size of the plain name, and cut short with an ellipsis like it. The ▾ is placed at the
+   button's end, so the label's text can be cut short on its own. */
 .period-choice ::deep .mud-menu,
 .period-choice ::deep .mud-menu > * {
     flex: 0 1 auto;
@@ -52,24 +53,28 @@
 }
 
 .period-choice ::deep .mud-button-root {
+    position: relative;
     max-width: 100%;
     text-transform: none;
     font: inherit;
     letter-spacing: normal;
-    padding: 2px 4px 2px 10px;
+    padding: 2px 28px 2px 10px;
 }
 
 .period-choice ::deep .mud-button-label {
-    min-width: 0;
-}
-
-.period-choice .period-text {
     display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .period-choice ::deep .mud-button-icon-end {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
     color: var(--mud-palette-primary);
-    margin-left: 0;
 }
 
 /* Phones: a slightly smaller name, so it fits beside "Go to today" more often. */

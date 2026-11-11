@@ -8,20 +8,18 @@
     <div class="period-name mud-typography mud-typography-h6 @(Choices is { Count: > 1 } ? "period-choice" : null)" data-testid="@NameTestId">
         @if (Choices is { Count: > 1 })
         {
-            <MudMenu AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
-                <ActivatorContent>
-                    <MudButton Variant="Variant.Text" Color="Color.Inherit" EndIcon="@Icons.Material.Filled.ArrowDropDown"
-                               aria-label="@($"Change period, {Name}")" aria-haspopup="menu">
-                        <span class="period-text">@Name</span>
-                    </MudButton>
-                </ActivatorContent>
-                <ChildContent>
-                    <MudText Typo="Typo.overline" Class="px-4 pt-2">Show</MudText>
-                    @foreach (var choice in Choices)
-                    {
-                        <MudMenuItem Icon="@(choice.Selected ? Icons.Material.Filled.Check : null)" OnClick="() => choice.Choose.InvokeAsync()" data-testid="@choice.TestId">@choice.Name</MudMenuItem>
-                    }
-                </ChildContent>
+            <MudMenu Label="@Name"
+                     EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                     Variant="Variant.Text"
+                     Color="Color.Inherit"
+                     AnchorOrigin="Origin.BottomCenter"
+                     TransformOrigin="Origin.TopCenter"
+                     AriaLabel="@($"Change period, {Name}")">
+                <MudText Typo="Typo.overline" Class="px-4 pt-2">Show</MudText>
+                @foreach (var choice in Choices)
+                {
+                    <MudMenuItem Icon="@(choice.Selected ? Icons.Material.Filled.Check : null)" OnClick="() => choice.Choose.InvokeAsync()" data-testid="@choice.TestId">@choice.Name</MudMenuItem>
+                }
             </MudMenu>
         }
         else

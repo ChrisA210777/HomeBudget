@@ -494,27 +494,42 @@ h1[tabindex="-1"]:focus-visible {
     justify-content: flex-start;
 }
 
-.page-toolbar .toolbar-menu .mud-button-root {
-    max-width: 100%;
-    text-transform: none;
-}
-
-.page-toolbar .toolbar-menu .mud-button-label {
-    min-width: 0;
-}
-
+/* The button's text is cut short with an ellipsis rather than wrapping (BUD-135). MudBlazor puts the text straight in
+   the label, so the label itself truncates, and the icons sit in the button's padding either side of it. */
 .page-toolbar .toolbar-menu > * {
     min-width: 0;
     max-width: 100%;
 }
 
-/* The menu's text in its own span, so it can be cut short with an ellipsis (BUD-135). */
-.page-toolbar .toolbar-menu .toolbar-menu-text {
+.page-toolbar .toolbar-menu .mud-button-root {
+    position: relative;
+    max-width: 100%;
+    text-transform: none;
+    padding-left: 34px;
+    padding-right: 30px;
+}
+
+.page-toolbar .toolbar-menu .mud-button-label {
     display: block;
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.page-toolbar .toolbar-menu .mud-button-icon-start,
+.page-toolbar .toolbar-menu .mud-button-icon-end {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+}
+
+.page-toolbar .toolbar-menu .mud-button-icon-start {
+    left: 10px;
+}
+
+.page-toolbar .toolbar-menu .mud-button-icon-end {
+    right: 6px;
 }
 
 /* Text that stops at two lines with an ellipsis, e.g. a long name in a list (BUD-126). */
