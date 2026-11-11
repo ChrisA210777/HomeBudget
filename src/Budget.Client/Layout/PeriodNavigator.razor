@@ -1,32 +1,34 @@
-@* Previous, the period's name, "Go to today" and next (BUD-124, BUD-130). Today is an icon beside the next arrow, so
-   the name always has the room it needs. The icon floats over the row, so the name doesn't move when it appears. Where the page offers more than one length of period, the name opens a menu
-   of them, e.g. a week or a month (BUD-135), instead of a separate toggle. *@
+@* Previous, the period's name, "Go to today" and next (BUD-124, BUD-130). Where the page offers more than one length
+   of period, the name opens a menu of them, e.g. a week or a month (BUD-135), instead of a separate toggle.
+   "Go to today" floats beside the next arrow, so the name doesn't move when it appears: the name stays centred while
+   it fits, and only a long one moves left to keep clear of the icon (see the .razor.css). *@
 
 <div class="period-navigator @(IsCurrent ? null : "has-today") @Class">
     <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@PreviousLabel" OnClick="OnPrevious" data-testid="@PreviousTestId" />
-    @if (Choices is { Count: > 1 })
-    {
-        <div class="period-name period-choice">
-            <MudMenu Label="@Name"
-                     EndIcon="@Icons.Material.Filled.ArrowDropDown"
-                     Variant="Variant.Text"
-                     Color="Color.Inherit"
-                     AnchorOrigin="Origin.BottomCenter"
-                     TransformOrigin="Origin.TopCenter"
-                     AriaLabel="@($"Change period, {Name}")"
-                     data-testid="@NameTestId">
-                <MudText Typo="Typo.overline" Class="px-4 pt-2">Show</MudText>
-                @foreach (var choice in Choices)
-                {
-                    <MudMenuItem Icon="@(choice.Selected ? Icons.Material.Filled.Check : null)" OnClick="() => choice.Choose.InvokeAsync()" data-testid="@choice.TestId">@choice.Name</MudMenuItem>
-                }
+    <div class="period-name mud-typography mud-typography-h6 @(Choices is { Count: > 1 } ? "period-choice" : null)" data-testid="@NameTestId">
+        @if (Choices is { Count: > 1 })
+        {
+            <MudMenu AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
+                <ActivatorContent>
+                    <MudButton Variant="Variant.Text" Color="Color.Inherit" EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                               aria-label="@($"Change period, {Name}")" aria-haspopup="menu">
+                        <span class="period-text">@Name</span>
+                    </MudButton>
+                </ActivatorContent>
+                <ChildContent>
+                    <MudText Typo="Typo.overline" Class="px-4 pt-2">Show</MudText>
+                    @foreach (var choice in Choices)
+                    {
+                        <MudMenuItem Icon="@(choice.Selected ? Icons.Material.Filled.Check : null)" OnClick="() => choice.Choose.InvokeAsync()" data-testid="@choice.TestId">@choice.Name</MudMenuItem>
+                    }
+                </ChildContent>
             </MudMenu>
-        </div>
-    }
-    else
-    {
-        <MudText Typo="Typo.h6" Align="Align.Center" Class="period-name" data-testid="@NameTestId">@Name</MudText>
-    }
+        }
+        else
+        {
+            <span class="period-text">@Name</span>
+        }
+    </div>
     @if (!IsCurrent)
     {
         @* Floats beside the next arrow, so the name stays where it is when it appears (BUD-135). *@

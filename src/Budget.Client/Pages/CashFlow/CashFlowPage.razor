@@ -44,23 +44,23 @@
             {
                 @if (_days is { Accounts.Count: > 0 } days)
                 {
-                    <MudMenu Label="@(SelectedDays?.Name ?? "Account")"
-                             StartIcon="@Icons.Material.Filled.AccountBalance"
-                             EndIcon="@Icons.Material.Filled.ArrowDropDown"
-                             Variant="Variant.Outlined"
-                             Color="Color.Primary"
-                             Size="Size.Small"
-                             AnchorOrigin="Origin.BottomRight"
-                             TransformOrigin="Origin.TopRight"
-                             AriaLabel="@($"Account: {SelectedDays?.Name}. Change the account")"
-                             Class="toolbar-menu"
-                             data-testid="day-account">
-                        <MudText Typo="Typo.overline" Class="px-4 pt-2">Account</MudText>
-                        @foreach (var account in days.Accounts)
-                        {
-                            <MudMenuItem Icon="@(account.AccountId == SelectedDays?.AccountId ? Icons.Material.Filled.Check : null)" OnClick="() => _account = account.AccountId"
-                                         data-testid="day-account-option">@account.Name</MudMenuItem>
-                        }
+                    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="toolbar-menu" data-testid="day-account">
+                        <ActivatorContent>
+                            @* Our own button, so a long name is cut short with an ellipsis rather than wrapping (BUD-135). *@
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.AccountBalance" EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                                       aria-label="@($"Account: {SelectedDays?.Name}. Change the account")" aria-haspopup="menu">
+                                <span class="toolbar-menu-text">@(SelectedDays?.Name ?? "Account")</span>
+                            </MudButton>
+                        </ActivatorContent>
+                        <ChildContent>
+                            <MudText Typo="Typo.overline" Class="px-4 pt-2">Account</MudText>
+                            @foreach (var account in days.Accounts)
+                            {
+                                <MudMenuItem Icon="@(account.AccountId == SelectedDays?.AccountId ? Icons.Material.Filled.Check : null)" OnClick="() => _account = account.AccountId"
+                                             data-testid="day-account-option">@account.Name</MudMenuItem>
+                            }
+                        </ChildContent>
                     </MudMenu>
                 }
             }

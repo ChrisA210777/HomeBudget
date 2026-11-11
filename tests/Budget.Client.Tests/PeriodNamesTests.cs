@@ -1,6 +1,6 @@
 namespace Budget.Client.Tests;
 
-/// <summary>Period names always include the year, this year too (BUD-124, BUD-130, BUD-135).</summary>
+/// <summary>Period names always include the year, this year too; two digits for a run of days (BUD-124, BUD-130, BUD-135).</summary>
 public sealed class PeriodNamesTests
 {
     [Theory]
@@ -9,9 +9,9 @@ public sealed class PeriodNamesTests
     public void Months(int year, int month, string expected) => Assert.Equal(expected, PeriodNames.Month(year, month));
 
     [Theory]
-    [InlineData("2026-11-01", "2026-11-07", "1 – 7 Nov 2026")]
-    [InlineData("2026-11-29", "2026-12-05", "29 Nov – 5 Dec 2026")]
-    [InlineData("2026-12-27", "2027-01-02", "27 Dec 2026 – 2 Jan 2027")]
+    [InlineData("2026-11-01", "2026-11-07", "1 – 7 Nov 26")]
+    [InlineData("2026-11-29", "2026-12-05", "29 Nov – 5 Dec 26")]
+    [InlineData("2026-12-27", "2027-01-02", "27 Dec 26 – 2 Jan 27")]
     public void Days(string from, string to, string expected) =>
         Assert.Equal(expected, PeriodNames.Days(DateOnly.Parse(from), DateOnly.Parse(to)));
 

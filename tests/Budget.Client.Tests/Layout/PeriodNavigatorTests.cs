@@ -32,7 +32,7 @@ public sealed class PeriodNavigatorTests : IDisposable
         var popovers = _context.RenderComponent<MudPopoverProvider>();
         var chosen = new List<string>();
         var cut = _context.RenderComponent<PeriodNavigator>(p => p
-            .Add(n => n.Name, "9 – 15 Nov 2026")
+            .Add(n => n.Name, "9 – 15 Nov 26")
             .Add(n => n.Choices, new PeriodChoice[]
             {
                 new("A week", "show-week", true, EventCallback.Factory.Create(this, () => chosen.Add("week"))),
@@ -40,8 +40,8 @@ public sealed class PeriodNavigatorTests : IDisposable
             }));
 
         var button = cut.Find("[data-testid=period-name] button");
-        Assert.Equal("Change period, 9 – 15 Nov 2026", button.GetAttribute("aria-label"));
-        Assert.Equal("9 – 15 Nov 2026", cut.Find("[data-testid=period-name]").TextContent.Trim());
+        Assert.Equal("Change period, 9 – 15 Nov 26", button.GetAttribute("aria-label"));
+        Assert.Equal("9 – 15 Nov 26", cut.Find("[data-testid=period-name]").TextContent.Trim());
 
         button.Click();
         popovers.WaitForElement("[data-testid=show-week]");

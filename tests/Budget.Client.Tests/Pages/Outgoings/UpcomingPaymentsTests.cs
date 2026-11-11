@@ -38,9 +38,9 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(DayOfWeek.Sunday, "2026-11-01", "2026-11-07", "1 – 7 Nov 2026")]
-    [InlineData(DayOfWeek.Monday, "2026-11-02", "2026-11-08", "2 – 8 Nov 2026")]
-    [InlineData(DayOfWeek.Thursday, "2026-11-05", "2026-11-11", "5 – 11 Nov 2026")]
+    [InlineData(DayOfWeek.Sunday, "2026-11-01", "2026-11-07", "1 – 7 Nov 26")]
+    [InlineData(DayOfWeek.Monday, "2026-11-02", "2026-11-08", "2 – 8 Nov 26")]
+    [InlineData(DayOfWeek.Thursday, "2026-11-05", "2026-11-11", "5 – 11 Nov 26")]
     public void Shows_this_week_starting_on_the_chosen_day(DayOfWeek firstDay, string from, string to, string name)
     {
         _settings.Saved = UserSettings.Defaults with { FirstDayOfWeek = firstDay };
@@ -74,7 +74,7 @@ public sealed class UpcomingPaymentsTests : IDisposable
         var cut = _context.RenderComponent<UpcomingPayments>();
 
         cut.Find("[data-testid=next-period]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("8 – 14 Nov 2026", Text(cut, "period-name")));
+        cut.WaitForAssertion(() => Assert.Equal("8 – 14 Nov 26", Text(cut, "period-name")));
         Assert.NotNull(cut.Find("[data-testid=go-to-today]"));
 
         cut.ChoosePeriod(popovers, "period-name", "show-month");

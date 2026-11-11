@@ -24,22 +24,22 @@
     @* The account filter; week or month is chosen from the period's name (BUD-124, BUD-135). *@
     <div class="page-toolbar mb-2">
         @* By account, including its pots: budgeting is done by account (BUD-96). A compact menu, not a form field. *@
-        <MudMenu Label="@(_account is null ? "All accounts" : AccountName(_account))"
-                 StartIcon="@Icons.Material.Filled.AccountBalance"
-                 EndIcon="@Icons.Material.Filled.ArrowDropDown"
-                 Variant="Variant.Outlined"
-                 Color="Color.Primary"
-                 Size="Size.Small"
-                 AnchorOrigin="Origin.BottomRight"
-                 TransformOrigin="Origin.TopRight"
-                 AriaLabel="@($"Paid from: {(_account is null ? "all accounts" : AccountName(_account))}. Change the account")"
-                 Class="toolbar-menu"
-                 data-testid="filter-account">
-            <MudText Typo="Typo.overline" Class="px-4 pt-2">Paid from</MudText>
-            @foreach (var (id, name) in AccountChoices())
-            {
-                <MudMenuItem Icon="@(id == _account ? Icons.Material.Filled.Check : null)" OnClick="() => _account = id" data-testid="filter-account-option">@name</MudMenuItem>
-            }
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="toolbar-menu" data-testid="filter-account">
+            <ActivatorContent>
+                @* Our own button, so a long name is cut short with an ellipsis rather than wrapping (BUD-135). *@
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.AccountBalance" EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                           aria-label="@($"Paid from: {(_account is null ? "all accounts" : AccountName(_account))}. Change the account")" aria-haspopup="menu">
+                    <span class="toolbar-menu-text">@(_account is null ? "All accounts" : AccountName(_account))</span>
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudText Typo="Typo.overline" Class="px-4 pt-2">Paid from</MudText>
+                @foreach (var (id, name) in AccountChoices())
+                {
+                    <MudMenuItem Icon="@(id == _account ? Icons.Material.Filled.Check : null)" OnClick="() => _account = id" data-testid="filter-account-option">@name</MudMenuItem>
+                }
+            </ChildContent>
         </MudMenu>
     </div>
 

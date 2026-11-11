@@ -503,7 +503,15 @@ h1[tabindex="-1"]:focus-visible {
     min-width: 0;
 }
 
-.page-toolbar .toolbar-menu .mud-button-label > :not(.mud-button-icon-start):not(.mud-button-icon-end) {
+.page-toolbar .toolbar-menu > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* The menu's text in its own span, so it can be cut short with an ellipsis (BUD-135). */
+.page-toolbar .toolbar-menu .toolbar-menu-text {
+    display: block;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
