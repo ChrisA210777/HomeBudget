@@ -189,14 +189,10 @@ h1[tabindex="-1"]:focus-visible {
     min-height: 48px;
 }
 
-/* The side drawer's groups (BUD-115): pages under another are indented below it. */
+/* The side drawer's groups (BUD-115, BUD-119). */
 .side-nav-list .mud-nav-link {
     color: inherit;
     text-decoration: none;
-}
-
-.side-nav-list .mud-nav-link.nav-sub {
-    padding-left: 40px;
 }
 
 .side-nav-list .nav-section-title {

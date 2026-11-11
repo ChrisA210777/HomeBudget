@@ -27,9 +27,9 @@ public sealed class MorePageTests : IDisposable
         var cut = _context.RenderComponent<MorePage>();
 
         cut.WaitForAssertion(() => Assert.Equal(
-            new[] { "Upcoming payments", "Renewals", "Categories", "Accounts", "Transfers", "Cash flow", "People", "Members", "Download or import data", "Settings" },
+            new[] { "Upcoming payments", "Renewals", "Cash flow", "Accounts", "People", "Members", "Import or export data", "Settings" },
             cut.FindAll("[data-testid=more-link]").Select(a => a.TextContent.Trim()).ToArray()));
-        Assert.Equal(new[] { "Outgoings", "Accounts", "Household", "You" }, cut.FindAll("h2").Select(h => h.TextContent.Trim()).ToArray());
+        Assert.Equal(new[] { "Planning", "Money", "Household", "You" }, cut.FindAll("h2").Select(h => h.TextContent.Trim()).ToArray());
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class MorePageTests : IDisposable
         var cut = _context.RenderComponent<MorePage>();
 
         cut.WaitForAssertion(() => Assert.Equal(
-            new[] { "Upcoming payments", "Renewals", "Categories", "Accounts", "People", "Members", "Settings" },
+            new[] { "Upcoming payments", "Renewals", "Accounts", "People", "Members", "Settings" },
             cut.FindAll("[data-testid=more-link]").Select(a => a.TextContent.Trim()).ToArray()));
     }
 

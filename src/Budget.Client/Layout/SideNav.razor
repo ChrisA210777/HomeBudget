@@ -1,4 +1,4 @@
-@* The side drawer's links, in groups (BUD-115). The current page's item is highlighted, including on pages under it
+@* The side drawer's links, in headed groups (BUD-115, BUD-119). The current page's item is highlighted, including on pages under it
    (an outgoing's page highlights Outgoings). *@
 @implements IDisposable
 @inject NavigationManager Navigation
@@ -19,7 +19,7 @@
             {
                 var active = item.Href == _active;
                 <li class="mud-nav-item">
-                    <a href="@item.Href" class="mud-nav-link mud-ripple @(active ? "active" : "") @(item.Sub ? "nav-sub" : "")"
+                    <a href="@item.Href" class="mud-nav-link mud-ripple @(active ? "active" : "")"
                        aria-current="@(active ? "page" : null)" data-testid="nav-link">
                         <MudIcon Icon="@item.Icon" Class="mud-nav-link-icon mud-nav-link-icon-default" aria-hidden="true" />
                         <div class="mud-nav-link-text">@item.Label</div>
@@ -43,7 +43,7 @@
     protected override void OnParametersSet() => _active = ActiveFor(Navigation.Uri);
 
     private string? ActiveFor(string uri) =>
-        NavItems.ActiveHref(Navigation.ToBaseRelativePath(uri), Sections.SelectMany(s => s.Items).Select(i => i.Href));
+        NavItems.ActiveHref(Navigation.ToBaseRelativePath(uri), Sections.SelectMany(s => s.Items));
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {

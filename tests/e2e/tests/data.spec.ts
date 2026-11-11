@@ -7,7 +7,7 @@ test('an admin can download the household as a JSON file', async ({ page }, test
   await addOutgoing(page, 'Council tax', 'Housing', '150');
 
   await page.goto('/');
-  await openFromNav(page, testInfo, 'Download or import data');
+  await openFromNav(page, testInfo, 'Import or export data');
   await expect(page).toHaveURL(/\/household\/data$/);
   await settled(page);
   await expect(page.getByTestId('export-warning')).toBeVisible();
