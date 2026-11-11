@@ -472,3 +472,36 @@ h1[tabindex="-1"]:focus-visible {
 .pot-heading + .plain-list .plain-list-item:first-child {
     border-top: 1px solid var(--mud-palette-lines-default);
 }
+
+/* Text that stops at two lines with an ellipsis, e.g. a long name in a list (BUD-126). */
+.two-lines {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+/* Renewals (BUD-126): on phones the person's chip goes under the name, lined up with it. */
+.renewal-title-break {
+    display: none;
+}
+
+@media (max-width: 599.98px) {
+    .renewal-title {
+        flex-wrap: wrap;
+        row-gap: 4px !important;
+    }
+
+    .renewal-title-break {
+        display: block;
+        flex-basis: 100%;
+        height: 0;
+    }
+
+    .renewal-title .renewal-person {
+        margin-left: 28px !important;
+    }
+}

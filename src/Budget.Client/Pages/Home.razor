@@ -123,7 +123,7 @@
                         }
                         else
                         {
-                            <MudText Typo="Typo.caption" Class="d-block">Left after everything</MudText>
+                            <MudText Typo="Typo.caption" Class="d-block">Left over</MudText>
                             @if (_budget.LeftAfterEverything < 0)
                             {
                                 <MudText Typo="Typo.h5" Class="budget-shortfall" data-testid="home-left">
@@ -154,13 +154,12 @@
                                 @foreach (var renewal in _renewals)
                                 {
                                     <li class="py-2" data-testid="coming-up">
+                                        @* The name and chip share a line; what to do uses the full width under them (BUD-123). *@
                                         <div class="d-flex align-start gap-2">
-                                            <div class="flex-grow-1" style="min-width: 0">
-                                                <MudLink Href="@BackLink.To($"/outgoings/{renewal.Id}", "/")" Typo="Typo.body1" data-testid="coming-up-name">@renewal.Name</MudLink>
-                                                <MudText Typo="Typo.body2" data-testid="coming-up-text">@OutgoingValidator.DescribeRenewal(renewal.Name, renewal.RenewalDate, renewal.AutoRenews)</MudText>
-                                            </div>
-                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ma-0" data-testid="coming-up-days">@OutgoingValidator.RenewsIn(renewal.DaysUntil)</MudChip>
+                                            <MudLink Href="@BackLink.To($"/outgoings/{renewal.Id}", "/")" Typo="Typo.body1" Class="flex-grow-1" Style="min-width: 0; overflow-wrap: anywhere" data-testid="coming-up-name">@renewal.Name</MudLink>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ma-0 flex-shrink-0" data-testid="coming-up-days">@OutgoingValidator.RenewsIn(renewal.DaysUntil)</MudChip>
                                         </div>
+                                        <MudText Typo="Typo.body2" data-testid="coming-up-text">@OutgoingValidator.DescribeRenewal(renewal.RenewalDate, renewal.AutoRenews)</MudText>
                                     </li>
                                 }
                             </ul>
