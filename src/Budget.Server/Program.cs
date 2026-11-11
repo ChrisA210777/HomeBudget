@@ -24,8 +24,9 @@ builder.Services.AddScoped<ExportBuilder>();
 builder.Services.AddInfrastructure();
 builder.Services.AddBudgetAuthentication(builder.Configuration);
 builder.Services.AddHouseholdAuthorization();
-builder.Services.AddProblemDetails();
-builder.Services.AddHealthChecks();
+builder.Services.AddProblemDetailsWithCorrelationId();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database", tags: [DatabaseHealthCheck.ReadyTag]);
 builder.Services.AddForwardedHeadersFromConfiguration(builder.Configuration);
 
 // Requests, dependencies, logs and exceptions go to Application Insights in Azure (BUD-12).
@@ -39,6 +40,7 @@ var app = builder.Build();
 
 // First, so everything after sees the original scheme and host (e.g. a dev tunnel's https URL).
 app.UseForwardedHeadersIfEnabled();
+app.UseCorrelationIdHeader();
 
 // In Development (and the end-to-end Testing environment) the database is created and migrated on startup. Deployed environments
 // apply migrations from the pipeline using the migration bundle instead (see ADR-003).
@@ -70,7 +72,8 @@ app.UseCsrfHeaderCheck();
 // reaches the endpoint that MapStaticAssets selected.
 app.MapStaticAssets();
 
-app.MapHealthChecks(ApiRoutes.Health);
+app.MapHealthChecks(ApiRoutes.Health, DatabaseHealthCheck.Liveness);
+app.MapHealthChecks(ApiRoutes.Ready, DatabaseHealthCheck.Readiness);
 
 // Feature endpoints, one group per feature folder (see ADR-004).
 app.MapAccountEndpoints();
