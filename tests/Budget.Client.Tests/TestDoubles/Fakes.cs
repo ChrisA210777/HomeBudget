@@ -334,3 +334,75 @@ public sealed class SettingsHouseholdApi : Budget.Client.Households.IHouseholdAp
 
     public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
 }
+
+/// <summary>Invitations (ADR-015): records what's created and revoked, and answers a link's preview.</summary>
+public sealed class FakeInvitationApi : Budget.Client.Households.IInvitationApi
+{
+    public List<Budget.Shared.Households.InvitationSummary> Pending { get; } = [];
+
+    public List<Budget.Shared.Households.CreateInvitationRequest> Created { get; } = [];
+
+    public List<Guid> Revoked { get; } = [];
+
+    public Budget.Shared.Households.InvitationPreview? Preview { get; set; }
+
+    public (Budget.Shared.Households.AcceptInvitationResponse? Joined, string? Problem) AcceptResult { get; set; }
+
+    public List<string> Accepted { get; } = [];
+
+    public Task<IReadOnlyList<Budget.Shared.Households.InvitationSummary>> ListAsync(Guid householdId) =>
+        Task.FromResult<IReadOnlyList<Budget.Shared.Households.InvitationSummary>>(Pending.ToList());
+
+    public Task<Budget.Client.Income.ApiResult<Budget.Shared.Households.InvitationSummary>> CreateAsync(Guid householdId, Budget.Shared.Households.CreateInvitationRequest request)
+    {
+        Created.Add(request);
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return Task.FromResult(Budget.Client.Income.ApiResult<Budget.Shared.Households.InvitationSummary>.Invalid(
+                new Dictionary<string, string[]> { ["Email"] = ["Enter a valid email address."] }));
+        }
+
+        var summary = new Budget.Shared.Households.InvitationSummary(
+            Guid.NewGuid(), request.Email!, request.Role, request.PersonId, request.PersonId is null ? null : "Jane", request.RequireEmailMatch, "Chris Austin",
+            new DateTimeOffset(2026, 11, 18, 9, 0, 0, TimeSpan.Zero), "https://budget.test/invite/abc123");
+        Pending.Add(summary);
+        return Task.FromResult(Budget.Client.Income.ApiResult<Budget.Shared.Households.InvitationSummary>.Success(summary));
+    }
+
+    public Task RevokeAsync(Guid householdId, Guid invitationId)
+    {
+        Revoked.Add(invitationId);
+        Pending.RemoveAll(i => i.Id == invitationId);
+        return Task.CompletedTask;
+    }
+
+    public Task<Budget.Shared.Households.InvitationPreview?> PreviewAsync(string token) => Task.FromResult(Preview);
+
+    public Task<(Budget.Shared.Households.AcceptInvitationResponse? Joined, string? Problem)> AcceptAsync(string token)
+    {
+        Accepted.Add(token);
+        return Task.FromResult(AcceptResult);
+    }
+}
+
+/// <summary>The share sheet and clipboard, with sharing available unless told otherwise.</summary>
+public sealed class FakeSharing(bool canShare = true) : Budget.Client.Households.ISharing
+{
+    public List<(string Title, string Text, string Url)> Shared { get; } = [];
+
+    public List<string> Copied { get; } = [];
+
+    public Task<bool> CanShareAsync() => Task.FromResult(canShare);
+
+    public Task<bool> ShareAsync(string title, string text, string url)
+    {
+        Shared.Add((title, text, url));
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> CopyAsync(string text)
+    {
+        Copied.Add(text);
+        return Task.FromResult(true);
+    }
+}
