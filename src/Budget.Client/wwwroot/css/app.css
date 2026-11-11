@@ -497,6 +497,9 @@ h1[tabindex="-1"]:focus-visible {
     white-space: nowrap;
 }
 
+/* Amounts never wrap, least of all between the sign and the number (BUD-128). */
+.text-nowrap {
+    white-space: nowrap !important;
 /* A page's toolbar (BUD-124): toggles on the left, a menu filling the rest, all on one line even on a phone. */
 .page-toolbar {
     display: flex;

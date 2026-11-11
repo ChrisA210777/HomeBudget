@@ -237,11 +237,21 @@ public static class IncomeLabels
     };
 }
 
-/// <summary>Formats money the same way everywhere, e.g. "£2,307.69".</summary>
+/// <summary>Formats money the same way everywhere, e.g. "£2,307.69" or "−£11.45".</summary>
 public static class Money
 {
+    /// <summary>A minus sign joined to the amount, so a line can never break between them (BUD-128).</summary>
+    public const string Minus = "\u2212\u2060";
+
+    /// <summary>A plus sign joined to the amount, so a line can never break between them (BUD-128).</summary>
+    public const string Plus = "+\u2060";
+
     public static string Format(decimal amount, string currencyCode = "GBP") =>
-        Symbol(currencyCode) + amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
+        (amount < 0 ? Minus : string.Empty) + Symbol(currencyCode) + Math.Abs(amount).ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>An amount coming in or going out, e.g. "+£2,307.69" or "−£11.45".</summary>
+    public static string Signed(decimal amount, bool coming, string currencyCode = "GBP") =>
+        (coming ? Plus : Minus) + Format(Math.Abs(amount), currencyCode);
 
     public static string Symbol(string currencyCode) => currencyCode switch
     {
