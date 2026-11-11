@@ -1,8 +1,8 @@
 @* Previous, the period's name, "Go to today" and next (BUD-124, BUD-130). Today is an icon beside the next arrow, so
-   the name always has the room it needs. Where the page offers more than one length of period, the name opens a menu
+   the name always has the room it needs. The icon floats over the row, so the name doesn't move when it appears. Where the page offers more than one length of period, the name opens a menu
    of them, e.g. a week or a month (BUD-135), instead of a separate toggle. *@
 
-<div class="period-navigator @Class">
+<div class="period-navigator @(IsCurrent ? null : "has-today") @Class">
     <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@PreviousLabel" OnClick="OnPrevious" data-testid="@PreviousTestId" />
     @if (Choices is { Count: > 1 })
     {
@@ -29,9 +29,12 @@
     }
     @if (!IsCurrent)
     {
-        <MudTooltip Text="@TodayLabel">
-            <MudIconButton Icon="@Icons.Material.Filled.Today" Color="Color.Primary" aria-label="@TodayLabel" OnClick="OnToday" data-testid="go-to-today" />
-        </MudTooltip>
+        @* Floats beside the next arrow, so the name stays where it is when it appears (BUD-135). *@
+        <div class="period-today">
+            <MudTooltip Text="@TodayLabel">
+                <MudIconButton Icon="@Icons.Material.Filled.Today" Color="Color.Primary" aria-label="@TodayLabel" OnClick="OnToday" data-testid="go-to-today" />
+            </MudTooltip>
+        </div>
     }
     <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@NextLabel" OnClick="OnNext" data-testid="@NextTestId" />
 </div>

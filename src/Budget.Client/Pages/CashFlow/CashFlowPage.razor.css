@@ -1,0 +1,7 @@
+/* Phones: the toggle and the account menu stay on one line; the menu takes the rest of the width and a long account
+   name is cut short with an ellipsis (BUD-135). Larger screens can wrap as before. */
+@media (max-width: 599.98px) {
+    .cash-flow-toolbar {
+        flex-wrap: nowrap !important;
+    }
+}

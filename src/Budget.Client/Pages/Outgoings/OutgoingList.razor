@@ -341,8 +341,8 @@
         [new("A month", "show-month", !IsYear, EventCallback.Factory.Create(this, () => SetMonthsAsync(1))), new("12 months", "show-year", IsYear, EventCallback.Factory.Create(this, () => SetMonthsAsync(12)))];
 
     private string PeriodName => IsYear
-        ? PeriodNames.Months(new DateOnly(_year, _month, 1), new DateOnly(_year, _month, 1).AddMonths(11), Today)
-        : PeriodNames.Month(_year, _month, Today);
+        ? PeriodNames.Months(new DateOnly(_year, _month, 1), new DateOnly(_year, _month, 1).AddMonths(11))
+        : PeriodNames.Month(_year, _month);
 
     private Guid? _category;
 

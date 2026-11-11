@@ -1,6 +1,21 @@
 .period-navigator {
     display: flex;
     align-items: center;
+    position: relative;
+}
+
+/* "Go to today" floats just inside the next arrow, so the name doesn't move when it appears (BUD-135). */
+.period-today {
+    position: absolute;
+    top: 50%;
+    right: 48px;
+    transform: translateY(-50%);
+}
+
+/* While it shows, a long name stops short of its icon on both sides, so the name stays centred and isn't covered. */
+.has-today ::deep .period-name {
+    padding-left: 40px;
+    padding-right: 40px;
 }
 
 .period-navigator ::deep .period-name {
@@ -45,4 +60,12 @@
 .period-choice ::deep .mud-button-icon-end {
     color: var(--mud-palette-primary);
     margin-left: 0;
+}
+
+/* Phones: a slightly smaller name, so "November 2026 ▾" fits beside "Go to today" on a 360px screen. */
+@media (max-width: 599.98px) {
+    .period-navigator ::deep .period-name,
+    .period-choice ::deep .mud-button-root {
+        font-size: 1.125rem;
+    }
 }

@@ -30,7 +30,7 @@ public sealed class BudgetPageTests : IDisposable
     {
         var cut = _context.RenderComponent<BudgetPage>();
 
-        Assert.Equal("November", Text(cut, "month-name"));
+        Assert.Equal("November 2026", Text(cut, "month-name"));
         Assert.Empty(cut.FindAll("[data-testid=go-to-today]"));
         Assert.Equal("£3,000.00", Text(cut, "budget-income"));
         Assert.Equal("− £1,090.00", Text(cut, "budget-essential"));
@@ -84,7 +84,7 @@ public sealed class BudgetPageTests : IDisposable
 
         // BUD-130: back to this month.
         cut.Find("[data-testid=go-to-today]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("November", Text(cut, "month-name")));
+        cut.WaitForAssertion(() => Assert.Equal("November 2026", Text(cut, "month-name")));
         Assert.Empty(cut.FindAll("[data-testid=go-to-today]"));
     }
 
