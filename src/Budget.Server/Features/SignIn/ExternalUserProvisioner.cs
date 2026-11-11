@@ -33,7 +33,7 @@ public sealed partial class ExternalUserProvisioner(
 
         // One user per email (ADR-015): a login whose provider has verified the email joins the user who already
         // has it. Only verified emails count, so nobody can claim someone else's account with an unchecked address.
-        if (VerifiedEmail(login) is { } email && await users.FindByEmailAsync(email) is { } sameEmail)
+        if (VerifiedEmail(login) is { } email && await OnlyUserWithEmailAsync(email) is { } sameEmail)
         {
             var added = await users.AddLoginAsync(sameEmail, new UserLoginInfo(login.LoginProvider, login.ProviderKey, login.ProviderDisplayName));
             if (added.Succeeded)
@@ -118,6 +118,19 @@ public sealed partial class ExternalUserProvisioner(
                 : displayName,
             CreatedAt = now,
         };
+    }
+
+    /// <summary>The user with this email, unless there's none or (from before this rule) more than one.</summary>
+    private async Task<ApplicationUser?> OnlyUserWithEmailAsync(string email)
+    {
+        try
+        {
+            return await users.FindByEmailAsync(email);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The login's email, if its provider says it has verified it.</summary>
