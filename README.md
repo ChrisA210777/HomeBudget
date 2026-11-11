@@ -58,18 +58,37 @@ The first time someone signs in, a user is created for them.
 
 ### Google sign-in (optional)
 
-"Sign in with Google" appears once a Google OAuth client is configured (ADR-015).
+"Sign in with Google" appears once a Google OAuth client is configured (ADR-015). Without one, only Microsoft is offered. The same client is used locally, through a phone tunnel and in Azure.
 
-1. In the [Google Cloud console](https://console.cloud.google.com), create a project, then go to **APIs & Services → OAuth consent screen**. Choose **External**, fill in the app name and your email, and add the scopes `openid`, `email` and `profile`. While it's in **Testing**, add the Google accounts that may sign in as test users, or publish it.
-2. Go to **Credentials → Create credentials → OAuth client ID**. Choose **Web application** and add the redirect URI `https://localhost:7180/signin-google` (and `https://<your app>/signin-google` once deployed).
-3. Store the client ID and secret as user secrets:
+**1. Create the OAuth client (once)**
 
-   ```bash
-   dotnet user-secrets set "Authentication:Google:ClientId" "<client id>" --project src/Budget.Server
-   dotnet user-secrets set "Authentication:Google:ClientSecret" "<secret>" --project src/Budget.Server
-   ```
+1. In the [Google Cloud console](https://console.cloud.google.com), create a project (e.g. "Home Budget").
+2. Go to **APIs & Services → OAuth consent screen** (called **Google Auth Platform** in newer accounts). Choose **External**, fill in the app name and your email, and add the scopes `openid`, `email` and `profile`. While it's in **Testing**, only the Google accounts added as **test users** can sign in; add yours, or publish the app.
+3. Go to **Credentials → Create credentials → OAuth client ID**, choose **Web application**, and add every address the app is used from as an **Authorised redirect URI**:
+   - `https://localhost:7180/signin-google` (local)
+   - `https://<tunnel host>/signin-google` (your phone, see below)
+   - `https://<Azure app address>/signin-google` (Azure, from the Deploy run's summary)
+4. Copy the **Client ID** and **Client secret**. Google shows the secret in full only once; put it only in the places below, never in the repo.
 
-Google verifies email addresses, so someone signing in with Google whose email already belongs to a user (say, from Microsoft sign-in) joins that user rather than becoming a new one. Microsoft emails aren't treated as verified, so the reverse doesn't happen automatically.
+**2. Locally**
+
+```bash
+dotnet user-secrets set "Authentication:Google:ClientId" "<client id>" --project src/Budget.Server
+dotnet user-secrets set "Authentication:Google:ClientSecret" "<client secret>" --project src/Budget.Server
+```
+
+Restart the app and the Google button appears.
+
+**3. In Azure**
+
+1. In GitHub, go to **Settings → Secrets and variables → Actions → Variables** and add `GOOGLE_CLIENT_ID` (it isn't secret).
+2. Go to **Settings → Environments → dev** and add the environment secret `GOOGLE_CLIENT_SECRET`, next to `MICROSOFT_CLIENT_SECRET`.
+3. Run **Actions → Deploy → Run workflow**, or merge to `main`. The deploy sets `Authentication__Google__ClientId` and `Authentication__Google__ClientSecret` on the web app. See [infra/README.md](infra/README.md).
+
+**Good to know**
+
+- Google verifies email addresses, so someone signing in with Google whose email already belongs to a user (say, from Microsoft sign-in) joins that user rather than becoming a new one. Microsoft emails aren't treated as verified, so the reverse doesn't happen automatically.
+- `redirect_uri_mismatch` from Google means the address you're using isn't one of the redirect URIs in step 1.3. Check `https`, the host and the port match exactly.
 
 ### Try it on your phone
 
@@ -77,7 +96,7 @@ Sign-in needs HTTPS and a redirect URI registered in Entra, so a phone can't jus
 
 1. Install the dev tunnels CLI (`winget install Microsoft.devtunnel`) and run `devtunnel user login`.
 2. Start the app, then run `devtunnel host -p 7180 --protocol https --allow-anonymous`. It prints a URL such as `https://abc123-7180.uks1.devtunnels.ms`.
-3. In the Entra app registration, go to **Authentication** and add `https://<that host>/signin-microsoft` as a Web redirect URI.
+3. In the Entra app registration, go to **Authentication** and add `https://<that host>/signin-microsoft` as a Web redirect URI. If you use Google sign-in, add `https://<that host>/signin-google` to the Google OAuth client too.
 4. Open the URL on your phone. It's HTTPS, so you can also install the app from the browser menu.
 
 In Development the app trusts the tunnel's `X-Forwarded-*` headers for `*.devtunnels.ms`, `*.trycloudflare.com` and ngrok hosts (`ForwardedHeaders` in `appsettings.Development.json`). This means sign-in sends you back to the tunnel, not to `localhost`.

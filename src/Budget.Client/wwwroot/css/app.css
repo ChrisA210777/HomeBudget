@@ -497,6 +497,39 @@ h1[tabindex="-1"]:focus-visible {
     white-space: nowrap;
 }
 
+/* A page's toolbar (BUD-124): toggles on the left, a menu filling the rest, all on one line even on a phone. */
+.page-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.page-toolbar > .mud-button-group-root {
+    flex-shrink: 0;
+}
+
+.page-toolbar .toolbar-menu {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.page-toolbar .toolbar-menu .mud-button-root {
+    max-width: 100%;
+    text-transform: none;
+}
+
+.page-toolbar .toolbar-menu .mud-button-label {
+    min-width: 0;
+}
+
+.page-toolbar .toolbar-menu .mud-button-label > :not(.mud-button-icon-start):not(.mud-button-icon-end) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Text that stops at two lines with an ellipsis, e.g. a long name in a list (BUD-126). */
 .two-lines {
     display: -webkit-box;
