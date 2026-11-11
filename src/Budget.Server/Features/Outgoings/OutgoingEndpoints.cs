@@ -170,7 +170,29 @@ public static class OutgoingEndpoints
             .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        return Results.Ok(new UpcomingPaymentsResponse(start, end, currency, payments));
+        // Income arriving, on the same dates as Cash flow (BUD-58, BUD-92).
+        var streams = await db.IncomeStreams
+            .Include(i => i.AmountChanges)
+            .Include(i => i.StatusPeriods)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .ToListAsync();
+        var income = streams
+            .SelectMany(i => i.PaymentsBetween(start, end).Select(p => new UpcomingIncome(
+                p.Date,
+                i.Id,
+                i.Name,
+                p.Amount,
+                p.Schedule.Every,
+                (PaymentUnitDto)p.Schedule.Unit,
+                accounts.DisplayName(i.AccountId),
+                people.GetValueOrDefault(i.PersonId),
+                i.AccountId)))
+            .OrderBy(p => p.Date)
+            .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return Results.Ok(new UpcomingPaymentsResponse(start, end, currency, payments, income));
     }
 
     /// <summary>Renewals over the next 12 months from today (BUD-81, ADR-013), soonest first.</summary>

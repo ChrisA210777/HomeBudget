@@ -460,9 +460,16 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var mortgage = Outgoing.Create(householdId, Details("Mortgage", housing, new DateOnly(2026, 1, 1)) with { AccountId = await AccountIdAsync(householdId, "Joint bills") }, 900m, PaymentSchedule.Monthly, "Start");
         var carInsurance = Outgoing.Create(householdId, Details("Car insurance", insurance, new DateOnly(2026, 3, 14)), 480m, PaymentSchedule.Yearly, "Start");
         var shopping = Outgoing.Create(householdId, Details("Food shopping", food, new DateOnly(2026, 11, 2)) with { Kind = OutgoingKind.Allowance }, 120m, PaymentSchedule.Weekly, "Start");
+        var jointBills = mortgage.AccountId!.Value;
         await ExecuteDbContextAsync(async db =>
         {
             db.Outgoings.AddRange(mortgage, carInsurance, shopping);
+
+            // Child Benefit into the joint account every 4 weeks (BUD-58).
+            var person = await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId).Select(p => p.Id).FirstAsync();
+            var benefit = Budget.Domain.Income.IncomeStream.Create(householdId, person, "Child Benefit", 102.20m, new DateOnly(2026, 11, 2), "Start", new PaymentSchedule(4, PaymentUnit.Week));
+            benefit.PayInto(jointBills);
+            db.IncomeStreams.Add(benefit);
             await db.SaveChangesAsync();
         });
         using var client = CreateClient(signedInAs: ownerId);
@@ -475,6 +482,8 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
             new[] { ("2026-11-30", "Food shopping", 120m), ("2026-12-01", "Mortgage", 900m) },
             week.Payments.Select(p => (p.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), p.Name, p.Amount)));
         Assert.Equal(("Joint bills", "Housing", PaymentUnitDto.Month), (week.Payments[1].PaidFrom, week.Payments[1].CategoryName, week.Payments[1].Unit));
+        var benefitIn = Assert.Single(week.Income!);
+        Assert.Equal((new DateOnly(2026, 11, 30), "Child Benefit", 102.20m, "Joint bills", (Guid?)jointBills), (benefitIn.Date, benefitIn.Name, benefitIn.Amount, benefitIn.PaidInto, benefitIn.AccountId));
 
         var march = (await client.GetFromJsonAsync<UpcomingPaymentsResponse>(Url(OutgoingRoutes.Payments(householdId, new DateOnly(2027, 3, 1), new DateOnly(2027, 3, 31)))))!;
         Assert.Equal(480m, march.Payments.Single(p => p.Name == "Car insurance").Amount);
