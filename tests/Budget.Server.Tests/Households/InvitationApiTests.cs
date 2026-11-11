@@ -36,7 +36,7 @@ public class InvitationApiTests(BudgetApiFactory factory) : IntegrationTestBase(
 
         var me = (await invitee.GetFromJsonAsync<CurrentUserResponse>(Url(AccountRoutes.CurrentUser)))!;
         var joined = Assert.Single(me.Households);
-        Assert.Equal((householdId, "User", (Guid?)jane, householdId), (joined.HouseholdId, joined.Role, joined.PersonId, me.ActiveHouseholdId));
+        Assert.Equal((householdId, "User", (Guid?)jane, householdId), (joined.HouseholdId, joined.Role, joined.PersonId, me.LastActiveHouseholdId));
         await ExecuteDbContextAsync(async db => Assert.False(await db.Households.AnyAsync(h => h.Id == starterHousehold)));
 
         // Single use, and the email is forgotten.
