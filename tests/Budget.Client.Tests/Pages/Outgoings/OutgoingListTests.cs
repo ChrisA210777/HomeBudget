@@ -173,7 +173,7 @@ public sealed class OutgoingListTests : IDisposable
         Assert.NotNull(cut.Find("[data-testid=filter-sheet]"));
         cut.InvokeAsync(() => cut.FindComponent<MudSelect<OutgoingKindDto?>>().Instance.ValueChanged.InvokeAsync(OutgoingKindDto.Allowance));
 
-        Assert.Equal("Show 1 outgoing", Text(cut, "close-filters"));
+        cut.WaitForAssertion(() => Assert.Equal("Show 1 outgoing", Text(cut, "close-filters")));
         cut.Find("[data-testid=close-filters]").Click();
         Assert.Empty(cut.FindAll("[data-testid=filter-sheet]"));
         Assert.Equal("Filter (1)", Text(cut, "open-filters"));
@@ -183,7 +183,7 @@ public sealed class OutgoingListTests : IDisposable
         // Removing the chip removes the filter.
         var chip = cut.FindComponents<MudChip<string>>().Single(c => c.Markup.Contains("data-testid=\"active-filter\"", StringComparison.Ordinal)).Instance;
         cut.InvokeAsync(() => chip.OnClose.InvokeAsync(chip));
-        Assert.Equal("Filter", Text(cut, "open-filters"));
+        cut.WaitForAssertion(() => Assert.Equal("Filter", Text(cut, "open-filters")));
         Assert.Equal(4, Texts(cut, "outgoing-name").Length);
     }
 
