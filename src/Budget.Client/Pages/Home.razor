@@ -100,7 +100,7 @@
                                                 <MudText Typo="Typo.body1"><strong>@step.Title</strong></MudText>
                                                 <MudText Typo="Typo.body2">@step.Text</MudText>
                                             </div>
-                                            <MudButton Href="@step.Href" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" data-testid="@($"setup-{step.Id}-go")">@step.Action</MudButton>
+                                            <MudButton Href="@(step.Href.EndsWith("/new", StringComparison.Ordinal) ? BackLink.To(step.Href, "/") : step.Href)" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" data-testid="@($"setup-{step.Id}-go")">@step.Action</MudButton>
                                             @if (step.Id == PeopleStep)
                                             {
                                                 <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="NotNowAsync" data-testid="setup-people-not-now">Not now</MudButton>
@@ -156,7 +156,7 @@
                                     <li class="py-2" data-testid="coming-up">
                                         <div class="d-flex align-start gap-2">
                                             <div class="flex-grow-1" style="min-width: 0">
-                                                <MudLink Href="@($"/outgoings/{renewal.Id}")" Typo="Typo.body1" data-testid="coming-up-name">@renewal.Name</MudLink>
+                                                <MudLink Href="@BackLink.To($"/outgoings/{renewal.Id}", "/")" Typo="Typo.body1" data-testid="coming-up-name">@renewal.Name</MudLink>
                                                 <MudText Typo="Typo.body2" data-testid="coming-up-text">@OutgoingValidator.DescribeRenewal(renewal.Name, renewal.RenewalDate, renewal.AutoRenews)</MudText>
                                             </div>
                                             <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ma-0" data-testid="coming-up-days">@OutgoingValidator.RenewsIn(renewal.DaysUntil)</MudChip>

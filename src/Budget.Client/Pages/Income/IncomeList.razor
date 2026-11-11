@@ -92,7 +92,7 @@
                 <MudCardContent>
                     <div class="d-flex align-start gap-2">
                         <div class="flex-grow-1" style="min-width: 0">
-                            <MudLink Href="@($"/income/{item.Id}")" Typo="Typo.h6" data-testid="income-name">@item.Name</MudLink>
+                            <MudLink Href="@BackLink.To($"/income/{item.Id}", "/income")" Typo="Typo.h6" data-testid="income-name">@item.Name</MudLink>
                             <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="income-person">@item.PersonName@(AccountOf(item).Pot is { } pot ? $" · {pot} pot" : !grouped && AccountOf(item).Name is { } account ? $" · into {account}" : string.Empty)</MudText>
                             @if (item.ReceivedAmount is { } received && !(item.Every == 1 && item.Unit == PaymentUnitDto.Month))
                             {

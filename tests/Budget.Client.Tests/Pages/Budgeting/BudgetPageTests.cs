@@ -121,8 +121,8 @@ public sealed class BudgetPageTests : IDisposable
         Assert.Equal(new[] { "New car", "Salary", "Gym" }, cut.FindAll("[data-testid=change-name]").Select(e => e.TextContent.Trim()));
         Assert.Equal(new[] { "New", "Went up · 1% pay rise", "Price went up · Price rise" }, cut.FindAll("[data-testid=change-reason]").Select(e => e.TextContent.Trim()));
         Assert.Equal(new[] { "£250.00 less left", "£30.00 more left", "£5.00 less left" }, cut.FindAll("[data-testid=change-effect]").Select(e => e.TextContent.Trim()));
-        Assert.Equal($"/outgoings/{carId}", cut.FindAll("[data-testid=change-name]").ToList()[0].GetAttribute("href"));
-        Assert.Equal($"/income/{salaryId}", cut.FindAll("[data-testid=change-name]").ToList()[1].GetAttribute("href"));
+        Assert.Equal($"/outgoings/{carId}?from=%2Fbudget", cut.FindAll("[data-testid=change-name]").ToList()[0].GetAttribute("href"));
+        Assert.Equal($"/income/{salaryId}?from=%2Fbudget", cut.FindAll("[data-testid=change-name]").ToList()[1].GetAttribute("href"));
     }
 
     [Fact]

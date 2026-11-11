@@ -95,7 +95,7 @@
                             <li class="d-flex align-start gap-2 py-2" data-testid="change">
                                 <MudIcon Icon="@Trend(change.Effect)" Color="@TrendColour(change.Effect)" Size="Size.Small" Class="mt-1" aria-hidden="true" />
                                 <div class="flex-grow-1" style="min-width: 0">
-                                    <MudLink Href="@(change.IsIncome ? $"/income/{change.Id}" : $"/outgoings/{change.Id}")" data-testid="change-name">@change.Name</MudLink>
+                                    <MudLink Href="@BackLink.To(change.IsIncome ? $"/income/{change.Id}" : $"/outgoings/{change.Id}", "/budget")" data-testid="change-name">@change.Name</MudLink>
                                     <MudText Typo="Typo.caption" Class="d-block" data-testid="change-reason">@Explain(change)</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="change-amounts">@Format(change.Previous) → @Format(change.Current)@(change.IsIncome ? " income" : string.Empty)</MudText>
                                 </div>

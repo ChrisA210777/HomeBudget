@@ -210,6 +210,13 @@ test('upcoming payments show what is due each day, a week or a month at a time',
   await expect(page.getByTestId('payment-name')).toHaveText(['Hedge trimming fund']);
   await page.getByTestId('go-to-today').click();
   await expect(page.getByTestId('payment-today')).toBeVisible();
+
+  // BUD-117: back means back, to Upcoming payments rather than the Outgoings list.
+  await page.getByTestId('payment-name').first().click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Hedge trimming fund' })).toBeVisible();
+  await expect(page.getByTestId('back')).toHaveText('Upcoming payments');
+  await page.getByTestId('back').click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Upcoming payments' })).toBeVisible();
 });
 
 test('the renewals calendar is reached from upcoming payments', async ({ page }) => {

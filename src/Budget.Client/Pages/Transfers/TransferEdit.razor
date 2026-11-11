@@ -17,7 +17,7 @@
 
 @* Adds a transfer, or changes one's details; amounts and pauses are changed on its own page (BUD-91). *@
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2">@(IsNew ? "Transfers" : "Transfer")</MudButton>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2" data-testid="back">@(IsNew ? BackLink.Name(BackHref) ?? "Back" : "Transfer")</MudButton>
     <h1 class="mud-typography mud-typography-h4 mb-4">@(IsNew ? "Add a transfer" : "Edit transfer")</h1>
 
     @if (!_loaded)
@@ -110,7 +110,11 @@
 
     private bool IsNew => TransferId is null;
 
-    private string BackHref => IsNew ? "/transfers" : $"/transfers/{TransferId}";
+    /// <summary>The page this was opened from, to go back to (BUD-117).</summary>
+    [SupplyParameterFromQuery(Name = BackLink.Param)]
+    public string? From { get; set; }
+
+    private string BackHref => IsNew ? BackLink.Resolve(From, "/transfers") : BackLink.To($"/transfers/{TransferId}", From);
 
     private HouseholdMembershipSummary? _household;
     private IReadOnlyList<AccountSummary> _accounts = [];
@@ -208,7 +212,7 @@
             var result = await send();
             if (result.Succeeded)
             {
-                Navigation.NavigateTo($"/transfers/{result.Value!.Id}");
+                Navigation.NavigateTo(BackLink.To($"/transfers/{result.Value!.Id}", From));
             }
             else if (result.Conflict)
             {

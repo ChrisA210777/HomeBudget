@@ -14,7 +14,7 @@
 
 @* One transfer (BUD-91): where it goes, and its amount history, pauses and ending, as for an outgoing. *@
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/transfers" Class="mb-2">Transfers</MudButton>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@BackHref" Class="mb-2" data-testid="back">@(BackLink.Name(BackHref) ?? "Back")</MudButton>
 
     @if (!_loaded)
     {
@@ -64,7 +64,7 @@
         </MudPaper>
 
         <ScheduleHistory TDetails="TransferDetailsResponse" Details="d" DetailsChanged="(TransferDetailsResponse changed) => _details = changed" View="TransferScheduleBackend.View"
-                         Backend="_backend!" CanEdit="_canEdit" Noun="transfer" EditHref="@($"/transfers/{TransferId}/edit")" ListHref="/transfers"
+                         Backend="_backend!" CanEdit="_canEdit" Noun="transfer" EditHref="@BackLink.To($"/transfers/{TransferId}/edit", From)" ListHref="@BackHref"
                          AmountPlaceholder="e.g. Bills went up" PausePlaceholder="e.g. Covered by savings this month" PauseNote="Nothing is moved for those payments." />
     }
 </MudContainer>
@@ -72,6 +72,12 @@
 @code {
     [Parameter]
     public Guid TransferId { get; set; }
+
+    /// <summary>The page this was opened from, to go back to (BUD-117).</summary>
+    [SupplyParameterFromQuery(Name = BackLink.Param)]
+    public string? From { get; set; }
+
+    private string BackHref => BackLink.Resolve(From, "/transfers");
 
     private HouseholdMembershipSummary? _household;
     private TransferDetailsResponse? _details;

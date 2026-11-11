@@ -263,12 +263,12 @@
     /// <summary>e.g. "Mortgage · Bills pot".</summary>
     private static string Label(CashFlowEntry entry) => entry.Pot is { } pot ? $"{entry.Name} · {pot} pot" : entry.Name;
 
-    private static string Link(CashFlowEntry entry) => entry.Kind switch
+    private static string Link(CashFlowEntry entry) => BackLink.To(entry.Kind switch
     {
         CashFlowKindDto.Income => $"/income/{entry.Id}",
         CashFlowKindDto.Outgoing or CashFlowKindDto.SavingsIn => $"/outgoings/{entry.Id}",
         _ => $"/transfers/{entry.Id}",
-    };
+    }, "/cash-flow");
 
     /// <summary>A surplus or shortfall, in words and with an icon, not colour alone.</summary>
     private RenderFragment Net(decimal net, string currency) =>
