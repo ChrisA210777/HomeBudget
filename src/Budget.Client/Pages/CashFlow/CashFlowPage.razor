@@ -287,12 +287,12 @@
             @if (net < 0m)
             {
                 <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" aria-hidden="true" />
-                <MudText Typo="Typo.body1" Style="font-weight: 600">Short by @Format(-net, currency)</MudText>
+                <MudText Typo="Typo.body1" Class="text-nowrap">Short by <strong>@Format(-net, currency)</strong></MudText>
             }
             else
             {
                 <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" aria-hidden="true" />
-                <MudText Typo="Typo.body1" Style="font-weight: 600">Surplus @Format(net, currency)</MudText>
+                <MudText Typo="Typo.body1" Class="text-nowrap">Surplus <strong>@Format(net, currency)</strong></MudText>
             }
         </span>;
 }
