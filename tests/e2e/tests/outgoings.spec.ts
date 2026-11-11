@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { addOutgoing, choose, settled, signIn, typeOutgoingName } from './helpers';
+import { addOutgoing, choose, expectToolbarTidy, settled, signIn, typeOutgoingName } from './helpers';
 
 
 test("an outgoing added from the home page shows in this month's list", async ({ page }) => {
@@ -200,6 +200,8 @@ test('upcoming payments show what is due each day, a week or a month at a time',
   await page.goto('/outgoings/upcoming');
   await expect(page.getByRole('heading', { level: 1, name: 'Upcoming payments' })).toBeVisible();
   await settled(page);
+  // BUD-124: Week | Month and the account menu line up, with space between them.
+  await expectToolbarTidy([page.getByTestId('period-toggle'), page.getByTestId('filter-account').getByRole('button')]);
   const today = page.getByTestId('payment-day').filter({ has: page.getByTestId('payment-today') });
   await expect(today.getByTestId('payment-name')).toHaveText('Hedge trimming fund');
   await expect(today.getByTestId('payment-amount')).toHaveText('£20.00');
