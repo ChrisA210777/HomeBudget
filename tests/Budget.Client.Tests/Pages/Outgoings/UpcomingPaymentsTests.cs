@@ -38,9 +38,9 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(DayOfWeek.Sunday, "2026-11-01", "2026-11-07", "1 Nov – 7 Nov 2026")]
-    [InlineData(DayOfWeek.Monday, "2026-11-02", "2026-11-08", "2 Nov – 8 Nov 2026")]
-    [InlineData(DayOfWeek.Thursday, "2026-11-05", "2026-11-11", "5 Nov – 11 Nov 2026")]
+    [InlineData(DayOfWeek.Sunday, "2026-11-01", "2026-11-07", "1 – 7 Nov")]
+    [InlineData(DayOfWeek.Monday, "2026-11-02", "2026-11-08", "2 – 8 Nov")]
+    [InlineData(DayOfWeek.Thursday, "2026-11-05", "2026-11-11", "5 – 11 Nov")]
     public void Shows_this_week_starting_on_the_chosen_day(DayOfWeek firstDay, string from, string to, string name)
     {
         _settings.Saved = UserSettings.Defaults with { FirstDayOfWeek = firstDay };
@@ -73,18 +73,20 @@ public sealed class UpcomingPaymentsTests : IDisposable
         var cut = _context.RenderComponent<UpcomingPayments>();
 
         cut.Find("[data-testid=next-period]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("8 Nov – 14 Nov 2026", Text(cut, "period-name")));
+        cut.WaitForAssertion(() => Assert.Equal("8 – 14 Nov", Text(cut, "period-name")));
         Assert.NotNull(cut.Find("[data-testid=go-to-today]"));
 
         cut.Find("[data-testid=show-month]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("November 2026", Text(cut, "period-name")));
+        cut.WaitForAssertion(() => Assert.Equal("November", Text(cut, "period-name")));
         cut.Find("[data-testid=next-period]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("December 2026", Text(cut, "period-name")));
+        cut.WaitForAssertion(() => Assert.Equal("December", Text(cut, "period-name")));
+        cut.Find("[data-testid=next-period]").Click();
+        cut.WaitForAssertion(() => Assert.Equal("January 2027", Text(cut, "period-name")));
         cut.Find("[data-testid=go-to-today]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("November 2026", Text(cut, "period-name")));
+        cut.WaitForAssertion(() => Assert.Equal("November", Text(cut, "period-name")));
 
         Assert.Equal(
-            new[] { ("2026-11-01", "2026-11-07"), ("2026-11-08", "2026-11-14"), ("2026-11-01", "2026-11-30"), ("2026-12-01", "2026-12-31"), ("2026-11-01", "2026-11-30") },
+            new[] { ("2026-11-01", "2026-11-07"), ("2026-11-08", "2026-11-14"), ("2026-11-01", "2026-11-30"), ("2026-12-01", "2026-12-31"), ("2027-01-01", "2027-01-31"), ("2026-11-01", "2026-11-30") },
             _api.Requests.Select(r => (r.From.ToString("yyyy-MM-dd"), r.To.ToString("yyyy-MM-dd"))));
     }
 
@@ -106,18 +108,20 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     [Fact]
-    public async Task Filtering_by_account_shows_what_goes_out_of_it_and_comes_into_it_including_pots()
+    public void Filtering_by_account_shows_what_goes_out_of_it_and_comes_into_it_including_pots()
     {
         _api.Income = true;
+        var popovers = _context.RenderComponent<MudBlazor.MudPopoverProvider>();
         var cut = _context.RenderComponent<UpcomingPayments>();
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<Guid?>>().Instance.ValueChanged.InvokeAsync(JointId));
+        Choose(cut, popovers, "Joint bills");
 
+        Assert.Equal("Joint bills", Text(cut, "filter-account"));
         Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "payment-name"));
         Assert.Empty(cut.FindAll("[data-testid=income-name]"));
         Assert.Equal("£930.00", Text(cut, "period-total"));
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<Guid?>>().Instance.ValueChanged.InvokeAsync(ChrisId));
+        Choose(cut, popovers, "Chris current");
 
         Assert.Equal(new[] { "Phone" }, Texts(cut, "payment-name"));
         Assert.Equal(new[] { "Salary" }, Texts(cut, "income-name"));
@@ -135,6 +139,17 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     public void Dispose() => _context.Dispose();
+
+    /// <summary>Picks an account from the Paid from menu (BUD-124).</summary>
+    private static void Choose(IRenderedComponent<UpcomingPayments> cut, IRenderedComponent<MudBlazor.MudPopoverProvider> popovers, string account)
+    {
+        cut.Find("[data-testid=filter-account] button").Click();
+        popovers.WaitForElements("[data-testid=filter-account-option]").Single(o => o.TextContent.Trim() == account).Click();
+
+        // The menu closes once a choice is made, ready to open again.
+        popovers.WaitForAssertion(() => Assert.Empty(popovers.FindAll("[data-testid=filter-account-option]")));
+        cut.WaitForAssertion(() => Assert.Equal(account, cut.Find("[data-testid=filter-account]").TextContent.Trim()));
+    }
 
     private static string Text(IRenderedComponent<UpcomingPayments> cut, string testId) => cut.Find($"[data-testid={testId}]").TextContent.Trim();
 

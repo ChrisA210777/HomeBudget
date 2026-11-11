@@ -21,35 +21,44 @@
         What's due each day, at the amount actually paid. Unlike the budget, a yearly bill only shows on the day it's paid.
     </MudText>
 
-    <div class="d-flex align-center flex-wrap gap-x-4 gap-y-2 mb-2">
+    @* One toolbar line, even on a phone: the period on the left, the account filling the rest (BUD-124). *@
+    <div class="page-toolbar mb-2">
         <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show payments for" data-testid="period-toggle">
             <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_month ? "false" : "true")"
                        OnClick="() => SetMonthAsync(false)" data-testid="show-week">Week</MudButton>
             <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_month ? "true" : "false")"
                        OnClick="() => SetMonthAsync(true)" data-testid="show-month">Month</MudButton>
         </MudButtonGroup>
-        @* By account, including its pots: budgeting is done by account (BUD-96). *@
-        <div style="width: 13rem">
-            <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="AccountName" Label="Paid from" Margin="Margin.Dense" Variant="Variant.Outlined" data-testid="filter-account">
-                <MudSelectItem T="Guid?" Value="null">@AccountName(null)</MudSelectItem>
-                <MudSelectItem T="Guid?" Value="Guid.Empty">@AccountName(Guid.Empty)</MudSelectItem>
-                @foreach (var account in _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)))
-                {
-                    <MudSelectItem T="Guid?" Value="account.Id">@account.Name</MudSelectItem>
-                }
-            </MudSelect>
-        </div>
+        @* By account, including its pots: budgeting is done by account (BUD-96). A compact menu, not a form field. *@
+        <MudMenu Label="@(_account is null ? "All accounts" : AccountName(_account))"
+                 StartIcon="@Icons.Material.Filled.AccountBalance"
+                 EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                 Variant="Variant.Outlined"
+                 Color="Color.Primary"
+                 Size="Size.Small"
+                 AnchorOrigin="Origin.BottomRight"
+                 TransformOrigin="Origin.TopRight"
+                 AriaLabel="@($"Paid from: {(_account is null ? "all accounts" : AccountName(_account))}. Change the account")"
+                 Class="toolbar-menu"
+                 data-testid="filter-account">
+            <MudText Typo="Typo.overline" Class="px-4 pt-2">Paid from</MudText>
+            @foreach (var (id, name) in AccountChoices())
+            {
+                <MudMenuItem Icon="@(id == _account ? Icons.Material.Filled.Check : null)" OnClick="() => _account = id" data-testid="filter-account-option">@name</MudMenuItem>
+            }
+        </MudMenu>
     </div>
 
-    <div class="d-flex align-center justify-space-between mb-2">
+    @* "Today" is an icon beside the next arrow, so the period's name always has room (BUD-124). *@
+    <div class="d-flex align-center mb-2">
         <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@(_month ? "Previous month" : "Previous week")" OnClick="() => MoveAsync(-1)" data-testid="previous-period" />
-        <div class="d-flex align-center flex-wrap justify-center gap-2">
-            <MudText Typo="Typo.h6" data-testid="period-name">@PeriodName</MudText>
-            @if (!(_from <= Today && Today <= _to))
-            {
-                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary" OnClick="GoToTodayAsync" data-testid="go-to-today">Today</MudButton>
-            }
-        </div>
+        <MudText Typo="Typo.h6" Align="Align.Center" Class="flex-grow-1 text-nowrap" data-testid="period-name">@PeriodName</MudText>
+        @if (!(_from <= Today && Today <= _to))
+        {
+            <MudTooltip Text="Go to today">
+                <MudIconButton Icon="@Icons.Material.Filled.Today" Color="Color.Primary" aria-label="Go to today" OnClick="GoToTodayAsync" data-testid="go-to-today" />
+            </MudTooltip>
+        }
         <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@(_month ? "Next month" : "Next week")" OnClick="() => MoveAsync(1)" data-testid="next-period" />
     </div>
 
@@ -137,11 +146,37 @@
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
-    private string PeriodName => _month
-        ? _from.ToString("MMMM yyyy", Display)
-        : _from.Year == _to.Year
-            ? $"{_from.ToString("d MMM", Display)} – {_to.ToString("d MMM yyyy", Display)}"
-            : $"{_from.ToString("d MMM yyyy", Display)} – {_to.ToString("d MMM yyyy", Display)}";
+    /// <summary>
+    /// "November" or "1 – 7 Nov" this year; the year only when it's another one, e.g. "January 2027" or
+    /// "29 Dec 2026 – 4 Jan 2027" (BUD-124).
+    /// </summary>
+    private string PeriodName
+    {
+        get
+        {
+            var thisYear = _from.Year == Today.Year && _to.Year == Today.Year;
+            if (_month)
+            {
+                return _from.ToString(thisYear ? "MMMM" : "MMMM yyyy", Display);
+            }
+
+            var to = _to.ToString(thisYear ? "d MMM" : "d MMM yyyy", Display);
+            var from = _from.Year != _to.Year ? _from.ToString("d MMM yyyy", Display)
+                : _from.Month != _to.Month ? _from.ToString("d MMM", Display)
+                : _from.ToString("%d", Display);
+            return $"{from} – {to}";
+        }
+    }
+
+    private IEnumerable<(Guid? Id, string Name)> AccountChoices()
+    {
+        yield return (null, "All accounts");
+        yield return (Guid.Empty, AccountName(Guid.Empty));
+        foreach (var account in _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)))
+        {
+            yield return (account.Id, account.Name);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
