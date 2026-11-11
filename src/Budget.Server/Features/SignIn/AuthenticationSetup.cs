@@ -8,6 +8,10 @@ namespace Budget.Server.Features.SignIn;
 public static class AuthenticationSetup
 {
     public const string MicrosoftConfigSection = "Authentication:Microsoft";
+    public const string GoogleConfigSection = "Authentication:Google";
+
+    /// <summary>A claim saying the provider has verified the email address (BUD-102).</summary>
+    public const string EmailVerifiedClaim = "email_verified";
 
     /// <summary>
     /// Cookie-based sign-in with external providers (Backend-for-Frontend, see ADR-001 and ADR-002).
@@ -50,6 +54,32 @@ public static class AuthenticationSetup
                 options.ClientId = microsoft["ClientId"]!;
                 options.ClientSecret = microsoft["ClientSecret"]!;
                 options.SignInScheme = IdentityConstants.ExternalScheme;
+                options.Events.OnAccessDenied = context =>
+                {
+                    context.Response.Redirect(AccountRoutes.LoginPageWithError(LoginErrors.Cancelled));
+                    context.HandleResponse();
+                    return Task.CompletedTask;
+                };
+                options.Events.OnRemoteFailure = context =>
+                {
+                    context.Response.Redirect(AccountRoutes.LoginPageWithError(LoginErrors.Failed));
+                    context.HandleResponse();
+                    return Task.CompletedTask;
+                };
+            });
+        }
+
+        // Google (ADR-015, BUD-102). Google's emails are verified, which lets a Google login join the user who
+        // already has that email.
+        var google = configuration.GetSection(GoogleConfigSection);
+        if (!string.IsNullOrWhiteSpace(google["ClientId"]) && !string.IsNullOrWhiteSpace(google["ClientSecret"]))
+        {
+            authentication.AddGoogle(options =>
+            {
+                options.ClientId = google["ClientId"]!;
+                options.ClientSecret = google["ClientSecret"]!;
+                options.SignInScheme = IdentityConstants.ExternalScheme;
+                options.ClaimActions.MapJsonKey(EmailVerifiedClaim, "email_verified");
                 options.Events.OnAccessDenied = context =>
                 {
                     context.Response.Redirect(AccountRoutes.LoginPageWithError(LoginErrors.Cancelled));

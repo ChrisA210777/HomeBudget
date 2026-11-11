@@ -29,6 +29,13 @@ param microsoftClientId string = ''
 @description('Client secret for that app registration.')
 param microsoftClientSecret string = ''
 
+@description('Google OAuth client ID for "Sign in with Google" (ADR-015). Empty turns Google sign-in off.')
+param googleClientId string = ''
+
+@secure()
+@description('Google OAuth client secret.')
+param googleClientSecret string = ''
+
 @description('Monthly budget for this resource group, in the billing currency. Alerts go out as soon as anything is spent.')
 param budgetAmount int = 1
 
@@ -156,6 +163,17 @@ var microsoftSettings = empty(microsoftClientId) ? [] : [
   }
 ]
 
+var googleSettings = empty(googleClientId) ? [] : [
+  {
+    name: 'Authentication__Google__ClientId'
+    value: googleClientId
+  }
+  {
+    name: 'Authentication__Google__ClientSecret'
+    value: googleClientSecret
+  }
+]
+
 resource site 'Microsoft.Web/sites@2023-12-01' = {
   name: 'app-${name}-${suffix}'
   location: location
@@ -214,7 +232,7 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
           name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
           value: 'false'
         }
-      ], microsoftSettings)
+      ], microsoftSettings, googleSettings)
     }
   }
 }

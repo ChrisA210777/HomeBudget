@@ -13,6 +13,7 @@
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
   <ItemGroup Label="ASP.NET Core / Blazor">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Google" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="$(AspNetCoreVersion)" />
