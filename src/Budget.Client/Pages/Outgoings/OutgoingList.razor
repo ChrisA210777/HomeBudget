@@ -252,6 +252,10 @@
     [SupplyParameterFromQuery(Name = "account")]
     public Guid? AccountQuery { get; set; }
 
+    /// <summary>Show only bills, savings or allowances, e.g. from the Budget page's totals by kind.</summary>
+    [SupplyParameterFromQuery(Name = "kind")]
+    public string? KindQuery { get; set; }
+
     private const string EveryoneKey = "";
     private const string HouseholdKey = "household";
 
@@ -302,6 +306,7 @@
 
         _category = CategoryQuery;
         _account = AccountQuery;
+        _kind = Enum.TryParse<OutgoingKindDto>(KindQuery, ignoreCase: true, out var kind) && Enum.IsDefined(kind) ? kind : null;
 
         // The view and grouping chosen last time, on any device (BUD-87).
         var settings = await Settings.GetAsync();
