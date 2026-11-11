@@ -89,35 +89,38 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     [Fact]
-    public void Shows_what_each_account_needs_with_its_pots_and_not_set_last()
+    public void Income_arrives_on_its_days_marked_as_money_in()
     {
+        _api.Income = true;
+
         var cut = _context.RenderComponent<UpcomingPayments>();
 
-        Assert.Equal(new[] { "Chris current £25.00", "Joint bills £930.00", "Not set £120.00" }, Texts(cut, "account-total"));
-        Assert.NotNull(cut.Find("[data-testid=filter-account]"));
-        Assert.Empty(cut.FindAll("[data-testid=group-toggle]"));
+        Assert.Equal(new[] { "Salary" }, Texts(cut, "income-name"));
+        Assert.Equal(new[] { "+£3,000.00" }, Texts(cut, "income-amount"));
+        Assert.Equal(new[] { "Monthly · Income · into Chris current · Chris" }, Texts(cut, "income-details"));
+        Assert.Equal("Coming in £3,000.00", Text(cut, "period-income"));
+        // Going out is unchanged; the salary's day shows its net.
+        Assert.Equal("£1,075.00", Text(cut, "period-total"));
+        Assert.Equal(new[] { "£120.00", "£930.00", "+£2,975.00" }, Texts(cut, "payment-day-total"));
+        Assert.Empty(cut.FindAll("[data-testid=account-totals]"));
     }
 
     [Fact]
-    public void Tapping_an_account_total_shows_only_that_accounts_payments_including_its_pots()
+    public async Task Filtering_by_account_shows_what_goes_out_of_it_and_comes_into_it_including_pots()
     {
+        _api.Income = true;
         var cut = _context.RenderComponent<UpcomingPayments>();
 
-        cut.FindAll("[data-testid=account-total]").ToList()[1].Click();
+        await cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<Guid?>>().Instance.ValueChanged.InvokeAsync(JointId));
 
-        cut.WaitForAssertion(() => Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "payment-name")));
+        Assert.Equal(new[] { "Council tax", "Mortgage" }, Texts(cut, "payment-name"));
+        Assert.Empty(cut.FindAll("[data-testid=income-name]"));
         Assert.Equal("£930.00", Text(cut, "period-total"));
-        Assert.Equal("2 payments", Text(cut, "payment-count"));
-        Assert.Equal("true", cut.FindAll("[data-testid=account-total]").ToList()[1].GetAttribute("aria-pressed"));
-        // The totals still show every account, so another can be picked.
-        Assert.Equal(3, cut.FindAll("[data-testid=account-total]").Count);
 
-        cut.FindAll("[data-testid=account-total]").ToList()[2].Click();
-        cut.WaitForAssertion(() => Assert.Equal(new[] { "Food shopping" }, Texts(cut, "payment-name")));
+        await cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<Guid?>>().Instance.ValueChanged.InvokeAsync(ChrisId));
 
-        // Tapping the selected one again shows everything.
-        cut.FindAll("[data-testid=account-total]").ToList()[2].Click();
-        cut.WaitForAssertion(() => Assert.Equal("4 payments", Text(cut, "payment-count")));
+        Assert.Equal(new[] { "Phone" }, Texts(cut, "payment-name"));
+        Assert.Equal(new[] { "Salary" }, Texts(cut, "income-name"));
     }
 
     [Fact]
@@ -144,6 +147,8 @@ public sealed class UpcomingPaymentsTests : IDisposable
 
         public bool Empty { get; set; }
 
+        public bool Income { get; set; }
+
         public Task<UpcomingPaymentsResponse> GetAsync(Guid householdId, DateOnly from, DateOnly to)
         {
             Requests.Add((from, to));
@@ -154,7 +159,10 @@ public sealed class UpcomingPaymentsTests : IDisposable
                 Payment(new DateOnly(2026, 11, 5), "Mortgage", 900m, PaymentUnitDto.Month, HousingId, "Housing", 10, "Joint bills › Mortgage", MortgagePotId),
                 Payment(new DateOnly(2026, 11, 6), "Phone", 25m, PaymentUnitDto.Month, Guid.NewGuid(), "Utilities", 20, "Chris current", ChrisId),
             ];
-            return Task.FromResult(new UpcomingPaymentsResponse(from, to, "GBP", payments));
+            IReadOnlyList<UpcomingIncome> income = Income
+                ? [new UpcomingIncome(new DateOnly(2026, 11, 6), Guid.NewGuid(), "Salary", 3000m, 1, PaymentUnitDto.Month, "Chris current", "Chris", ChrisId)]
+                : [];
+            return Task.FromResult(new UpcomingPaymentsResponse(from, to, "GBP", payments, income));
         }
 
         private static UpcomingPayment Payment(

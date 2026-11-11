@@ -72,13 +72,10 @@ test("an account's outgoings are one tap away from the Accounts page", async ({ 
   await expect(page.getByTestId('outgoing-name')).toHaveText(['Hedge trimming fund']);
   await expect(page.getByTestId('month-total')).toHaveText('£20.00');
 
-  // BUD-96: Upcoming payments totals each account, and tapping one shows only its payments.
+  // BUD-96, BUD-58: Upcoming payments filters by account.
   await page.goto('/outgoings/upcoming');
   await settled(page);
-  const total = page.getByTestId('account-total').filter({ hasText: 'Garden account' });
-  await expect(total).toContainText('£20.00');
-  await total.click();
-  await expect(total).toHaveAttribute('aria-pressed', 'true');
+  await choose(page, 'filter-account', 'Garden account');
   await expect(page.getByTestId('payment-name')).toHaveText(['Hedge trimming fund']);
   await expect(page.getByTestId('period-total')).toHaveText('£20.00');
 });

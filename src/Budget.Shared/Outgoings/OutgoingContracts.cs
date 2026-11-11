@@ -135,7 +135,20 @@ public sealed record RenewalEntry(
     string? PersonName = null);
 
 /// <summary>The payments due between <see cref="From"/> and <see cref="To"/>, in date order (BUD-82, ADR-013).</summary>
-public sealed record UpcomingPaymentsResponse(DateOnly From, DateOnly To, string CurrencyCode, IReadOnlyList<UpcomingPayment> Payments);
+/// <param name="Income">Income arriving in the period (BUD-58), on the same dates as Cash flow.</param>
+public sealed record UpcomingPaymentsResponse(DateOnly From, DateOnly To, string CurrencyCode, IReadOnlyList<UpcomingPayment> Payments, IReadOnlyList<UpcomingIncome>? Income = null);
+
+/// <summary>Income arriving on a day (BUD-58): its schedule from its first amount, adjusted for leave.</summary>
+public sealed record UpcomingIncome(
+    DateOnly Date,
+    Guid IncomeStreamId,
+    string Name,
+    decimal Amount,
+    int Every,
+    PaymentUnitDto Unit,
+    string? PaidInto,
+    string? PersonName,
+    Guid? AccountId);
 
 /// <summary>One payment due: what is actually paid on the day, not a monthly average.</summary>
 public sealed record UpcomingPayment(

@@ -67,29 +67,24 @@
     }
     else
     {
-        var shown = Shown.ToList();
-        var totals = AccountTotals().ToList();
+        var rows = Rows().ToList();
+        var outRows = rows.Where(r => !r.IsIn).ToList();
+        var inTotal = rows.Where(r => r.IsIn).Sum(r => r.Amount);
         <MudPaper Class="pa-4 mb-3" Elevation="1">
-            <MudText Typo="Typo.overline">Due @(_month ? "this month" : "this week")@(_account is null ? string.Empty : $" from {AccountName(_account)}")</MudText>
-            <MudText Typo="Typo.h4" data-testid="period-total">@Format(shown.Sum(p => p.Amount))</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="payment-count">@Count(shown.Count)</MudText>
-            @if (totals.Count > 1 || (totals.Count == 1 && totals[0].Id != Guid.Empty))
+            <MudText Typo="Typo.overline">Going out @(_month ? "this month" : "this week")@(_account is null ? string.Empty : $" from {AccountName(_account)}")</MudText>
+            <MudText Typo="Typo.h4" data-testid="period-total">@Format(outRows.Sum(r => r.Amount))</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="payment-count">@Count(outRows.Count)</MudText>
+            @if (inTotal > 0)
             {
-                @* What each account needs, side by side; tap one to see just its payments (BUD-96). *@
-                <div class="d-flex flex-wrap align-center gap-x-1 mt-2" role="group" aria-label="Due from each account" data-testid="account-totals">
-                    @foreach (var total in totals)
-                    {
-                        var selected = _account == total.Id;
-                        <MudButton Variant="@(selected ? Variant.Filled : Variant.Text)" Color="Color.Primary" Size="Size.Small" Class="px-2"
-                                   aria-pressed="@(selected ? "true" : "false")" OnClick="() => _account = selected ? null : total.Id" data-testid="account-total">
-                            @total.Name @Format(total.Amount)
-                        </MudButton>
-                    }
-                </div>
+                @* Income arriving in the period (BUD-58). *@
+                <MudText Typo="Typo.body1" Class="mt-2 d-flex align-center gap-1" data-testid="period-income">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" Color="Color.Success" aria-hidden="true" />
+                    Coming in @Format(inTotal)
+                </MudText>
             }
         </MudPaper>
 
-        @if (shown.Count == 0)
+        @if (rows.Count == 0)
         {
             <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="payments-empty">
                 <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Size="Size.Large" Color="Color.Secondary" />
@@ -98,7 +93,7 @@
         }
         else
         {
-            @Days(shown)
+            @Days(rows)
         }
     }
 </MudContainer>
@@ -117,22 +112,28 @@
 
     private (Guid? Id, string? Name, string? Pot) AccountOf(UpcomingPayment payment) => AccountLevel.Of(payment.AccountId, payment.PaidFrom, _accounts);
 
-    private IEnumerable<UpcomingPayment> Shown =>
-        (_data?.Payments ?? []).Where(p => _account is null || (AccountOf(p).Id ?? Guid.Empty) == _account);
+    /// <summary>A payment out or income in (BUD-58), as listed on a day.</summary>
+    private sealed record Row(DateOnly Date, bool IsIn, string Name, decimal Amount, string Details, string Icon, string Href, int Sort);
 
-    /// <summary>The period's total from each account, by name, with "Not set" last.</summary>
-    private IEnumerable<(Guid Id, string Name, decimal Amount)> AccountTotals() =>
-        (_data?.Payments ?? [])
-            .GroupBy(p => AccountOf(p).Id ?? Guid.Empty)
-            .Select(g => (Id: g.Key, Name: g.Key == Guid.Empty ? "Not set" : AccountOf(g.First()).Name ?? "Not set", Amount: g.Sum(p => p.Amount)))
-            .OrderBy(t => t.Id == Guid.Empty)
-            .ThenBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase);
+    /// <summary>Payments and income in the period, for the chosen account (with its pots) or all of them.</summary>
+    private IEnumerable<Row> Rows()
+    {
+        var payments = (_data?.Payments ?? [])
+            .Where(p => Matches(AccountOf(p).Id))
+            .Select(p => new Row(p.Date, false, p.Name, p.Amount, Details(p), CategoryIconSvg.For(p.CategoryIcon), $"/outgoings/{p.OutgoingId}", p.CategorySortOrder));
+        var income = (_data?.Income ?? [])
+            .Where(i => Matches(AccountLevel.Of(i.AccountId, i.PaidInto, _accounts).Id))
+            .Select(i => new Row(i.Date, true, i.Name, i.Amount, Details(i), Icons.Material.Filled.ArrowDownward, $"/income/{i.IncomeStreamId}", -1));
+        return income.Concat(payments).OrderBy(r => r.Date).ThenBy(r => r.Sort).ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase);
+    }
+
+    private bool Matches(Guid? accountId) => _account is null || (accountId ?? Guid.Empty) == _account;
 
     private string AccountName(Guid? id) => id switch
     {
         null => "All",
         var none when none == Guid.Empty => "Not set",
-        _ => _accounts.FirstOrDefault(a => a.Id == id)?.Name ?? (_data?.Payments.Select(AccountOf).FirstOrDefault(a => a.Id == id).Name ?? "That account"),
+        _ => _accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "That account",
     };
     private DayOfWeek _firstDay = DayOfWeek.Sunday;
     private DateOnly _from;
@@ -195,12 +196,17 @@
         await LoadAsync();
     }
 
-    /// <summary>The days with something due, each with its payments and total; days with nothing are left out.</summary>
-    private RenderFragment Days(IEnumerable<UpcomingPayment> payments) =>
+    /// <summary>
+    /// The days with something due or arriving, each with its payments and total; days with nothing are left out. A day
+    /// with income shows its net, signed; otherwise what goes out.
+    /// </summary>
+    private RenderFragment Days(IEnumerable<Row> rows) =>
         @<div>
-        @foreach (var day in payments.GroupBy(p => p.Date).OrderBy(g => g.Key))
+        @foreach (var day in rows.GroupBy(r => r.Date).OrderBy(g => g.Key))
         {
             var isToday = day.Key == Today;
+            var hasIncome = day.Any(r => r.IsIn);
+            var net = day.Sum(r => r.IsIn ? r.Amount : -r.Amount);
             <div class="mb-3" data-testid="payment-day" data-date="@day.Key.ToString("yyyy-MM-dd", Display)">
                 <div class="d-flex align-center gap-2 mb-1 category-heading">
                     <MudText Typo="Typo.subtitle2" data-testid="payment-day-name">@day.Key.ToString("ddd d MMM", Display)</MudText>
@@ -209,20 +215,20 @@
                         <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ma-0" data-testid="payment-today">Today</MudChip>
                     }
                     <span class="flex-grow-1"></span>
-                    <MudText Typo="Typo.subtitle2" data-testid="payment-day-total">@Format(day.Sum(p => p.Amount))</MudText>
+                    <MudText Typo="Typo.subtitle2" data-testid="payment-day-total">@(hasIncome ? Signed(net) : Format(-net))</MudText>
                 </div>
                 <MudPaper Outlined="true">
                     <ul class="plain-list">
-                        @foreach (var payment in day)
+                        @foreach (var row in day)
                         {
-                            <li class="plain-list-item" data-testid="payment">
+                            <li class="plain-list-item" data-testid="@(row.IsIn ? "income" : "payment")">
                                 <div class="d-flex align-start gap-2">
-                                    <MudIcon Icon="@CategoryIconSvg.For(payment.CategoryIcon)" Size="Size.Small" Color="Color.Secondary" Class="mt-1" aria-hidden="true" />
+                                    <MudIcon Icon="@row.Icon" Size="Size.Small" Color="@(row.IsIn ? Color.Success : Color.Secondary)" Class="mt-1" aria-hidden="true" />
                                     <div class="flex-grow-1" style="min-width: 0">
-                                        <MudLink Href="@($"/outgoings/{payment.OutgoingId}")" Typo="Typo.body1" data-testid="payment-name">@payment.Name</MudLink>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="payment-details">@Details(payment)</MudText>
+                                        <MudLink Href="@row.Href" Typo="Typo.body1" data-testid="@(row.IsIn ? "income-name" : "payment-name")">@row.Name</MudLink>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="@(row.IsIn ? "income-details" : "payment-details")">@row.Details</MudText>
                                     </div>
-                                    <MudText Typo="Typo.subtitle1" Class="text-right text-nowrap" data-testid="payment-amount">@Format(payment.Amount)</MudText>
+                                    <MudText Typo="Typo.subtitle1" Class="text-right text-nowrap" data-testid="@(row.IsIn ? "income-amount" : "payment-amount")">@(row.IsIn ? "+" : string.Empty)@Format(row.Amount)</MudText>
                                 </div>
                             </li>
                         }
@@ -231,6 +237,25 @@
             </div>
         }
         </div>;
+
+    /// <summary>e.g. "Monthly · Income · into Joint › Bills · Jane".</summary>
+    private static string Details(UpcomingIncome income)
+    {
+        var parts = new List<string> { PaymentPeriods.Frequency(income.Every, income.Unit), "Income" };
+        if (!string.IsNullOrWhiteSpace(income.PaidInto))
+        {
+            parts.Add($"into {income.PaidInto.Trim()}");
+        }
+
+        if (income.PersonName is { } person)
+        {
+            parts.Add(person);
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    private string Signed(decimal amount) => amount < 0 ? $"−{Format(-amount)}" : $"+{Format(amount)}";
 
     private string Details(UpcomingPayment payment)
     {
