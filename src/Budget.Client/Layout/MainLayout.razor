@@ -25,7 +25,7 @@
         <a href="/" class="app-title @(_household is null ? "" : "d-none d-sm-inline-flex")" data-testid="app-title">Home Budget</a>
         @if (_household is not null)
         {
-            <span class="app-title-separator d-none d-sm-inline mx-1" aria-hidden="true">·</span>
+            <span class="app-title-separator d-none d-sm-inline ml-2" aria-hidden="true">·</span>
             <HouseholdSwitcher Active="_household" Households="_households" />
         }
         <MudSpacer />

@@ -82,17 +82,44 @@ body {
     font-weight: 500;
 }
 
-/* The household switcher (BUD-20): the household's name, shortened in code if it's long. */
+/* The household switcher (BUD-20): the household's name, shortened in code if it's long. It reads as part of the
+   title ("Home Budget · Smith Family ▾"), so it uses the title's font and sits on the same line, with only a little
+   padding so the gaps either side of the dot match. */
+.household-switcher {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    min-width: 0;
+}
+
 .household-switcher .mud-button-root {
     text-transform: none;
     font-size: 1.25rem;
-    font-weight: 400;
+    font-weight: 500;
+    line-height: inherit;
+    letter-spacing: normal;
     min-height: 44px;
+    min-width: 0;
+    padding-left: 6px;
+    padding-right: 2px;
     white-space: nowrap;
 }
 
+.household-switcher .mud-button-icon-end {
+    margin-left: 2px;
+    margin-right: 0;
+}
+
 .app-title-separator {
+    align-self: center;
     opacity: 0.7;
+}
+
+/* Blazor moves focus to the page's heading after each navigation so screen readers announce the new page. The
+   heading isn't something you can click or tab to, so it shouldn't show a focus ring. */
+h1:focus,
+h1[tabindex="-1"]:focus-visible {
+    outline: none;
 }
 
 /* Phones: the bottom bar replaces the side drawer. */
