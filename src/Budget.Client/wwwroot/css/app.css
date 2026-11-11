@@ -489,19 +489,56 @@ h1[tabindex="-1"]:focus-visible {
     justify-content: flex-end;
 }
 
+/* A menu on its own, e.g. Upcoming payments' account (BUD-135), starts on the left like any other toolbar. */
+.page-toolbar .toolbar-menu:only-child {
+    justify-content: flex-start;
+}
+
+/* The button's text is cut short with an ellipsis rather than wrapping (BUD-135). MudBlazor puts the text straight in
+   the label, so the label itself truncates, and the icons sit in the button's padding either side of it. */
+.page-toolbar .toolbar-menu > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
 .page-toolbar .toolbar-menu .mud-button-root {
+    position: relative;
     max-width: 100%;
     text-transform: none;
+    padding-left: 34px;
+    padding-right: 30px;
 }
 
 .page-toolbar .toolbar-menu .mud-button-label {
-    min-width: 0;
-}
-
-.page-toolbar .toolbar-menu .mud-button-label > :not(.mud-button-icon-start):not(.mud-button-icon-end) {
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.page-toolbar .toolbar-menu .mud-button-icon-start,
+.page-toolbar .toolbar-menu .mud-button-icon-end {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    /* Only as tall as the icon, so the icon itself is centred, not a line of text around it. */
+    display: flex;
+    align-items: center;
+    line-height: 0;
+}
+
+.page-toolbar .toolbar-menu .mud-button-icon-start {
+    left: 10px;
+}
+
+.page-toolbar .toolbar-menu .mud-button-icon-end {
+    right: 6px;
+}
+
+/* The period navigator's menu (BUD-135). It opens in the popover layer, outside the navigator's scoped styles. */
+.period-menu {
+    min-width: 180px;
 }
 
 /* Text that stops at two lines with an ellipsis, e.g. a long name in a list (BUD-126). */

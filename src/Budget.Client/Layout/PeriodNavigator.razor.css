@@ -1,12 +1,89 @@
 .period-navigator {
     display: flex;
     align-items: center;
+    position: relative;
 }
 
-.period-navigator ::deep .period-name {
+/* "Go to today" floats just inside the next arrow, so the name doesn't move when it appears (BUD-135). */
+.period-today {
+    position: absolute;
+    top: 50%;
+    right: 48px;
+    transform: translateY(-50%);
+}
+
+/*
+ * The name sits between two flexible spaces that share the spare room equally, so it's centred. While "Go to today"
+ * shows, the right-hand space can't be narrower than the icon: a name that fits stays centred, a longer one moves left
+ * just enough to keep clear of it, and only a name too long for the whole space is cut short (BUD-135).
+ */
+.period-name {
     flex: 1 1 auto;
     min-width: 0;
+    display: flex;
+    align-items: center;
     white-space: nowrap;
+}
+
+.period-name::before,
+.period-name::after {
+    content: "";
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.has-today .period-name::after {
+    min-width: 40px;
+}
+
+.period-text {
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* The name as a menu: the size of the plain name, and cut short with an ellipsis like it. The ▾ is placed at the
+   button's end, so the label's text can be cut short on its own. */
+.period-choice ::deep .mud-menu,
+.period-choice ::deep .mud-menu > * {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.period-choice ::deep .mud-button-root {
+    position: relative;
+    max-width: 100%;
+    text-transform: none;
+    font: inherit;
+    letter-spacing: normal;
+    padding: 2px 28px 2px 10px;
+}
+
+.period-choice ::deep .mud-button-label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.period-choice ::deep .mud-button-icon-end {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    color: var(--mud-palette-primary);
+    /* Only as tall as the icon, so the icon itself is centred, not a line of text around it. */
+    display: flex;
+    align-items: center;
+    line-height: 0;
+}
+
+/* Phones: a slightly smaller name, so it fits beside "Go to today" more often. */
+@media (max-width: 599.98px) {
+    .period-name {
+        font-size: 1.125rem;
+    }
 }

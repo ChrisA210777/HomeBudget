@@ -32,7 +32,7 @@ public sealed class IncomeListTests : IncomeTestContext
 
         var cut = Context.RenderComponent<IncomeList>();
 
-        Assert.Equal("November", cut.Find("[data-testid=month-name]").TextContent.Trim());
+        Assert.Equal("November 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal("£2,585.00", cut.Find("[data-testid=month-total]").TextContent.Trim());
         var items = cut.FindAll("[data-testid=income-item]").ToList();
         Assert.Equal(2, items.Count);
@@ -51,9 +51,10 @@ public sealed class IncomeListTests : IncomeTestContext
         [
             new(Guid.NewGuid(), "Chris – salary", Guid.NewGuid(), "Chris Austin", 39450m, 3300m, 3300m, 1, PaymentUnitDto.Month, [], new DateOnly(2026, 1, 1), null),
         ], 39450m, "GBP");
+        var popovers = Context.RenderComponent<MudBlazor.MudPopoverProvider>();
         var cut = Context.RenderComponent<IncomeList>();
 
-        cut.Find("[data-testid=show-year]").Click();
+        cut.ChoosePeriod(popovers, "month-name", "show-year");
 
         cut.WaitForAssertion(() => Assert.Equal(new[] { 1, 12 }, Api.MonthsRequested));
         Assert.Equal("Nov 2026 – Oct 2027", cut.Find("[data-testid=month-name]").TextContent.Trim());
@@ -118,7 +119,7 @@ public sealed class IncomeListTests : IncomeTestContext
         var cut = Context.RenderComponent<IncomeList>();
 
         Assert.Equal(new[] { 12 }, Api.MonthsRequested);
-        Assert.Equal("true", cut.Find("[data-testid=show-year]").GetAttribute("aria-pressed"));
+        Assert.Equal("Nov 2026 – Oct 2027", cut.Find("[data-testid=month-name]").TextContent.Trim());
     }
 
     [Fact]
@@ -127,7 +128,7 @@ public sealed class IncomeListTests : IncomeTestContext
         var cut = Context.RenderComponent<IncomeList>();
 
         cut.Find("[data-testid=next-month]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("December", cut.Find("[data-testid=month-name]").TextContent.Trim()));
+        cut.WaitForAssertion(() => Assert.Equal("December 2026", cut.Find("[data-testid=month-name]").TextContent.Trim()));
         cut.Find("[data-testid=previous-month]").Click();
         cut.Find("[data-testid=previous-month]").Click();
 

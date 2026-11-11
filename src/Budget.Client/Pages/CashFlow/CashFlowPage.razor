@@ -32,8 +32,8 @@
     }
     else
     {
-        @* One toolbar, as on Upcoming payments (BUD-130). *@
-        <div class="page-toolbar flex-wrap mb-2">
+        @* One toolbar, as on Upcoming payments (BUD-130). Week or month is chosen from the period's name (BUD-135). *@
+        <div class="page-toolbar cash-flow-toolbar flex-wrap mb-2">
             <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Show" data-testid="view-toggle">
                 <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_daily ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_daily ? "false" : "true")"
                            OnClick="() => SetDailyAsync(false)" data-testid="show-monthly">Monthly</MudButton>
@@ -42,12 +42,6 @@
             </MudButtonGroup>
             @if (_daily)
             {
-                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" role="group" aria-label="Period" data-testid="period-toggle">
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Outlined : Variant.Filled)" aria-pressed="@(_month ? "false" : "true")"
-                               OnClick="() => SetMonthAsync(false)" data-testid="show-week">Week</MudButton>
-                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_month ? Variant.Filled : Variant.Outlined)" aria-pressed="@(_month ? "true" : "false")"
-                               OnClick="() => SetMonthAsync(true)" data-testid="show-month">Month</MudButton>
-                </MudButtonGroup>
                 @if (_days is { Accounts.Count: > 0 } days)
                 {
                     <MudMenu Label="@(SelectedDays?.Name ?? "Account")"
@@ -74,7 +68,8 @@
 
         <PeriodNavigator Name="@PeriodName" IsCurrent="@(_from <= Today && Today <= _to)" Class="mb-2"
                          PreviousLabel="@(Monthly ? "Previous month" : "Previous week")" NextLabel="@(Monthly ? "Next month" : "Next week")"
-                         OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="GoToTodayAsync" />
+                         OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="GoToTodayAsync"
+                         Choices="@(_daily ? WeekOrMonth : null)" />
 
         @if (!_daily)
         {
@@ -148,16 +143,17 @@
                 @foreach (var day in account.Days)
                 {
                     <section class="mb-3" data-testid="cash-flow-day" aria-label="@day.Date.ToString("dddd d MMMM", Display)">
-                        <h2 class="mud-typography mud-typography-subtitle2 d-flex align-center gap-2 mb-1" style="font-weight: 600">
-                            <span class="flex-grow-1" data-testid="day-name">@day.Date.ToString("ddd d MMM", Display)</span>
+                        @* The day's total lines up with the amounts in the panel below: wording on the left, amount on the right (BUD-135). *@
+                        <h2 class="mud-typography mud-typography-subtitle2 d-flex align-center gap-2 mb-1 pr-3">
+                            <span class="flex-grow-1" style="font-weight: 600" data-testid="day-name">@day.Date.ToString("ddd d MMM", Display)</span>
                             @if (day.IsShort)
                             {
                                 <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" aria-hidden="true" />
-                                <span data-testid="day-short">Short by @Format(-day.RunningTotal, _days.CurrencyCode)</span>
+                                <span class="text-nowrap" data-testid="day-short">Short by <strong>@Format(-day.RunningTotal, _days.CurrencyCode)</strong></span>
                             }
                             else
                             {
-                                <span style="font-weight: 400" data-testid="day-running">@Format(day.RunningTotal, _days.CurrencyCode) so far</span>
+                                <span class="text-nowrap" data-testid="day-running">Running total <strong>@Format(day.RunningTotal, _days.CurrencyCode)</strong></span>
                             }
                         </h2>
                         <MudPaper Outlined="true" Class="px-3 py-1">
@@ -197,7 +193,10 @@
     /// <summary>The monthly view, or day by day over a month: both move a month at a time.</summary>
     private bool Monthly => !_daily || _month;
 
-    private string PeriodName => Monthly ? PeriodNames.Month(_from.Year, _from.Month, Today) : PeriodNames.Days(_from, _to, Today);
+    private IReadOnlyList<PeriodChoice> WeekOrMonth =>
+        [new("Week view", "show-week", !_month, EventCallback.Factory.Create(this, () => SetMonthAsync(false))), new("Month view", "show-month", _month, EventCallback.Factory.Create(this, () => SetMonthAsync(true)))];
+
+    private string PeriodName => Monthly ? PeriodNames.Month(_from.Year, _from.Month) : PeriodNames.Days(_from, _to);
 
     private CashFlowDaysAccount? SelectedDays =>
         _days?.Accounts.FirstOrDefault(a => a.AccountId == _account) ?? _days?.Accounts.FirstOrDefault();
@@ -288,12 +287,12 @@
             @if (net < 0m)
             {
                 <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" aria-hidden="true" />
-                <MudText Typo="Typo.body1" Style="font-weight: 600">Short by @Format(-net, currency)</MudText>
+                <MudText Typo="Typo.body1" Class="text-nowrap">Short by <strong>@Format(-net, currency)</strong></MudText>
             }
             else
             {
                 <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" aria-hidden="true" />
-                <MudText Typo="Typo.body1" Style="font-weight: 600">Surplus @Format(net, currency)</MudText>
+                <MudText Typo="Typo.body1" Class="text-nowrap">Surplus <strong>@Format(net, currency)</strong></MudText>
             }
         </span>;
 }

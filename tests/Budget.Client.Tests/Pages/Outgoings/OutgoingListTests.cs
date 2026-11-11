@@ -43,7 +43,7 @@ public sealed class OutgoingListTests : IDisposable
     {
         var cut = _context.RenderComponent<OutgoingList>();
 
-        Assert.Equal("November", cut.Find("[data-testid=month-name]").TextContent.Trim());
+        Assert.Equal("November 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal(new[] { "Housing", "Insurance", "Food & household" }, Texts(cut, "category-name"));
         Assert.Equal(3, cut.FindAll("[data-testid=category-group] [data-testid=category-icon]").Count);
         Assert.Equal(new[] { "£150.00", "£40.00", "£520.00" }, Texts(cut, "category-subtotal"));
@@ -127,7 +127,7 @@ public sealed class OutgoingListTests : IDisposable
         cut.WaitForAssertion(() => Assert.Equal(
             new[] { (2026, 11, false), (2026, 12, false), (2026, 11, false), (2026, 10, false), (2026, 10, true) },
             _api.Requests));
-        Assert.Equal("October", cut.Find("[data-testid=month-name]").TextContent.Trim());
+        Assert.Equal("October 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal("Hide", cut.Find("[data-testid=show-all]").TextContent.Trim());
     }
 
@@ -142,14 +142,15 @@ public sealed class OutgoingListTests : IDisposable
     [Fact]
     public void The_year_view_asks_for_12_months_from_the_shown_month_and_says_so()
     {
+        var popovers = _context.RenderComponent<MudPopoverProvider>();
         var cut = _context.RenderComponent<OutgoingList>();
-        Assert.Equal("true", cut.Find("[data-testid=show-month]").GetAttribute("aria-pressed"));
+        Assert.Equal("November 2026", Text(cut, "month-name"));
+        Assert.Equal("Change period, November 2026", cut.Find("[data-testid=month-name] button").GetAttribute("aria-label"));
 
-        cut.Find("[data-testid=show-year]").Click();
+        cut.ChoosePeriod(popovers, "month-name", "show-year");
 
         cut.WaitForAssertion(() => Assert.Equal(new[] { 1, 12 }, _api.MonthsRequested));
         Assert.Equal((2026, 11, false), _api.Requests[^1]);
-        Assert.Equal("true", cut.Find("[data-testid=show-year]").GetAttribute("aria-pressed"));
         Assert.Equal("Nov 2026 – Oct 2027", Text(cut, "month-name"));
         Assert.All(Texts(cut, "outgoing-period"), text => Assert.Equal("over 12 months", text));
         Assert.Equal("Start a month later", cut.Find("[data-testid=next-month]").GetAttribute("aria-label"));
@@ -172,7 +173,7 @@ public sealed class OutgoingListTests : IDisposable
         Assert.NotNull(cut.Find("[data-testid=filter-sheet]"));
         cut.InvokeAsync(() => cut.FindComponent<MudSelect<OutgoingKindDto?>>().Instance.ValueChanged.InvokeAsync(OutgoingKindDto.Allowance));
 
-        Assert.Equal("Show 1 outgoing", Text(cut, "close-filters"));
+        cut.WaitForAssertion(() => Assert.Equal("Show 1 outgoing", Text(cut, "close-filters")));
         cut.Find("[data-testid=close-filters]").Click();
         Assert.Empty(cut.FindAll("[data-testid=filter-sheet]"));
         Assert.Equal("Filter (1)", Text(cut, "open-filters"));
@@ -182,7 +183,7 @@ public sealed class OutgoingListTests : IDisposable
         // Removing the chip removes the filter.
         var chip = cut.FindComponents<MudChip<string>>().Single(c => c.Markup.Contains("data-testid=\"active-filter\"", StringComparison.Ordinal)).Instance;
         cut.InvokeAsync(() => chip.OnClose.InvokeAsync(chip));
-        Assert.Equal("Filter", Text(cut, "open-filters"));
+        cut.WaitForAssertion(() => Assert.Equal("Filter", Text(cut, "open-filters")));
         Assert.Equal(4, Texts(cut, "outgoing-name").Length);
     }
 

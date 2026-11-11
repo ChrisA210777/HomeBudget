@@ -1,14 +1,40 @@
-@* Previous, the period's name, "Go to today" and next (BUD-124, BUD-130). Today is an icon beside the next arrow, so
-   the name always has the room it needs. *@
+@* Previous, the period's name, "Go to today" and next (BUD-124, BUD-130). Where the page offers more than one length
+   of period, the name opens a menu of them, e.g. a week or a month (BUD-135), instead of a separate toggle.
+   "Go to today" floats beside the next arrow, so the name doesn't move when it appears: the name stays centred while
+   it fits, and only a long one moves left to keep clear of the icon (see the .razor.css). *@
 
-<div class="period-navigator @Class">
+<div class="period-navigator @(IsCurrent ? null : "has-today") @Class">
     <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@PreviousLabel" OnClick="OnPrevious" data-testid="@PreviousTestId" />
-    <MudText Typo="Typo.h6" Align="Align.Center" Class="period-name" data-testid="@NameTestId">@Name</MudText>
+    <div class="period-name mud-typography mud-typography-h6 @(Choices is { Count: > 1 } ? "period-choice" : null)" data-testid="@NameTestId">
+        @if (Choices is { Count: > 1 })
+        {
+            <MudMenu Label="@Name"
+                     EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                     Variant="Variant.Text"
+                     Color="Color.Inherit"
+                     AnchorOrigin="Origin.BottomCenter"
+                     TransformOrigin="Origin.TopCenter"
+                     PopoverClass="period-menu"
+                     AriaLabel="@($"Change period, {Name}")">
+                @foreach (var choice in Choices)
+                {
+                    <MudMenuItem Icon="@(choice.Selected ? Icons.Material.Filled.Check : null)" OnClick="() => choice.Choose.InvokeAsync()" data-testid="@choice.TestId">@choice.Name</MudMenuItem>
+                }
+            </MudMenu>
+        }
+        else
+        {
+            <span class="period-text">@Name</span>
+        }
+    </div>
     @if (!IsCurrent)
     {
-        <MudTooltip Text="@TodayLabel">
-            <MudIconButton Icon="@Icons.Material.Filled.Today" Color="Color.Primary" aria-label="@TodayLabel" OnClick="OnToday" data-testid="go-to-today" />
-        </MudTooltip>
+        @* Floats beside the next arrow, so the name stays where it is when it appears (BUD-135). *@
+        <div class="period-today">
+            <MudTooltip Text="@TodayLabel">
+                <MudIconButton Icon="@Icons.Material.Filled.Today" Color="Color.Primary" aria-label="@TodayLabel" OnClick="OnToday" data-testid="go-to-today" />
+            </MudTooltip>
+        </div>
     }
     <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@NextLabel" OnClick="OnNext" data-testid="@NextTestId" />
 </div>
@@ -51,4 +77,8 @@
 
     [Parameter]
     public string NameTestId { get; set; } = "period-name";
+
+    /// <summary>The lengths of period the page offers, e.g. a week or a month; with two or more, the name opens them as a menu.</summary>
+    [Parameter]
+    public IReadOnlyList<PeriodChoice>? Choices { get; set; }
 }

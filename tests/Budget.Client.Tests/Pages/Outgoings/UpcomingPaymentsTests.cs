@@ -38,9 +38,9 @@ public sealed class UpcomingPaymentsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(DayOfWeek.Sunday, "2026-11-01", "2026-11-07", "1 – 7 Nov")]
-    [InlineData(DayOfWeek.Monday, "2026-11-02", "2026-11-08", "2 – 8 Nov")]
-    [InlineData(DayOfWeek.Thursday, "2026-11-05", "2026-11-11", "5 – 11 Nov")]
+    [InlineData(DayOfWeek.Sunday, "2026-11-01", "2026-11-07", "1 – 7 Nov 26")]
+    [InlineData(DayOfWeek.Monday, "2026-11-02", "2026-11-08", "2 – 8 Nov 26")]
+    [InlineData(DayOfWeek.Thursday, "2026-11-05", "2026-11-11", "5 – 11 Nov 26")]
     public void Shows_this_week_starting_on_the_chosen_day(DayOfWeek firstDay, string from, string to, string name)
     {
         _settings.Saved = UserSettings.Defaults with { FirstDayOfWeek = firstDay };
@@ -70,20 +70,21 @@ public sealed class UpcomingPaymentsTests : IDisposable
     [Fact]
     public void Moving_between_weeks_and_months_asks_for_those_days()
     {
+        var popovers = _context.RenderComponent<MudBlazor.MudPopoverProvider>();
         var cut = _context.RenderComponent<UpcomingPayments>();
 
         cut.Find("[data-testid=next-period]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("8 – 14 Nov", Text(cut, "period-name")));
+        cut.WaitForAssertion(() => Assert.Equal("8 – 14 Nov 26", Text(cut, "period-name")));
         Assert.NotNull(cut.Find("[data-testid=go-to-today]"));
 
-        cut.Find("[data-testid=show-month]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("November", Text(cut, "period-name")));
+        cut.ChoosePeriod(popovers, "period-name", "show-month");
+        cut.WaitForAssertion(() => Assert.Equal("November 2026", Text(cut, "period-name")));
         cut.Find("[data-testid=next-period]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("December", Text(cut, "period-name")));
+        cut.WaitForAssertion(() => Assert.Equal("December 2026", Text(cut, "period-name")));
         cut.Find("[data-testid=next-period]").Click();
         cut.WaitForAssertion(() => Assert.Equal("January 2027", Text(cut, "period-name")));
         cut.Find("[data-testid=go-to-today]").Click();
-        cut.WaitForAssertion(() => Assert.Equal("November", Text(cut, "period-name")));
+        cut.WaitForAssertion(() => Assert.Equal("November 2026", Text(cut, "period-name")));
 
         Assert.Equal(
             new[] { ("2026-11-01", "2026-11-07"), ("2026-11-08", "2026-11-14"), ("2026-11-01", "2026-11-30"), ("2026-12-01", "2026-12-31"), ("2027-01-01", "2027-01-31"), ("2026-11-01", "2026-11-30") },

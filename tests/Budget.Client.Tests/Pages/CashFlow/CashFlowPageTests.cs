@@ -36,7 +36,7 @@ public sealed class CashFlowPageTests : IDisposable
 
         var cut = _context.RenderComponent<CashFlowPage>();
 
-        Assert.Equal("November", Text(cut, "period-name"));
+        Assert.Equal("November 2026", Text(cut, "period-name"));
         Assert.Equal(new[] { "Current", "Joint" }, Texts(cut, "account-name"));
         Assert.Equal(new[] { "Surplus £2,000.00", "Short by £150.00" }, Texts(cut, "account-net"));
         Assert.Equal(new[] { "In £3,000.00 · Out £1,000.00", "In £1,000.00 · Out £1,150.00" }, Texts(cut, "account-totals"));
@@ -53,7 +53,7 @@ public sealed class CashFlowPageTests : IDisposable
         cut.Find("[data-testid=next-period]").Click();
 
         cut.WaitForAssertion(() => Assert.Equal(new[] { (2026, 11), (2026, 12) }, _api.Months));
-        Assert.Equal("December", Text(cut, "period-name"));
+        Assert.Equal("December 2026", Text(cut, "period-name"));
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class CashFlowPageTests : IDisposable
 
         cut.WaitForAssertion(() => Assert.Equal((new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)), _api.Days.Single()));
         // The first account is shown to start with.
-        Assert.Equal(new[] { "£2,000.00 so far" }, Texts(cut, "day-running"));
+        Assert.Equal(new[] { "Running total £2,000.00" }, Texts(cut, "day-running"));
 
         // BUD-130: the account is a compact menu.
         cut.Find("[data-testid=day-account] button").Click();

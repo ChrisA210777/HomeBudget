@@ -18,7 +18,7 @@
         What comes in against what goes out each month. Annual and weekly payments are averaged into the month.
     </MudText>
 
-    <PeriodNavigator Name="@PeriodNames.Month(_year, _month, Today)" IsCurrent="@(_year == Today.Year && _month == Today.Month)" Class="mb-3"
+    <PeriodNavigator Name="@PeriodNames.Month(_year, _month)" IsCurrent="@(_year == Today.Year && _month == Today.Month)" Class="mb-3"
                      OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="() => MoveAsync(Today.Year * 12 + Today.Month - (_year * 12 + _month))"
                      PreviousTestId="previous-month" NextTestId="next-month" NameTestId="month-name" />
 
