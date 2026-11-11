@@ -5,7 +5,17 @@ namespace Budget.Shared;
 /// </summary>
 public static class ApiRoutes
 {
+    /// <summary>Is the app running? Doesn't touch the database, so checking it doesn't wake the free-tier database.</summary>
     public const string Health = "/health";
+
+    /// <summary>Can the app reach the database? For checking a deployment (BUD-12).</summary>
+    public const string Ready = "/health/ready";
+
+    /// <summary>
+    /// Response header with the request's correlation id: Application Insights' operation id. The client shows it when
+    /// something goes wrong on the server, so a problem can be found in the logs (BUD-12).
+    /// </summary>
+    public const string CorrelationIdHeaderName = "X-Correlation-Id";
 
     public const string ApiBase = "/api";
 

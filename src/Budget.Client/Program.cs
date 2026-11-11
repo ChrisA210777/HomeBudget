@@ -20,7 +20,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // The API is served from the same origin as the client (see ADR-001), so the session cookie
 // is sent automatically.
-builder.Services.AddScoped(_ => new HttpClient(new CsrfHeaderHandler { InnerHandler = new HttpClientHandler() })
+builder.Services.AddScoped(_ => new HttpClient(new CsrfHeaderHandler { InnerHandler = new ServerErrorHandler { InnerHandler = new HttpClientHandler() } })
 {
     BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
 });
