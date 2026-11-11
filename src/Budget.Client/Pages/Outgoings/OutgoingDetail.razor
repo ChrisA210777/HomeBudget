@@ -53,7 +53,7 @@
         {
             <MudAlert Severity="Severity.Warning" Dense="true" Class="my-2" data-testid="outgoing-coming-up">
                 <b>@OutgoingValidator.RenewsIn(comingUp.DayNumber - DateOnly.FromDateTime(Clock.GetLocalNow().DateTime).DayNumber).</b>
-                @OutgoingValidator.DescribeRenewal(d.Name, comingUp, d.AutoRenews)
+                @OutgoingValidator.DescribeRenewal(comingUp, d.AutoRenews)
             </MudAlert>
         }
 

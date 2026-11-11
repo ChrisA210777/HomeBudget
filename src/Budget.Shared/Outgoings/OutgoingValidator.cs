@@ -159,15 +159,25 @@ public static partial class OutgoingValidator
     };
 
     /// <summary>
-    /// What to do about a renewal: "Car insurance renews automatically on 3 Mar – cancel or switch
-    /// before then if you want to." or "TV Licence needs renewing by 3 Mar." (BUD-52).
+    /// What to do about a renewal, named: "Car insurance renews automatically on 3 Mar 2027. Switch or cancel before
+    /// then if you want to." or "TV Licence needs renewing by 3 Mar 2027." (BUD-52).
     /// </summary>
     public static string DescribeRenewal(string name, DateOnly renewalDate, bool autoRenews)
     {
+        var text = DescribeRenewal(renewalDate, autoRenews);
+        return $"{name} {char.ToLowerInvariant(text[0])}{text[1..]}";
+    }
+
+    /// <summary>
+    /// The same, where the name is already shown next to it (BUD-123): "Renews automatically on 3 Mar 2027. Switch or
+    /// cancel before then if you want to." or "Needs renewing by 3 Mar 2027."
+    /// </summary>
+    public static string DescribeRenewal(DateOnly renewalDate, bool autoRenews)
+    {
         var date = renewalDate.ToString("d MMM yyyy", CultureInfo.InvariantCulture);
         return autoRenews
-            ? $"{name} renews automatically on {date} – cancel or switch before then if you want to."
-            : $"{name} needs renewing by {date}.";
+            ? $"Renews automatically on {date}. Switch or cancel before then if you want to."
+            : $"Needs renewing by {date}.";
     }
 
     /// <summary>Common reference names, suggested after the household's own (BUD-56).</summary>

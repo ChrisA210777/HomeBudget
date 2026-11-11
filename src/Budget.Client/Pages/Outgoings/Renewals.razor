@@ -54,13 +54,16 @@
                                         <MudText Typo="Typo.h6" Align="Align.Center" Class="d-block" data-testid="renewal-day">@renewal.Date.Day</MudText>
                                     </div>
                                     <div class="flex-grow-1" style="min-width: 0">
-                                        <div class="d-flex align-center gap-2">
-                                            <MudIcon Icon="@CategoryIconSvg.For(renewal.CategoryIcon)" Size="Size.Small" Color="Color.Secondary" aria-hidden="true" />
-                                            <MudLink Href="@BackLink.To($"/outgoings/{renewal.OutgoingId}", "/outgoings/renewals")" Typo="Typo.body1" data-testid="renewal-name">@renewal.Name</MudLink>
+                                        @* A long name stops at two lines (BUD-126); on phones the person goes under it. *@
+                                        <div class="d-flex align-center gap-2 renewal-title">
+                                            <MudIcon Icon="@CategoryIconSvg.For(renewal.CategoryIcon)" Size="Size.Small" Color="Color.Secondary" Class="flex-shrink-0" aria-hidden="true" />
+                                            <MudLink Href="@BackLink.To($"/outgoings/{renewal.OutgoingId}", "/outgoings/renewals")" Typo="Typo.body1" Class="two-lines"
+                                                     title="@renewal.Name" data-testid="renewal-name">@renewal.Name</MudLink>
                                             @* Who it's for, so two with the same name can be told apart (BUD-97). *@
                                             @if (renewal.PersonName is { } person)
                                             {
-                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Person" Class="ma-0"
+                                                <span class="renewal-title-break" aria-hidden="true"></span>
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Person" Class="ma-0 flex-shrink-0 renewal-person"
                                                          aria-label="@($"For {person}")" data-testid="renewal-person">@person</MudChip>
                                             }
                                         </div>

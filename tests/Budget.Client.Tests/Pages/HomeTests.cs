@@ -61,8 +61,8 @@ public sealed class HomeTests : IDisposable
         var cut = _context.RenderComponent<Home>();
 
         var texts = cut.FindAll("[data-testid=coming-up-text]").Select(e => e.TextContent.Trim()).ToList();
-        Assert.Equal("Car insurance renews automatically on 3 Mar 2027 – cancel or switch before then if you want to.", texts[0]);
-        Assert.Equal("TV Licence needs renewing by 20 Mar 2027.", texts[1]);
+        Assert.Equal("Renews automatically on 3 Mar 2027. Switch or cancel before then if you want to.", texts[0]);
+        Assert.Equal("Needs renewing by 20 Mar 2027.", texts[1]);
         Assert.Equal(new[] { "Renews in 12 days", "Renews in 29 days" }, cut.FindAll("[data-testid=coming-up-days]").Select(e => e.TextContent.Trim()));
     }
 
