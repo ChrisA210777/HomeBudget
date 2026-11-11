@@ -16,8 +16,11 @@ test("an outgoing added from the home page shows in this month's list", async ({
 
   await page.getByTestId('save').click();
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Outgoings' })).toBeVisible();
+  // BUD-117: back to the page it was added from.
+  await expect(page.getByTestId('welcome')).toBeVisible();
   await expect(page.getByText('Insurance for the car was added.')).toBeVisible();
+  await page.goto('/outgoings');
+  await settled(page);
   const item = page.getByTestId('outgoing-item').filter({ hasText: 'Insurance for the car' });
   // It starts this month, so this month counts in full (ADR-011).
   await expect(item.getByTestId('outgoing-monthly')).toHaveText('£40.00');
