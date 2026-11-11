@@ -133,10 +133,11 @@ Dev runs in Azure on free tiers, deployed by GitHub Actions after CI passes on `
 
 ## Documentation
 
-Design and operational documentation is in Confluence (space SD, Home Budget folder): architecture, ADRs, the domain model, roles, the export format, local development, deploying to Azure and monitoring. [CLAUDE.md](CLAUDE.md) lists which page covers what; keep the relevant page up to date with every change.
+Design and operational documentation is in Confluence (space SD, Home Budget folder): architecture, ADRs, the domain model, roles, the export format, UI conventions, local development, deploying to Azure and monitoring. [CLAUDE.md](CLAUDE.md) lists which page covers what; keep the relevant page up to date with every change.
 
 ## Conventions
 
+- UI work follows the UI conventions in [CLAUDE.md](CLAUDE.md) and the UI Conventions page in Confluence.
 - Nullable reference types are on and warnings are treated as errors.
 - Package versions are managed centrally in `Directory.Packages.props`.
 - Branch from `main`, name branches `feature/BUD-<number>-short-description`, and open a pull request. CI must pass before merging.

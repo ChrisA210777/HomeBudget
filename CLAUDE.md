@@ -27,7 +27,7 @@ version. Don't leave it for later. If a decision is made in conversation, write 
 | The export/import format (any contract change bumps `schemaVersion`) | **Data Export & Import Format** (287571969) |
 | What the app does, or what's in or out of scope | **Project Overview** (285605889) |
 | Ideas for later, or the status of ones listed there | **Future Ideas (to discuss)** (287899649) |
-| A UI pattern, layout rule or wording convention | **UI Conventions** (Confluence) and the *UI conventions* section below |
+| A UI pattern, layout rule or wording convention | **UI Conventions** (289603597) and the *UI conventions* section below |
 | An architectural decision | A new ADR page under **Architecture Decision Records** (285769729), plus a row in its table |
 
 **ADRs are records of a decision.** Don't rewrite one when things change later: add a dated "Update" panel at the
