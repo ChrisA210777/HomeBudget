@@ -211,12 +211,16 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         var savings = details.Kind == OutgoingKind.Savings;
         Recipient = savings ? null : Values.Optional(details.Recipient, nameof(details.Recipient), RecipientMaxLength);
         SavingsAccountId = savings ? details.SavingsAccountId : null;
-        PaymentMethod = details.PaymentMethod;
         AccountId = details.AccountId;
-        ReferenceLabel = Values.Optional(details.ReferenceLabel, nameof(details.ReferenceLabel), ReferenceLabelMaxLength);
-        ReferenceValue = Values.Optional(details.ReferenceValue, nameof(details.ReferenceValue), ReferenceValueMaxLength);
-        Website = ValidWebsite(details.Website);
-        ContactPhone = Values.Optional(details.ContactPhone, nameof(details.ContactPhone), ContactPhoneMaxLength);
+
+        // Payment details only where they apply (BUD-105): bills have them all, savings only how they're paid
+        // (the provider's details belong to the account), and allowances none.
+        var bill = details.Kind == OutgoingKind.Bill;
+        PaymentMethod = details.Kind == OutgoingKind.Allowance ? null : details.PaymentMethod;
+        ReferenceLabel = bill ? Values.Optional(details.ReferenceLabel, nameof(details.ReferenceLabel), ReferenceLabelMaxLength) : null;
+        ReferenceValue = bill ? Values.Optional(details.ReferenceValue, nameof(details.ReferenceValue), ReferenceValueMaxLength) : null;
+        Website = bill ? ValidWebsite(details.Website) : null;
+        ContactPhone = bill ? Values.Optional(details.ContactPhone, nameof(details.ContactPhone), ContactPhoneMaxLength) : null;
         Notes = Values.Optional(details.Notes, nameof(details.Notes), NotesMaxLength);
     }
 

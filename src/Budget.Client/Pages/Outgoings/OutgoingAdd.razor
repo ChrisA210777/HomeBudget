@@ -195,32 +195,39 @@
                                       MaxLength="OutgoingValidator.RecipientMaxLength" Variant="Variant.Outlined" data-testid="recipient" />
                     }
 
-                    <MudSelect T="PaymentMethodDto?" @bind-Value="_paymentMethod" ToStringFunc="MethodName" Label="How it's paid" Clearable="true"
-                               Variant="Variant.Outlined" data-testid="payment-method">
-                        @foreach (var method in Enum.GetValues<PaymentMethodDto>())
-                        {
-                            <MudSelectItem T="PaymentMethodDto?" Value="method">@OutgoingValidator.Describe(method)</MudSelectItem>
-                        }
-                    </MudSelect>
+                    @* How it's paid applies to bills and savings; the rest only to bills (BUD-105). *@
+                    @if (_kind != OutgoingKindDto.Allowance)
+                    {
+                        <MudSelect T="PaymentMethodDto?" @bind-Value="_paymentMethod" ToStringFunc="MethodName" Label="How it's paid" Clearable="true"
+                                   Variant="Variant.Outlined" data-testid="payment-method">
+                            @foreach (var method in Enum.GetValues<PaymentMethodDto>())
+                            {
+                                <MudSelectItem T="PaymentMethodDto?" Value="method">@OutgoingValidator.Describe(method)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
 
                     <MudAutocomplete T="string" @bind-Value="_paidFrom" SearchFunc="SearchPaidFromAsync" CoerceValue="true" CoerceText="false"
                                      Label="Paid from" HelperText="The account's name, e.g. “Joint current account”" MaxLength="OutgoingValidator.PaidFromMaxLength"
                                      ShowProgressIndicator="false" Variant="Variant.Outlined" AdornmentAriaLabel="Show suggested accounts" data-testid="paid-from" />
 
-                    <div class="d-flex gap-2 flex-wrap">
-                        <MudAutocomplete T="string" @bind-Value="_referenceLabel" SearchFunc="SearchReferenceLabelsAsync" CoerceValue="true" CoerceText="false"
-                                         Label="Reference name" Placeholder="e.g. Policy number" MaxLength="OutgoingValidator.ReferenceLabelMaxLength"
-                                         ShowProgressIndicator="false" Variant="Variant.Outlined" AdornmentAriaLabel="Show suggested reference names" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-label" />
-                        <MudTextField @bind-Value="_referenceValue" Label="Reference" Immediate="true"
-                                      MaxLength="OutgoingValidator.ReferenceValueMaxLength" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-value" />
-                    </div>
+                    @if (_kind == OutgoingKindDto.Bill)
+                    {
+                        <div class="d-flex gap-2 flex-wrap">
+                            <MudAutocomplete T="string" @bind-Value="_referenceLabel" SearchFunc="SearchReferenceLabelsAsync" CoerceValue="true" CoerceText="false"
+                                             Label="Reference name" Placeholder="e.g. Policy number" MaxLength="OutgoingValidator.ReferenceLabelMaxLength"
+                                             ShowProgressIndicator="false" Variant="Variant.Outlined" AdornmentAriaLabel="Show suggested reference names" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-label" />
+                            <MudTextField @bind-Value="_referenceValue" Label="Reference" Immediate="true"
+                                          MaxLength="OutgoingValidator.ReferenceValueMaxLength" Variant="Variant.Outlined" Class="flex-grow-1" Style="min-width: 10rem" data-testid="reference-value" />
+                        </div>
 
-                    <MudTextField @bind-Value="_website" Label="Website" InputType="InputType.Url" Placeholder="example.com"
-                                  Error="Has(nameof(CreateOutgoingRequest.Website))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Website))"
-                                  MaxLength="OutgoingValidator.WebsiteMaxLength" Variant="Variant.Outlined" data-testid="website" />
+                        <MudTextField @bind-Value="_website" Label="Website" InputType="InputType.Url" Placeholder="example.com"
+                                      Error="Has(nameof(CreateOutgoingRequest.Website))" ErrorText="@ErrorFor(nameof(CreateOutgoingRequest.Website))"
+                                      MaxLength="OutgoingValidator.WebsiteMaxLength" Variant="Variant.Outlined" data-testid="website" />
 
-                    <MudTextField @bind-Value="_contactPhone" Label="Contact phone" InputType="InputType.Telephone"
-                                  MaxLength="OutgoingValidator.ContactPhoneMaxLength" Variant="Variant.Outlined" data-testid="contact-phone" />
+                        <MudTextField @bind-Value="_contactPhone" Label="Contact phone" InputType="InputType.Telephone"
+                                      MaxLength="OutgoingValidator.ContactPhoneMaxLength" Variant="Variant.Outlined" data-testid="contact-phone" />
+                    }
 
                     <MudTextField @bind-Value="_notes" Label="Notes" Lines="3" Sizing="InputSizing.Auto" Immediate="true"
                                   MaxLength="OutgoingValidator.NotesMaxLength" Variant="Variant.Outlined" data-testid="notes" />
@@ -474,12 +481,12 @@
             Unit = _unit,
             FirstPaymentDate = IncomeDates.ToDateOnly(_firstPaymentDate),
             Recipient = _kind == OutgoingKindDto.Allowance ? null : _recipient,
-            PaymentMethod = _paymentMethod,
+            PaymentMethod = _kind == OutgoingKindDto.Allowance ? null : _paymentMethod,
             PaidFrom = _paidFrom,
-            ReferenceLabel = _referenceLabel,
-            ReferenceValue = _referenceValue,
-            Website = _website,
-            ContactPhone = _contactPhone,
+            ReferenceLabel = _kind == OutgoingKindDto.Bill ? _referenceLabel : null,
+            ReferenceValue = _kind == OutgoingKindDto.Bill ? _referenceValue : null,
+            Website = _kind == OutgoingKindDto.Bill ? _website : null,
+            ContactPhone = _kind == OutgoingKindDto.Bill ? _contactPhone : null,
             Notes = _notes,
             RenewalDate = renews ? IncomeDates.ToDateOnly(_renewalDate) : null,
             RenewalEveryMonths = _renewalEveryMonths,
