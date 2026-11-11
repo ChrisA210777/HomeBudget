@@ -190,7 +190,7 @@ public sealed class MembersTests : IDisposable
         cut.Find("[data-testid=delete-cancel]").Click();
 
         Assert.Empty(_api.Deleted);
-        Assert.NotNull(cut.Find("[data-testid=delete-household]"));
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=delete-household]")));
     }
 
     public void Dispose() => _context.Dispose();
