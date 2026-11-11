@@ -82,24 +82,30 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     [Fact]
-    public async Task Filters_change_the_list_and_the_totals()
+    public void Filters_change_the_list_and_the_totals()
     {
+        var popovers = _context.RenderComponent<MudPopoverProvider>();
         var cut = _context.RenderComponent<OutgoingList>();
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<OutgoingKindDto?>>().Instance.ValueChanged.InvokeAsync(OutgoingKindDto.Allowance));
+        // BUD-131: compact menus, filled while they narrow the list.
+        Assert.Equal("Kind: All", Text(cut, "filter-kind"));
+        Choose(cut, popovers, "filter-kind", "Allowances");
 
+        Assert.Equal("Kind: Allowances", Text(cut, "filter-kind"));
+        Assert.Contains("mud-button-filled", cut.Find("[data-testid=filter-kind] button").ClassName, StringComparison.Ordinal);
+        Assert.DoesNotContain("mud-button-filled", cut.Find("[data-testid=filter-priority] button").ClassName, StringComparison.Ordinal);
         Assert.Equal(new[] { "Food shopping" }, Texts(cut, "outgoing-name"));
         Assert.Equal("£520.00", Text(cut, "month-total"));
         Assert.Equal("£0.00", Text(cut, "total-essential"));
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<OutgoingKindDto?>>().Instance.ValueChanged.InvokeAsync(null));
-        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<string>>().Instance.ValueChanged.InvokeAsync(StaticPeopleApi.ChrisId.ToString()));
+        Choose(cut, popovers, "filter-kind", "All");
+        Choose(cut, popovers, "filter-person", "Chris Austin");
 
         Assert.Equal(new[] { "Car insurance" }, Texts(cut, "outgoing-name"));
         Assert.Equal("£40.00", Text(cut, "month-total"));
 
-        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<string>>().Instance.ValueChanged.InvokeAsync("household"));
-        await cut.InvokeAsync(() => cut.FindComponent<MudSelect<OutgoingPriorityDto?>>().Instance.ValueChanged.InvokeAsync(OutgoingPriorityDto.Optional));
+        Choose(cut, popovers, "filter-person", "Household");
+        Choose(cut, popovers, "filter-priority", "Optional");
 
         Assert.Empty(cut.FindAll("[data-testid=outgoing-item]"));
         Assert.NotNull(cut.Find("[data-testid=outgoings-no-match]"));
@@ -388,6 +394,13 @@ public sealed class OutgoingListTests : IDisposable
     }
 
     public void Dispose() => _context.Dispose();
+
+    private static void Choose(IRenderedComponent<OutgoingList> cut, IRenderedComponent<MudPopoverProvider> popovers, string filter, string option)
+    {
+        cut.Find($"[data-testid={filter}] button").Click();
+        popovers.WaitForElements($"[data-testid={filter}-option]").Single(o => o.TextContent.Trim() == option).Click();
+        popovers.WaitForAssertion(() => Assert.Empty(popovers.FindAll($"[data-testid={filter}-option]")));
+    }
 
     private static string Text(IRenderedComponent<OutgoingList> cut, string testId) => cut.Find($"[data-testid={testId}]").TextContent.Trim();
 

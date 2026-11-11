@@ -81,51 +81,17 @@
                 </div>
             </MudPaper>
 
-            @* One line on phones too: each filter shrinks to share the width (BUD-79). *@
-            <div class="list-filters d-flex flex-wrap gap-2 pb-1" data-testid="list-filters">
-                <div class="list-filter" style="width: 11rem">
-                    <MudSelect T="OutgoingKindDto?" @bind-Value="_kind" ToStringFunc="KindFilterName" Label="Kind" Margin="Margin.Dense"
-                               Variant="Variant.Outlined" data-testid="filter-kind">
-                        <MudSelectItem T="OutgoingKindDto?" Value="null">@KindFilterName(null)</MudSelectItem>
-                        @foreach (var kind in Enum.GetValues<OutgoingKindDto>())
-                        {
-                            <MudSelectItem T="OutgoingKindDto?" Value="kind">@KindFilterName(kind)</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
-                <div class="list-filter" style="width: 11rem">
-                    <MudSelect T="OutgoingPriorityDto?" @bind-Value="_priority" ToStringFunc="PriorityFilterName" Label="Priority" Margin="Margin.Dense"
-                               Variant="Variant.Outlined" data-testid="filter-priority">
-                        <MudSelectItem T="OutgoingPriorityDto?" Value="null">@PriorityFilterName(null)</MudSelectItem>
-                        @foreach (var priority in Enum.GetValues<OutgoingPriorityDto>())
-                        {
-                            <MudSelectItem T="OutgoingPriorityDto?" Value="priority">@PriorityFilterName(priority)</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
-                <div class="list-filter" style="width: 13rem">
-                    <MudSelect T="string" @bind-Value="_person" ToStringFunc="PersonFilterName" Label="For" Margin="Margin.Dense"
-                               Variant="Variant.Outlined" data-testid="filter-person">
-                        <MudSelectItem T="string" Value="@EveryoneKey">@PersonFilterName(EveryoneKey)</MudSelectItem>
-                        <MudSelectItem T="string" Value="@HouseholdKey">@PersonFilterName(HouseholdKey)</MudSelectItem>
-                        @foreach (var person in _people)
-                        {
-                            <MudSelectItem T="string" Value="@person.Id.ToString()">@person.DisplayName</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
+            @* Compact filters that wrap onto a second line only if they need to (BUD-79, BUD-95, BUD-131). *@
+            <div class="list-filters pb-1" data-testid="list-filters">
+                <FilterMenu TValue="OutgoingKindDto?" Label="Kind" @bind-Value="_kind" TestId="filter-kind"
+                            Options="@([(null, KindFilterName(null)), .. Enum.GetValues<OutgoingKindDto>().Select(k => ((OutgoingKindDto?)k, KindFilterName(k)))])" />
+                <FilterMenu TValue="OutgoingPriorityDto?" Label="Priority" @bind-Value="_priority" TestId="filter-priority"
+                            Options="@([(null, PriorityFilterName(null)), .. Enum.GetValues<OutgoingPriorityDto>().Select(p => ((OutgoingPriorityDto?)p, PriorityFilterName(p)))])" />
+                <FilterMenu TValue="string" Label="For" @bind-Value="_person" TestId="filter-person"
+                            Options="@([(EveryoneKey, PersonFilterName(EveryoneKey)), (HouseholdKey, PersonFilterName(HouseholdKey)), .. _people.Select(p => (p.Id.ToString(), p.DisplayName))])" />
                 @* By the account it's paid from, including its pots (BUD-95). *@
-                <div class="list-filter" style="width: 13rem">
-                    <MudSelect T="Guid?" @bind-Value="_account" ToStringFunc="AccountFilterName" Label="Paid from" Margin="Margin.Dense"
-                               Variant="Variant.Outlined" data-testid="filter-account">
-                        <MudSelectItem T="Guid?" Value="null">@AccountFilterName(null)</MudSelectItem>
-                        <MudSelectItem T="Guid?" Value="Guid.Empty">@AccountFilterName(Guid.Empty)</MudSelectItem>
-                        @foreach (var account in _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)))
-                        {
-                            <MudSelectItem T="Guid?" Value="account.Id">@account.DisplayName</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
+                <FilterMenu TValue="Guid?" Label="Paid from" @bind-Value="_account" TestId="filter-account"
+                            Options="@([(null, AccountFilterName(null)), (Guid.Empty, AccountFilterName(Guid.Empty)), .. _accounts.Where(a => a.ParentAccountId is null && (!a.IsArchived || a.Id == _account)).Select(a => ((Guid?)a.Id, a.DisplayName))])" />
             </div>
 
             @if (_category is { } categoryId)
