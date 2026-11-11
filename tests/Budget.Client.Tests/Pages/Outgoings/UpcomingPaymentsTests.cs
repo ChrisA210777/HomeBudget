@@ -145,6 +145,10 @@ public sealed class UpcomingPaymentsTests : IDisposable
     {
         cut.Find("[data-testid=filter-account] button").Click();
         popovers.WaitForElements("[data-testid=filter-account-option]").Single(o => o.TextContent.Trim() == account).Click();
+
+        // The menu closes once a choice is made, ready to open again.
+        popovers.WaitForAssertion(() => Assert.Empty(popovers.FindAll("[data-testid=filter-account-option]")));
+        cut.WaitForAssertion(() => Assert.Equal(account, cut.Find("[data-testid=filter-account]").TextContent.Trim()));
     }
 
     private static string Text(IRenderedComponent<UpcomingPayments> cut, string testId) => cut.Find($"[data-testid={testId}]").TextContent.Trim();
