@@ -126,6 +126,21 @@ public sealed class OutgoingAddTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(OutgoingKindDto.Bill, 1, 1)]
+    [InlineData(OutgoingKindDto.Savings, 1, 0)]
+    [InlineData(OutgoingKindDto.Allowance, 0, 0)]
+    public async Task Only_the_payment_details_that_apply_are_offered(OutgoingKindDto kind, int method, int rest)
+    {
+        var cut = _context.RenderComponent<OutgoingAdd>();
+        await cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<OutgoingKindDto>>().Instance.ValueChanged.InvokeAsync(kind));
+
+        cut.Find("[data-testid=toggle-details]").Click();
+
+        Assert.Equal(method, cut.FindAll("[data-testid=payment-method]").Count);
+        Assert.Equal(new[] { rest, rest, rest, rest }, new[] { "reference-label", "reference-value", "website", "contact-phone" }.Select(id => cut.FindAll($"[data-testid={id}]").Count));
+    }
+
     [Fact]
     public async Task Typing_your_own_name_fills_in_nothing()
     {

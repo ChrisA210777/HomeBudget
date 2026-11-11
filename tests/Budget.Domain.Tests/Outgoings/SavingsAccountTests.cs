@@ -15,7 +15,24 @@ public class SavingsAccountTests
         FirstPaymentDate = new DateOnly(2026, 1, 1),
         Recipient = "Someone",
         SavingsAccountId = Isa,
+        PaymentMethod = PaymentMethod.StandingOrder,
+        ReferenceLabel = "Account number",
+        ReferenceValue = "12345678",
+        Website = "https://example.com",
+        ContactPhone = "0800 123 456",
     };
+
+    [Theory]
+    [InlineData(OutgoingKind.Bill, true, true)]
+    [InlineData(OutgoingKind.Savings, true, false)]
+    [InlineData(OutgoingKind.Allowance, false, false)]
+    public void Payment_details_are_kept_only_where_they_apply(OutgoingKind kind, bool method, bool rest)
+    {
+        var outgoing = Outgoing.Create(Guid.NewGuid(), Details(kind), 100m, PaymentSchedule.Monthly, "Start");
+
+        Assert.Equal(method, outgoing.PaymentMethod is not null);
+        Assert.Equal(new[] { rest, rest, rest, rest }, new[] { outgoing.ReferenceLabel, outgoing.ReferenceValue, outgoing.Website, outgoing.ContactPhone }.Select(v => v is not null));
+    }
 
     [Fact]
     public void Savings_keep_the_account_they_go_into_and_no_recipient()
