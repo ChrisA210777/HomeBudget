@@ -74,7 +74,9 @@ test("an account's outgoings are one tap away from the Accounts page", async ({ 
   // BUD-96, BUD-58: Upcoming payments filters by account.
   await page.goto('/outgoings/upcoming');
   await settled(page);
-  await choose(page, 'filter-account', 'Garden account');
+  await page.getByTestId('filter-account').getByRole('button').click();
+  await page.getByTestId('filter-account-option').filter({ hasText: 'Garden account' }).click();
+  await expect(page.getByTestId('filter-account')).toHaveText('Garden account');
   await expect(page.getByTestId('payment-name')).toHaveText(['Hedge trimming fund']);
   await expect(page.getByTestId('period-total')).toHaveText('£20.00');
 });
