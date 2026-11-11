@@ -41,6 +41,13 @@ public sealed class Account : AuditableEntity, IHouseholdOwned
 
     public bool IsArchived { get; private set; }
 
+    /// <summary>
+    /// The income or transfer whose arrival starts this account's month (BUD-136), or <c>null</c> for the 1st. Cash flow
+    /// starts the account's running total again each time it arrives. Not a foreign key: if the payment is deleted,
+    /// the account simply goes back to the 1st. Always <c>null</c> for a pot, which follows its account.
+    /// </summary>
+    public Guid? MonthStartsWithId { get; private set; }
+
     public bool IsPot => ParentAccountId is not null;
 
     /// <param name="ownerPersonId">A person in the household, or <c>null</c> for the household's own account.</param>
@@ -96,6 +103,17 @@ public sealed class Account : AuditableEntity, IHouseholdOwned
 
         ParentAccountId = account.Id;
         OwnerPersonId = account.OwnerPersonId;
+    }
+
+    /// <summary>Starts the account's month when the given income or transfer arrives, or on the 1st for <c>null</c>.</summary>
+    public void StartMonthWith(Guid? paymentId)
+    {
+        if (IsPot && paymentId is not null)
+        {
+            throw new InvalidOperationException("A pot's month follows its account.");
+        }
+
+        MonthStartsWithId = paymentId;
     }
 
     public void Archive() => IsArchived = true;

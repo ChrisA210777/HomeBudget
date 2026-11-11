@@ -130,7 +130,8 @@
                         <MudText Typo="Typo.body2" Class="flex-grow-1" data-testid="day-totals">
                             In @Format(account.TotalIn, _days.CurrencyCode) · Out @Format(account.TotalOut, _days.CurrencyCode)
                         </MudText>
-                        @Net(account.Net, _days.CurrencyCode)
+                        @* Where the account stands at the end of the period, counting from its month's start (BUD-136). *@
+                        @Net(account.Days.LastOrDefault()?.RunningTotal ?? account.BroughtForward, _days.CurrencyCode)
                     </div>
                     @if (account.Days.FirstOrDefault(d => d.IsShort) is { } firstShort)
                     {
@@ -138,10 +139,32 @@
                             More goes out than has come in by @IncomeDates.Format(firstShort.Date). Money will need to be in the account before then.
                         </MudAlert>
                     }
+                    @if (account is { Suggestion: { } suggestion, AccountId: { } accountId } && _canEdit)
+                    {
+                        @* Short only until regular money arrives: offer to start the account's month with it (BUD-136). *@
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" data-testid="month-start-tip">
+                            <div>@suggestion.Name arrives on @suggestion.Date.ToString("d MMM", Display). If that's when this account gets its money for the month, start its month then, so it isn't shown short before it arrives.</div>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Class="mt-1"
+                                       OnClick="() => StartMonthWithAsync(accountId, suggestion.PaymentId)" data-testid="use-month-start">Start its month with @suggestion.Name</MudButton>
+                        </MudAlert>
+                    }
                 </MudPaper>
+
+                @if (account.BroughtForwardSince is { } since)
+                {
+                    @* The period starts part-way through the account's month: the running totals carry on from here (BUD-136). *@
+                    <div class="d-flex align-center gap-2 mb-3 pr-3 mud-typography mud-typography-subtitle2" data-testid="brought-forward">
+                        <span class="flex-grow-1">Brought forward since @since.ToString("d MMM", Display)</span>
+                        <strong class="text-nowrap">@Format(account.BroughtForward, _days.CurrencyCode)</strong>
+                    </div>
+                }
 
                 @foreach (var day in account.Days)
                 {
+                    @if (day.MonthStarted is { } started)
+                    {
+                        <div class="month-start" data-testid="month-start">@MonthStartLabel(account, day, started)</div>
+                    }
                     <section class="mb-3" data-testid="cash-flow-day" aria-label="@day.Date.ToString("dddd d MMMM", Display)">
                         @* The day's total lines up with the amounts in the panel below: wording on the left, amount on the right (BUD-135). *@
                         <h2 class="mud-typography mud-typography-subtitle2 d-flex align-center gap-2 mb-1 pr-3">
@@ -187,6 +210,7 @@
     private Guid? _account;
     private CashFlowMonthResponse? _monthData;
     private CashFlowDaysResponse? _days;
+    private bool _canEdit;
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
@@ -206,6 +230,7 @@
         _firstDay = (await Settings.GetAsync()).FirstDayOfWeek;
         (_from, _to) = PaymentPeriods.MonthOf(Today);
         _household = await Session.GetActiveHouseholdAsync();
+        _canEdit = _household is not null && _household.Role != "Viewer";
         _loaded = true;
         await LoadAsync();
     }
@@ -270,6 +295,18 @@
     }
 
     private static string Format(decimal amount, string currency) => Money.Format(amount, currency);
+
+    /// <summary>e.g. "Month starts · Salary", or "Month starts · 1 Dec" when nothing happened that day.</summary>
+    private static string MonthStartLabel(CashFlowDaysAccount account, CashFlowDay day, DateOnly started) =>
+        string.Join(" · ", new[] { "Month starts", account.MonthStartsWith, started == day.Date ? null : started.ToString("d MMM", Display) }.OfType<string>());
+
+    private async Task StartMonthWithAsync(Guid accountId, Guid paymentId)
+    {
+        if (_household is not null && await CashFlowApi.SetMonthStartAsync(_household.HouseholdId, accountId, paymentId))
+        {
+            await LoadAsync();
+        }
+    }
 
     /// <summary>e.g. "Mortgage · Bills pot".</summary>
     private static string Label(CashFlowEntry entry) => entry.Pot is { } pot ? $"{entry.Name} · {pot} pot" : entry.Name;

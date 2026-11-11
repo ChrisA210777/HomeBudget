@@ -152,6 +152,8 @@
     private string? _editName;
     private string? _editProvider;
     private Guid? _editOwner;
+    private Guid? _editMonthStart;
+    private bool _editAdvanced;
 
     private Guid? _mergingId;
     private Guid? _mergeInto;
@@ -223,6 +225,27 @@
                         </div>
                     }
                 </div>
+                @if (!isPot && _transfersEnabled)
+                {
+                    @* An advanced setting for Cash flow (BUD-136): most accounts' months start on the 1st. *@
+                    @if (_editAdvanced)
+                    {
+                        <MudSelect T="Guid?" @bind-Value="_editMonthStart" ToStringFunc="@(id => MonthStartName(account, id))" Label="Month starts"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3" data-testid="edit-month-start"
+                                   HelperText="@MonthStartHelp(account)">
+                            <MudSelectItem T="Guid?" Value="null">@MonthStartName(account, null)</MudSelectItem>
+                            @foreach (var option in account.MonthStartOptions)
+                            {
+                                <MudSelectItem T="Guid?" Value="option.Id">@MonthStartName(account, option.Id)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Class="mt-2" EndIcon="@Icons.Material.Filled.ExpandMore"
+                                   OnClick="() => _editAdvanced = true" data-testid="edit-more-options">More options</MudButton>
+                    }
+                }
                 <div class="d-flex gap-2 mt-2">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="() => SaveEditAsync(account)"
                                Disabled="@(_saving || !Online || string.IsNullOrWhiteSpace(_editName))" data-testid="edit-account-save">Save</MudButton>
@@ -265,7 +288,14 @@
                                 @OutgoingCount(isPot ? account.OutgoingCount : OutgoingsFor(account))
                             }
                             @(account.IncomeCount > 0 ? $" · {(account.IncomeCount == 1 ? "1 income" : $"{account.IncomeCount} incomes")}" : string.Empty)
+                            @(account.MonthStartsWithName is { } startsWith ? $" · Month starts when {startsWith} arrives" : string.Empty)
                         </MudText>
+                        @if (account.MonthStartMissing)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Warning" Class="d-block" data-testid="month-start-missing">
+                                The payment this account's month started with has gone, so its month starts on the 1st again.
+                            </MudText>
+                        }
                     </div>
                     @if (account.IsArchived)
                     {
@@ -338,7 +368,17 @@
         _editName = account.Name;
         _editProvider = account.Provider;
         _editOwner = account.OwnerPersonId;
+        _editMonthStart = account.MonthStartsWithId;
+        _editAdvanced = account.MonthStartsWithId is not null;
     }
+
+    private static string MonthStartHelp(AccountSummary account) => account.MonthStartOptions.Count == 0
+        ? "Cash flow counts this account's month from the 1st. Pay income or a transfer into it to start its month when that arrives instead."
+        : "When this account gets its money for the month, such as your pay. Cash flow counts each month from then.";
+
+    /// <summary>"On the 1st", or "When Salary arrives" (BUD-136).</summary>
+    private static string MonthStartName(AccountSummary account, Guid? id) =>
+        account.MonthStartOptions.FirstOrDefault(o => o.Id == id) is { } option ? $"When {option.Name} arrives" : "On the 1st";
 
     private void StartMerge(AccountSummary account)
     {
@@ -361,7 +401,13 @@
 
     private Task SaveEditAsync(AccountSummary account) =>
         SaveAsync(
-            () => AccountsApi.UpdateAsync(_household!.HouseholdId, account.Id, new SaveAccountRequest { Name = _editName ?? string.Empty, Provider = _editProvider, OwnerPersonId = _editOwner }),
+            () => AccountsApi.UpdateAsync(_household!.HouseholdId, account.Id, new SaveAccountRequest
+            {
+                Name = _editName ?? string.Empty,
+                Provider = _editProvider,
+                OwnerPersonId = _editOwner,
+                MonthStartsWithId = _editMonthStart,
+            }),
             "Saved.",
             () => _editingId = null);
 

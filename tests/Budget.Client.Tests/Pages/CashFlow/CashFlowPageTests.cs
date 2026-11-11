@@ -79,6 +79,66 @@ public sealed class CashFlowPageTests : IDisposable
     }
 
     [Fact]
+    public void Carries_on_from_the_accounts_month_and_marks_where_it_starts_again()
+    {
+        UseTransfers(true);
+        var topUp = Guid.NewGuid();
+        _api.DaysResponse = (from, to) => new CashFlowDaysResponse(from, to, "GBP",
+        [
+            new(JointId, "Joint",
+            [
+                new(new DateOnly(2026, 11, 5), [new(CashFlowKindDto.Outgoing, Guid.NewGuid(), "Council tax", null, 150m)], 0m, 150m, -150m, true),
+                new(new DateOnly(2026, 11, 25), [new(CashFlowKindDto.TransferIn, topUp, "Bills top-up", "Bills", 1000m)], 1000m, 0m, 1000m, false)
+                {
+                    MonthStarted = new DateOnly(2026, 11, 25),
+                },
+            ], 1000m, 150m)
+            {
+                BroughtForward = 0m,
+                BroughtForwardSince = new DateOnly(2026, 10, 25),
+                MonthStartsWith = "Bills top-up",
+            },
+        ]);
+        var cut = _context.RenderComponent<CashFlowPage>();
+
+        cut.Find("[data-testid=show-daily]").Click();
+
+        // BUD-136: the running totals carry on from the account's month, which starts again when the top-up arrives.
+        cut.WaitForAssertion(() => Assert.Equal("Brought forward since 25 Oct £0.00", Text(cut, "brought-forward")));
+        Assert.Equal(new[] { "Month starts · Bills top-up" }, Texts(cut, "month-start"));
+        Assert.Equal(new[] { "Short by £150.00" }, Texts(cut, "day-short"));
+        Assert.Equal(new[] { "Running total £1,000.00" }, Texts(cut, "day-running"));
+        Assert.Equal("Surplus £1,000.00", Text(cut, "account-net"));
+        Assert.Empty(cut.FindAll("[data-testid=month-start-tip]"));
+    }
+
+    [Fact]
+    public void Offers_to_start_an_accounts_month_when_its_money_arrives()
+    {
+        UseTransfers(true);
+        var topUp = Guid.NewGuid();
+        _api.DaysResponse = (from, to) => new CashFlowDaysResponse(from, to, "GBP",
+        [
+            new(JointId, "Joint",
+            [
+                new(new DateOnly(2026, 11, 1), [new(CashFlowKindDto.Outgoing, Guid.NewGuid(), "Mortgage", null, 1000m)], 0m, 1000m, -1000m, true),
+                new(new DateOnly(2026, 11, 25), [new(CashFlowKindDto.TransferIn, topUp, "Bills top-up", null, 1000m)], 1000m, 0m, 0m, false),
+            ], 1000m, 1000m)
+            {
+                Suggestion = new MonthStartSuggestion(topUp, "Bills top-up", new DateOnly(2026, 11, 25)),
+            },
+        ]);
+        var cut = _context.RenderComponent<CashFlowPage>();
+        cut.Find("[data-testid=show-daily]").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Bills top-up arrives on 25 Nov", Text(cut, "month-start-tip"), StringComparison.Ordinal));
+        cut.Find("[data-testid=use-month-start]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(new[] { (JointId, (Guid?)topUp) }, _api.MonthStarts));
+        Assert.Equal(2, _api.Days.Count);
+    }
+
+    [Fact]
     public void Says_how_to_turn_it_on_when_transfers_are_off()
     {
         UseTransfers(false);
@@ -106,6 +166,17 @@ public sealed class CashFlowPageTests : IDisposable
 
         public List<(DateOnly From, DateOnly To)> Days { get; } = [];
 
+        public List<(Guid AccountId, Guid? PaymentId)> MonthStarts { get; } = [];
+
+        /// <summary>A day-by-day response for a test to use instead of the usual one.</summary>
+        public Func<DateOnly, DateOnly, CashFlowDaysResponse>? DaysResponse { get; set; }
+
+        public Task<bool> SetMonthStartAsync(Guid householdId, Guid accountId, Guid? paymentId)
+        {
+            MonthStarts.Add((accountId, paymentId));
+            return Task.FromResult(true);
+        }
+
         public Task<CashFlowMonthResponse> GetMonthAsync(Guid householdId, int year, int month)
         {
             Months.Add((year, month));
@@ -124,6 +195,11 @@ public sealed class CashFlowPageTests : IDisposable
         public Task<CashFlowDaysResponse> GetDaysAsync(Guid householdId, DateOnly from, DateOnly to)
         {
             Days.Add((from, to));
+            if (DaysResponse is not null)
+            {
+                return Task.FromResult(DaysResponse(from, to));
+            }
+
             return Task.FromResult(new CashFlowDaysResponse(from, to, "GBP",
             [
                 new(CurrentId, "Current",

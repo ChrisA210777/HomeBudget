@@ -24,6 +24,7 @@ public static class AccountEndpoints
         accounts.MapPost("/{accountId:guid}/restore", (Guid householdId, Guid accountId, BudgetDbContext db) => SetArchivedAsync(householdId, accountId, archived: false, db))
             .RequireAuthorization(HouseholdPolicies.User);
         accounts.MapPost("/{accountId:guid}/merge", MergeAsync).RequireAuthorization(HouseholdPolicies.Admin);
+        accounts.MapPut("/{accountId:guid}/month-start", SetMonthStartAsync).RequireAuthorization(HouseholdPolicies.User);
         return app;
     }
 
@@ -44,18 +45,31 @@ public static class AccountEndpoints
             .GroupBy(s => s.AccountId!.Value)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count);
+        var incomes = await db.IncomeStreams.AsNoTracking().ToListAsync();
+        var transfers = await db.Transfers.AsNoTracking().ToListAsync();
 
-        AccountSummary Summary(Account a) => new(
-            a.Id,
-            a.Name,
-            a.Provider,
-            a.OwnerPersonId,
-            a.OwnerPersonId is { } owner ? people.GetValueOrDefault(owner) : null,
-            a.ParentAccountId,
-            a.IsArchived,
-            directory.DisplayName(a.Id)!,
-            counts.GetValueOrDefault(a.Id),
-            incomeCounts.GetValueOrDefault(a.Id));
+        AccountSummary Summary(Account a)
+        {
+            var options = MonthStarts.Options(a, directory, incomes, transfers);
+            var chosen = options.FirstOrDefault(o => o.Id == a.MonthStartsWithId);
+            return new(
+                a.Id,
+                a.Name,
+                a.Provider,
+                a.OwnerPersonId,
+                a.OwnerPersonId is { } owner ? people.GetValueOrDefault(owner) : null,
+                a.ParentAccountId,
+                a.IsArchived,
+                directory.DisplayName(a.Id)!,
+                counts.GetValueOrDefault(a.Id),
+                incomeCounts.GetValueOrDefault(a.Id))
+            {
+                MonthStartsWithId = chosen?.Id,
+                MonthStartsWithName = chosen?.Name,
+                MonthStartMissing = a.MonthStartsWithId is not null && chosen is null,
+                MonthStartOptions = options,
+            };
+        }
 
         var byName = StringComparer.CurrentCultureIgnoreCase;
         return directory.All
@@ -97,9 +111,19 @@ public static class AccountEndpoints
         }
 
         var errors = await ValidateAsync(request, directory, account.ParentAccountId, exceptId: account.Id, db);
+        if (!account.IsPot && request.MonthStartsWithId is { } monthStart && !await IsMonthStartOptionAsync(account, monthStart, directory, db))
+        {
+            errors[nameof(request.MonthStartsWithId)] = [MonthStartProblem];
+        }
+
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
+        }
+
+        if (!account.IsPot)
+        {
+            account.StartMonthWith(request.MonthStartsWithId);
         }
 
         // A pot belongs to its account's owner; an account's pots follow it.
@@ -112,6 +136,34 @@ public static class AccountEndpoints
 
         await db.SaveChangesAsync();
         return Results.Ok((await SummariesAsync(householdId, db)).Single(a => a.Id == account.Id));
+    }
+
+    private const string MonthStartProblem = "Choose income or a transfer that's paid into this account.";
+
+    /// <summary>When an account's month starts, e.g. from Cash flow's suggestion (BUD-136).</summary>
+    private static async Task<IResult> SetMonthStartAsync(Guid householdId, Guid accountId, SetMonthStartRequest request, BudgetDbContext db)
+    {
+        var directory = await AccountDirectory.LoadAsync(db, householdId);
+        if (directory.Find(accountId) is not { IsPot: false } account)
+        {
+            return Results.NotFound();
+        }
+
+        if (request.MonthStartsWithId is { } monthStart && !await IsMonthStartOptionAsync(account, monthStart, directory, db))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(request.MonthStartsWithId)] = [MonthStartProblem] });
+        }
+
+        account.StartMonthWith(request.MonthStartsWithId);
+        await db.SaveChangesAsync();
+        return Results.Ok((await SummariesAsync(householdId, db)).Single(a => a.Id == account.Id));
+    }
+
+    private static async Task<bool> IsMonthStartOptionAsync(Account account, Guid paymentId, AccountDirectory directory, BudgetDbContext db)
+    {
+        var incomes = await db.IncomeStreams.AsNoTracking().Where(i => i.Id == paymentId).ToListAsync();
+        var transfers = await db.Transfers.AsNoTracking().Where(t => t.Id == paymentId).ToListAsync();
+        return MonthStarts.Options(account, directory, incomes, transfers).Any(o => o.Id == paymentId);
     }
 
     private static async Task<IResult> SetArchivedAsync(Guid householdId, Guid accountId, bool archived, BudgetDbContext db)

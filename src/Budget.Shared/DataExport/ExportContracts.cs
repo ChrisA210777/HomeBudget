@@ -246,6 +246,12 @@ public sealed record ExportedAccount
 
     public bool Archived { get; init; }
 
+    /// <summary>
+    /// The id of an income or transfer in this file whose arrival starts the account's month in Cash flow, or <c>null</c>
+    /// for the 1st (version 5, BUD-136).
+    /// </summary>
+    public Guid? MonthStartsWith { get; init; }
+
     public IReadOnlyList<ExportedPot> Pots { get; init; } = [];
 }
 
