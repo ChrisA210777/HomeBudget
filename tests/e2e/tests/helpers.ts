@@ -48,6 +48,13 @@ export async function expectToolbarTidy(controls: Locator[]): Promise<void> {
   }
 }
 
+/** Groups the Outgoings list from its Group menu (BUD-134). */
+export async function groupOutgoingsBy(page: Page, grouping: 'Category' | 'Paid from'): Promise<void> {
+  await page.getByTestId('group-by').getByRole('button').click();
+  await page.getByTestId('group-by-option').filter({ hasText: grouping }).click();
+  await expect(page.getByTestId('group-by')).toHaveText(`Group: ${grouping}`);
+}
+
 /** Opens a page from the main navigation: the side drawer, or on phones the bottom bar or its More page (BUD-115, BUD-116). */
 export async function openFromNav(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   if (isPhone(testInfo)) {

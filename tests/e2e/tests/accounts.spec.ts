@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { addIncome, choose, openFromNav, settled, signIn, typeOutgoingName } from './helpers';
+import { addIncome, choose, openFromNav, settled, signIn, typeOutgoingName, groupOutgoingsBy } from './helpers';
 
 // BUD-89: accounts and pots, chosen as "Paid from" on outgoings.
 
@@ -99,7 +99,7 @@ test('grouped by Paid from, an account shows its pots as subgroups with subtotal
 
   await page.goto('/outgoings');
   await settled(page);
-  await page.getByTestId('group-paid-from').click();
+  await groupOutgoingsBy(page, 'Paid from');
 
   // BUD-101: the account's total, then what's not in a pot and each pot.
   await expect(page.getByTestId('paid-from-name')).toHaveText(['Garden account']);
