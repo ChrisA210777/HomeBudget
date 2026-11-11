@@ -49,18 +49,9 @@
         </MudMenu>
     </div>
 
-    @* "Today" is an icon beside the next arrow, so the period's name always has room (BUD-124). *@
-    <div class="d-flex align-center mb-2">
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@(_month ? "Previous month" : "Previous week")" OnClick="() => MoveAsync(-1)" data-testid="previous-period" />
-        <MudText Typo="Typo.h6" Align="Align.Center" Class="flex-grow-1 text-nowrap" data-testid="period-name">@PeriodName</MudText>
-        @if (!(_from <= Today && Today <= _to))
-        {
-            <MudTooltip Text="Go to today">
-                <MudIconButton Icon="@Icons.Material.Filled.Today" Color="Color.Primary" aria-label="Go to today" OnClick="GoToTodayAsync" data-testid="go-to-today" />
-            </MudTooltip>
-        }
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@(_month ? "Next month" : "Next week")" OnClick="() => MoveAsync(1)" data-testid="next-period" />
-    </div>
+    <PeriodNavigator Name="@PeriodName" IsCurrent="@(_from <= Today && Today <= _to)" Class="mb-2"
+                     PreviousLabel="@(_month ? "Previous month" : "Previous week")" NextLabel="@(_month ? "Next month" : "Next week")"
+                     OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="GoToTodayAsync" />
 
     @if (_loaded && _household is null)
     {
@@ -146,27 +137,7 @@
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
-    /// <summary>
-    /// "November" or "1 – 7 Nov" this year; the year only when it's another one, e.g. "January 2027" or
-    /// "29 Dec 2026 – 4 Jan 2027" (BUD-124).
-    /// </summary>
-    private string PeriodName
-    {
-        get
-        {
-            var thisYear = _from.Year == Today.Year && _to.Year == Today.Year;
-            if (_month)
-            {
-                return _from.ToString(thisYear ? "MMMM" : "MMMM yyyy", Display);
-            }
-
-            var to = _to.ToString(thisYear ? "d MMM" : "d MMM yyyy", Display);
-            var from = _from.Year != _to.Year ? _from.ToString("d MMM yyyy", Display)
-                : _from.Month != _to.Month ? _from.ToString("d MMM", Display)
-                : _from.ToString("%d", Display);
-            return $"{from} – {to}";
-        }
-    }
+    private string PeriodName => _month ? PeriodNames.Month(_from.Year, _from.Month, Today) : PeriodNames.Days(_from, _to, Today);
 
     private IEnumerable<(Guid? Id, string Name)> AccountChoices()
     {

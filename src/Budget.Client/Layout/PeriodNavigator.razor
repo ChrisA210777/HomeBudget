@@ -1,0 +1,54 @@
+@* Previous, the period's name, "Go to today" and next (BUD-124, BUD-130). Today is an icon beside the next arrow, so
+   the name always has the room it needs. *@
+
+<div class="period-navigator @Class">
+    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="@PreviousLabel" OnClick="OnPrevious" data-testid="@PreviousTestId" />
+    <MudText Typo="Typo.h6" Align="Align.Center" Class="period-name" data-testid="@NameTestId">@Name</MudText>
+    @if (!IsCurrent)
+    {
+        <MudTooltip Text="@TodayLabel">
+            <MudIconButton Icon="@Icons.Material.Filled.Today" Color="Color.Primary" aria-label="@TodayLabel" OnClick="OnToday" data-testid="go-to-today" />
+        </MudTooltip>
+    }
+    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="@NextLabel" OnClick="OnNext" data-testid="@NextTestId" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Extra classes, e.g. for spacing.</summary>
+    [Parameter]
+    public string? Class { get; set; }
+
+    /// <summary>Whether today is in the period shown; if not, "Go to today" is offered.</summary>
+    [Parameter]
+    public bool IsCurrent { get; set; }
+
+    [Parameter]
+    public string PreviousLabel { get; set; } = "Previous month";
+
+    [Parameter]
+    public string NextLabel { get; set; } = "Next month";
+
+    [Parameter]
+    public string TodayLabel { get; set; } = "Go to today";
+
+    [Parameter]
+    public EventCallback OnPrevious { get; set; }
+
+    [Parameter]
+    public EventCallback OnNext { get; set; }
+
+    [Parameter]
+    public EventCallback OnToday { get; set; }
+
+    [Parameter]
+    public string PreviousTestId { get; set; } = "previous-period";
+
+    [Parameter]
+    public string NextTestId { get; set; } = "next-period";
+
+    [Parameter]
+    public string NameTestId { get; set; } = "period-name";
+}

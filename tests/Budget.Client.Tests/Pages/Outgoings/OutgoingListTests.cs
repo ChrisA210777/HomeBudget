@@ -43,7 +43,7 @@ public sealed class OutgoingListTests : IDisposable
     {
         var cut = _context.RenderComponent<OutgoingList>();
 
-        Assert.Equal("November 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
+        Assert.Equal("November", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal(new[] { "Housing", "Insurance", "Food & household" }, Texts(cut, "category-name"));
         Assert.Equal(3, cut.FindAll("[data-testid=category-group] [data-testid=category-icon]").Count);
         Assert.Equal(new[] { "£150.00", "£40.00", "£520.00" }, Texts(cut, "category-subtotal"));
@@ -121,7 +121,7 @@ public sealed class OutgoingListTests : IDisposable
         cut.WaitForAssertion(() => Assert.Equal(
             new[] { (2026, 11, false), (2026, 12, false), (2026, 11, false), (2026, 10, false), (2026, 10, true) },
             _api.Requests));
-        Assert.Equal("October 2026", cut.Find("[data-testid=month-name]").TextContent.Trim());
+        Assert.Equal("October", cut.Find("[data-testid=month-name]").TextContent.Trim());
         Assert.Equal("Hide", cut.Find("[data-testid=show-all]").TextContent.Trim());
     }
 

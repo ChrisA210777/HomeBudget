@@ -18,11 +18,9 @@
         What comes in against what goes out each month. Annual and weekly payments are averaged into the month.
     </MudText>
 
-    <div class="d-flex align-center justify-space-between mb-3">
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Previous month" OnClick="() => MoveAsync(-1)" data-testid="previous-month" />
-        <MudText Typo="Typo.h6" data-testid="month-name">@IncomeDates.MonthName(_year, _month)</MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Next month" OnClick="() => MoveAsync(1)" data-testid="next-month" />
-    </div>
+    <PeriodNavigator Name="@PeriodNames.Month(_year, _month, Today)" IsCurrent="@(_year == Today.Year && _month == Today.Month)" Class="mb-3"
+                     OnPrevious="() => MoveAsync(-1)" OnNext="() => MoveAsync(1)" OnToday="() => MoveAsync(Today.Year * 12 + Today.Month - (_year * 12 + _month))"
+                     PreviousTestId="previous-month" NextTestId="next-month" NameTestId="month-name" />
 
     @if (_loaded && _household is null)
     {
@@ -189,6 +187,8 @@
             _budget = await BudgetApi.GetMonthAsync(_household.HouseholdId, _year, _month);
         }
     }
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
     private async Task MoveAsync(int months)
     {

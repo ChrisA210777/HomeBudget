@@ -36,7 +36,7 @@ public sealed class CashFlowPageTests : IDisposable
 
         var cut = _context.RenderComponent<CashFlowPage>();
 
-        Assert.Equal("November 2026", Text(cut, "period-name"));
+        Assert.Equal("November", Text(cut, "period-name"));
         Assert.Equal(new[] { "Current", "Joint" }, Texts(cut, "account-name"));
         Assert.Equal(new[] { "Surplus £2,000.00", "Short by £150.00" }, Texts(cut, "account-net"));
         Assert.Equal(new[] { "In £3,000.00 · Out £1,000.00", "In £1,000.00 · Out £1,150.00" }, Texts(cut, "account-totals"));
@@ -53,13 +53,14 @@ public sealed class CashFlowPageTests : IDisposable
         cut.Find("[data-testid=next-period]").Click();
 
         cut.WaitForAssertion(() => Assert.Equal(new[] { (2026, 11), (2026, 12) }, _api.Months));
-        Assert.Equal("December 2026", Text(cut, "period-name"));
+        Assert.Equal("December", Text(cut, "period-name"));
     }
 
     [Fact]
     public void Day_by_day_shows_running_totals_and_flags_the_timing_gap()
     {
         UseTransfers(true);
+        var popovers = _context.RenderComponent<MudBlazor.MudPopoverProvider>();
         var cut = _context.RenderComponent<CashFlowPage>();
 
         cut.Find("[data-testid=show-daily]").Click();
@@ -68,7 +69,10 @@ public sealed class CashFlowPageTests : IDisposable
         // The first account is shown to start with.
         Assert.Equal(new[] { "£2,000.00 so far" }, Texts(cut, "day-running"));
 
-        cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<Guid?>>().Instance.ValueChanged.InvokeAsync(JointId));
+        // BUD-130: the account is a compact menu.
+        cut.Find("[data-testid=day-account] button").Click();
+        popovers.WaitForElements("[data-testid=day-account-option]").Single(o => o.TextContent.Trim() == "Joint").Click();
+        cut.WaitForAssertion(() => Assert.Equal("Joint", Text(cut, "day-account")));
 
         cut.WaitForAssertion(() => Assert.Equal(new[] { "Short by £1,000.00", "Short by £150.00" }, Texts(cut, "day-short")));
         Assert.Contains("1 Nov 2026", Text(cut, "timing-gap"), StringComparison.Ordinal);
