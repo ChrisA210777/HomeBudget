@@ -54,6 +54,7 @@ test('on a phone the outgoings actions shrink to icons and the filters are one t
   test.skip(!isPhone(testInfo), 'Phone layout only');
   await page.setViewportSize({ width: 360, height: 740 });
   await signIn(page);
+  await addOutgoing(page, 'Hedge trimming fund', 'Home maintenance', '20');
   await page.goto('/outgoings');
   await settled(page);
 
