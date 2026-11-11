@@ -140,7 +140,16 @@ jobs:
         working-directory: tests/e2e
         run: |
           npm install --no-audit --no-fund
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
+          # The system packages come from Ubuntu's mirrors, which are sometimes unreachable from GitHub's runners, and
+          # apt can spend many minutes failing. Try twice, a few minutes each; if they still can't be fetched, carry on:
+          # the runner image already has what headless Chromium needs, and what's missing is mostly extra fonts.
+          for attempt in 1 2; do
+            if timeout 240 sudo npx playwright install-deps chromium; then exit 0; fi
+            echo "Installing system packages failed or timed out (attempt $attempt)"
+            sleep 15
+          done
+          echo "::warning::Couldn't install Playwright's system packages; using what the runner already has"
 
       - name: Run end-to-end tests
         working-directory: tests/e2e
