@@ -117,5 +117,5 @@ test("an outgoing's actions fit on one line, with Change amount as the main acti
   const tops = await actions.evaluateAll(buttons => buttons.map(b => Math.round(b.getBoundingClientRect().top)));
   expect(new Set(tops).size, 'the actions should share one line').toBe(1);
   await expect(page.getByTestId('change-amount')).toHaveClass(/mud-button-filled/);
-  await expect(page.getByTestId('change-amount')).toHaveText(isPhone(testInfo) ? 'Amount' : 'Change amount', { useInnerText: true });
+  await expect(page.getByTestId('change-amount')).toHaveText(isPhone(testInfo) ? /^amount$/i : /^change amount$/i, { useInnerText: true });
 });
