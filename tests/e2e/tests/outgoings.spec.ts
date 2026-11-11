@@ -193,11 +193,8 @@ test('groups close to their header, one at a time or all at once', async ({ page
 test('upcoming payments show what is due each day, a week or a month at a time', async ({ page }) => {
   await signIn(page);
   await addOutgoing(page, 'Hedge trimming fund', 'Home maintenance', '20');
-  await page.goto('/outgoings');
-  await settled(page);
-
   // BUD-82: a monthly outgoing starting today is due today, at its real amount.
-  await page.getByTestId('go-to-upcoming').click();
+  await page.goto('/outgoings/upcoming');
   await expect(page.getByRole('heading', { level: 1, name: 'Upcoming payments' })).toBeVisible();
   await settled(page);
   const today = page.getByTestId('payment-day').filter({ has: page.getByTestId('payment-today') });
@@ -212,13 +209,17 @@ test('upcoming payments show what is due each day, a week or a month at a time',
   await expect(page.getByTestId('payment-today')).toBeVisible();
 });
 
-test('the renewals calendar is reached from upcoming payments', async ({ page }) => {
+test('the renewals calendar is reached from outgoings, and links back to them', async ({ page }) => {
   await signIn(page);
-  await page.goto('/outgoings/upcoming');
+  await page.goto('/outgoings');
   await settled(page);
 
   // BUD-81: a new household has nothing with a renewal date yet.
   await page.getByTestId('go-to-renewals').click();
   await expect(page.getByRole('heading', { level: 1, name: 'Renewals' })).toBeVisible();
   await expect(page.getByTestId('renewals-empty')).toContainText('Nothing renews in the next 12 months');
+
+  // BUD-118: a link between related pages, not a back button.
+  await page.getByTestId('go-to-outgoings').click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Outgoings' })).toBeVisible();
 });
