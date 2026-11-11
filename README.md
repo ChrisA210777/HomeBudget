@@ -131,6 +131,10 @@ A test fails if the model has changes that aren't in a migration. CI also builds
 
 Dev runs in Azure on free tiers, deployed by GitHub Actions after CI passes on `main`. The templates, one-off setup and trade-offs are in [infra/README.md](infra/README.md).
 
+## Documentation
+
+Design and operational documentation is in Confluence (space SD, Home Budget folder): architecture, ADRs, the domain model, roles, the export format, local development, deploying to Azure and monitoring. [CLAUDE.md](CLAUDE.md) lists which page covers what; keep the relevant page up to date with every change.
+
 ## Conventions
 
 - Nullable reference types are on and warnings are treated as errors.
