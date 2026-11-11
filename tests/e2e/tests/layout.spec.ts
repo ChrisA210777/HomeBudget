@@ -58,7 +58,7 @@ test('on a phone the outgoings actions shrink to icons and the filters fit two t
   await settled(page);
 
   const heading = await box(page.getByRole('heading', { level: 1, name: 'Outgoings' }));
-  for (const [testId, name] of [['add-outgoing', 'Add an outgoing'], ['go-to-categories', 'Categories'], ['go-to-upcoming', 'Upcoming payments']]) {
+  for (const [testId, name] of [['add-outgoing', 'Add an outgoing'], ['go-to-categories', 'Categories'], ['go-to-renewals', 'Renewals']]) {
     const button = page.getByTestId(testId);
     await expect(button).toHaveAccessibleName(name);
     await expect(button.locator('.button-label')).toBeHidden();

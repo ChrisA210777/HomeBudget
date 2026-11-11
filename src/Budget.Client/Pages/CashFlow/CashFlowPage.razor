@@ -15,7 +15,10 @@
 
 @* Money in and out of each account, with its pots (BUD-92, ADR-014): monthly budget amounts, or day by day. *@
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-2 mb-16">
-    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/accounts" Class="mb-1">Accounts</MudButton>
+    <div class="d-flex align-center flex-wrap gap-2 mb-1">
+        <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AccountBalance" Href="/accounts" data-testid="go-to-accounts">Accounts</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz" Href="/transfers" data-testid="go-to-transfers">Transfers</MudButton>
+    </div>
     <h1 class="mud-typography mud-typography-h4 mb-1">Cash flow</h1>
     <MudText Typo="Typo.body2" Class="mb-3">
         Money into and out of each account, with its pots counted in. Transfers between an account and its own pots aren't shown, as the money stays in the account.

@@ -12,8 +12,8 @@
 
 @* Money moved between accounts and pots (BUD-91, ADR-014), grouped by the account it goes into. *@
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 mb-16">
-    <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-2">
-        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/accounts">Accounts</MudButton>
+    <div class="d-flex align-center flex-wrap gap-2 mb-2">
+        <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AccountBalance" Href="/accounts" data-testid="go-to-accounts">Accounts</MudButton>
         <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Timeline" Href="/cash-flow" data-testid="go-to-cash-flow">Cash flow</MudButton>
     </div>
     <div class="d-flex align-center flex-wrap gap-2 mb-1">
