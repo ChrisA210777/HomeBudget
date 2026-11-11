@@ -1,0 +1,117 @@
+@page "/invite/{Token}"
+@attribute [Authorize]
+@using Budget.Client.Households
+@using Budget.Shared.Households
+@inject IInvitationApi InvitationApi
+@inject IAccountApi AccountApi
+@inject NavigationManager Navigation
+
+<PageTitle>Invitation · Home Budget</PageTitle>
+
+@* Where an invitation link lands, once signed in (ADR-015, BUD-24). *@
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-6 mb-16">
+    @if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_preview is null)
+    {
+        <MudAlert Severity="Severity.Warning" data-testid="invite-not-found">This invitation link isn't valid. Ask whoever sent it for a new one.</MudAlert>
+    }
+    else
+    {
+        var p = _preview;
+        <MudPaper Class="pa-6" Elevation="1">
+            <MudIcon Icon="@Icons.Material.Filled.MailOutline" Size="Size.Large" Color="Color.Primary" aria-hidden="true" />
+            <h1 class="mud-typography mud-typography-h5 mt-2 mb-2" data-testid="invite-heading">Join @p.HouseholdName</h1>
+            <MudText Typo="Typo.body1" Class="mb-4" data-testid="invite-summary">
+                @p.InvitedByName invited you to @p.HouseholdName as @Article(p.Role) <strong>@p.Role</strong>@(p.PersonName is { } person ? $", as {person}" : string.Empty).
+            </MudText>
+
+            @if (_problem is not null)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="invite-problem">@_problem</MudAlert>
+            }
+
+            @switch (p.Status)
+            {
+                case "Accepted":
+                    <MudAlert Severity="Severity.Info" data-testid="invite-used">This invitation has already been used.</MudAlert>
+                    break;
+                case "Revoked":
+                    <MudAlert Severity="Severity.Info" data-testid="invite-revoked">This invitation was cancelled. Ask @p.InvitedByName for a new one.</MudAlert>
+                    break;
+                case "Expired":
+                    <MudAlert Severity="Severity.Info" data-testid="invite-expired">This invitation expired on @p.ExpiresAt.ToLocalTime().ToString("d MMMM"). Ask @p.InvitedByName for a new one.</MudAlert>
+                    break;
+                default:
+                    @if (p.AlreadyMember)
+                    {
+                        <MudText Typo="Typo.body2" Class="mb-3" data-testid="invite-already-member">You're already a member of @p.HouseholdName.</MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AcceptAsync" Disabled="_saving" data-testid="accept-invite">Go to @p.HouseholdName</MudButton>
+                    }
+                    else if (!p.EmailAllowed)
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="invite-wrong-email">
+                            This invitation is for @p.InvitedEmail, but you're signed in as @(p.SignedInEmail ?? "an account without an email"). Sign in with the account for @p.InvitedEmail to accept it.
+                        </MudAlert>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="SignInAgainAsync" data-testid="invite-switch-account">Sign in with another account</MudButton>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                            You're signed in as @(p.SignedInEmail ?? "your account"). The invitation expires on @p.ExpiresAt.ToLocalTime().ToString("d MMMM").
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AcceptAsync" Disabled="_saving" data-testid="accept-invite">Join @p.HouseholdName</MudButton>
+                    }
+                    break;
+            }
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string Token { get; set; } = string.Empty;
+
+    private InvitationPreview? _preview;
+    private string? _problem;
+    private bool _loaded;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _preview = await InvitationApi.PreviewAsync(Token);
+        _loaded = true;
+    }
+
+    private async Task AcceptAsync()
+    {
+        _saving = true;
+        try
+        {
+            var (joined, problem) = await InvitationApi.AcceptAsync(Token);
+            if (joined is null)
+            {
+                _problem = problem;
+                return;
+            }
+
+            // A full load so the menus show the household just joined.
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>Signs out and back in, returning here.</summary>
+    private async Task SignInAgainAsync()
+    {
+        await AccountApi.SignOutAsync();
+        Navigation.NavigateTo($"{Budget.Shared.AccountRoutes.LoginPage}?returnUrl={Uri.EscapeDataString(InvitationRoutes.Page(Token))}", forceLoad: true);
+    }
+
+    private static string Article(string role) => role == MemberRoles.Admin ? "an" : "a";
+}

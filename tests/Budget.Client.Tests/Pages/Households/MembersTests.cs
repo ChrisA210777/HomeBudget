@@ -23,6 +23,9 @@ public sealed class MembersTests : IDisposable
     {
         _context.Services.AddMudServices();
         _context.Services.AddSingleton<IHouseholdApi>(_api);
+        _context.Services.AddSingleton<Budget.Client.Households.IInvitationApi>(new FakeInvitationApi());
+        _context.Services.AddSingleton<Budget.Client.People.IPeopleApi>(new StaticPeopleApi());
+        _context.Services.AddSingleton<Budget.Client.Households.ISharing>(new FakeSharing());
         _context.Services.AddSingleton<TimeProvider>(new FixedClock(new DateTimeOffset(2026, 11, 6, 12, 0, 0, TimeSpan.Zero)));
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");

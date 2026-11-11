@@ -96,6 +96,11 @@
             </ul>
         </MudPaper>
 
+        @if (_isAdmin && _household is not null)
+        {
+            <InvitationsPanel HouseholdId="_household.HouseholdId" HouseholdName="@_household.Name" />
+        }
+
         @if (_household is not null)
         {
             <MudPaper Outlined="true" Class="pa-4 mt-4" data-testid="leave-section">

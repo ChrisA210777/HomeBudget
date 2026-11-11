@@ -1,0 +1,226 @@
+@* Inviting people and the invitations still waiting (ADR-015, BUD-23, BUD-25, BUD-44). Admins only. *@
+@using Budget.Client.Households
+@using Budget.Client.People
+@using Budget.Shared.Households
+@using Budget.Shared.People
+@inject IInvitationApi InvitationApi
+@inject IPeopleApi PeopleApi
+@inject ISharing Sharing
+@inject ISnackbar Snackbar
+
+<MudPaper Outlined="true" Class="pa-4 mt-4" data-testid="invitations">
+    <div class="d-flex align-center flex-wrap gap-2 mb-2">
+        <h2 class="mud-typography mud-typography-h6 flex-grow-1 ma-0">Invitations</h2>
+        @if (!_inviting)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="StartInvite" Disabled="!Online" data-testid="invite">Invite someone</MudButton>
+        }
+    </div>
+
+    @if (_inviting)
+    {
+        <MudStack Spacing="3" Class="mb-4" data-testid="invite-form">
+            <MudTextField @bind-Value="_email" Label="Their email" InputType="InputType.Email" Variant="Variant.Outlined" Immediate="true"
+                          Error="@Has("Email")" ErrorText="@ErrorFor("Email")" data-testid="invite-email" />
+            <div class="d-flex flex-wrap gap-2">
+                <div style="min-width: 10rem" class="flex-grow-1">
+                    <MudSelect T="string" @bind-Value="_role" Label="Role" Variant="Variant.Outlined" data-testid="invite-role">
+                        @foreach (var role in MemberRoles.All)
+                        {
+                            <MudSelectItem T="string" Value="role">@role</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                <div style="min-width: 10rem" class="flex-grow-1">
+                    <MudSelect T="Guid?" @bind-Value="_personId" ToStringFunc="PersonName" Label="Who they are" Variant="Variant.Outlined"
+                               Error="@Has("PersonId")" ErrorText="@ErrorFor("PersonId")" data-testid="invite-person">
+                        <MudSelectItem T="Guid?" Value="null">Someone new</MudSelectItem>
+                        @foreach (var person in _people.Where(p => p.LinkedUserId is null))
+                        {
+                            <MudSelectItem T="Guid?" Value="person.Id">@person.DisplayName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </div>
+            <MudCheckBox T="bool" @bind-Value="_requireMatch" Color="Color.Primary" Label="Only accept if they sign in with this email" data-testid="invite-match" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Without this, anyone with the link can join. Leave it off if they might sign in with a different email, such as a Microsoft account set up with another address.
+            </MudText>
+            <div class="d-flex justify-end gap-2">
+                <MudButton Variant="Variant.Text" OnClick="() => _inviting = false">Cancel</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync" Disabled="@(_saving || !Online)" data-testid="invite-create">Create invitation</MudButton>
+            </div>
+        </MudStack>
+    }
+
+    @if (_invitations is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_invitations.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="no-invitations">No invitations waiting.</MudText>
+    }
+    else
+    {
+        <ul class="plain-list" aria-label="Invitations waiting to be accepted">
+            @foreach (var invitation in _invitations)
+            {
+                var justMade = invitation.Id == _justMade;
+                <li class="plain-list-item px-0" data-testid="invitation">
+                    <div class="d-flex align-start flex-wrap gap-2">
+                        <div class="flex-grow-1" style="min-width: 0">
+                            <MudText Typo="Typo.body1" Style="font-weight: 500; overflow-wrap: anywhere" data-testid="invitation-email">@invitation.Email</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block" data-testid="invitation-details">@Details(invitation)</MudText>
+                        </div>
+                        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="() => RevokeAsync(invitation)" Disabled="!Online"
+                                   aria-label="@($"Revoke the invitation for {invitation.Email}")" data-testid="revoke-invitation">Revoke</MudButton>
+                    </div>
+                    @if (justMade)
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2" data-testid="invitation-ready">Invitation ready. Send them the link:</MudAlert>
+                    }
+                    @if (invitation.Link is { } link)
+                    {
+                        <div class="d-flex flex-wrap gap-2 mt-2" role="group" aria-label="@($"Send the invitation for {invitation.Email}")">
+                            @if (_canShare)
+                            {
+                                <MudButton Variant="@(justMade ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Share"
+                                           OnClick="() => ShareAsync(invitation, link)" data-testid="share-invitation">Share…</MudButton>
+                            }
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.ContentCopy"
+                                       OnClick="() => CopyAsync(link)" data-testid="copy-invitation">Copy link</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Email"
+                                       Href="@InvitationText.MailTo(invitation.Email, invitation.InvitedByName, HouseholdName, link, invitation.ExpiresAt)" data-testid="email-invitation">Email</MudButton>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">This link can't be shown any more. Revoke it and invite them again.</MudText>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</MudPaper>
+
+@code {
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    [Parameter, EditorRequired]
+    public Guid HouseholdId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string HouseholdName { get; set; } = string.Empty;
+
+    private IReadOnlyList<InvitationSummary>? _invitations;
+    private IReadOnlyList<PersonSummary> _people = [];
+    private IReadOnlyDictionary<string, string[]> _errors = new Dictionary<string, string[]>();
+    private bool _canShare;
+    private bool _inviting;
+    private bool _saving;
+    private Guid? _justMade;
+
+    private string? _email;
+    private string _role = MemberRoles.User;
+    private Guid? _personId;
+    private bool _requireMatch;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _invitations = await InvitationApi.ListAsync(HouseholdId);
+        _people = await PeopleApi.ListAsync(HouseholdId);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _canShare = await Sharing.CanShareAsync();
+            }
+            catch (Microsoft.JSInterop.JSException)
+            {
+                _canShare = false;
+            }
+
+            if (_canShare)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void StartInvite()
+    {
+        _inviting = true;
+        _email = null;
+        _role = MemberRoles.User;
+        _personId = null;
+        _requireMatch = false;
+        _errors = new Dictionary<string, string[]>();
+    }
+
+    private async Task CreateAsync()
+    {
+        _saving = true;
+        try
+        {
+            var result = await InvitationApi.CreateAsync(HouseholdId, new CreateInvitationRequest { Email = _email, Role = _role, PersonId = _personId, RequireEmailMatch = _requireMatch });
+            if (result.Succeeded)
+            {
+                _inviting = false;
+                _justMade = result.Value!.Id;
+                _invitations = await InvitationApi.ListAsync(HouseholdId);
+            }
+            else
+            {
+                _errors = result.Errors;
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task RevokeAsync(InvitationSummary invitation)
+    {
+        await InvitationApi.RevokeAsync(HouseholdId, invitation.Id);
+        Snackbar.Add($"The invitation for {invitation.Email} was revoked.", Severity.Success);
+        _invitations = await InvitationApi.ListAsync(HouseholdId);
+    }
+
+    private async Task ShareAsync(InvitationSummary invitation, string link) =>
+        await Sharing.ShareAsync(
+            InvitationText.Subject(HouseholdName),
+            InvitationText.Body(invitation.InvitedByName, HouseholdName, link, invitation.ExpiresAt).Replace(link, string.Empty, StringComparison.Ordinal).TrimEnd(),
+            link);
+
+    private async Task CopyAsync(string link)
+    {
+        var copied = await Sharing.CopyAsync(link);
+        Snackbar.Add(copied ? "Link copied." : "Couldn't copy the link. Select it from the email option instead.", copied ? Severity.Success : Severity.Warning);
+    }
+
+    /// <summary>e.g. "User · Jane · Email must match · Expires 18 Nov".</summary>
+    private static string Details(InvitationSummary invitation)
+    {
+        var parts = new List<string> { invitation.Role, invitation.PersonName ?? "Someone new" };
+        if (invitation.RequireEmailMatch)
+        {
+            parts.Add("Email must match");
+        }
+
+        parts.Add($"Expires {invitation.ExpiresAt.ToLocalTime():d MMM}");
+        return string.Join(" · ", parts);
+    }
+
+    private string PersonName(Guid? id) => id is null ? "Someone new" : _people.FirstOrDefault(p => p.Id == id)?.DisplayName ?? string.Empty;
+
+    private bool Has(string field) => _errors.ContainsKey(field);
+
+    private string? ErrorFor(string field) => _errors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
+}
