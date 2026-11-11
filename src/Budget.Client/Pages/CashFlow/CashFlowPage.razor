@@ -143,16 +143,17 @@
                 @foreach (var day in account.Days)
                 {
                     <section class="mb-3" data-testid="cash-flow-day" aria-label="@day.Date.ToString("dddd d MMMM", Display)">
-                        <h2 class="mud-typography mud-typography-subtitle2 d-flex align-center gap-2 mb-1" style="font-weight: 600">
-                            <span class="flex-grow-1" data-testid="day-name">@day.Date.ToString("ddd d MMM", Display)</span>
+                        @* The day's total lines up with the amounts in the panel below: wording on the left, amount on the right (BUD-135). *@
+                        <h2 class="mud-typography mud-typography-subtitle2 d-flex align-center gap-2 mb-1 pr-3">
+                            <span class="flex-grow-1" style="font-weight: 600" data-testid="day-name">@day.Date.ToString("ddd d MMM", Display)</span>
                             @if (day.IsShort)
                             {
                                 <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" aria-hidden="true" />
-                                <span data-testid="day-short">Short by @Format(-day.RunningTotal, _days.CurrencyCode)</span>
+                                <span class="text-nowrap" data-testid="day-short">Short by <strong>@Format(-day.RunningTotal, _days.CurrencyCode)</strong></span>
                             }
                             else
                             {
-                                <span style="font-weight: 400" data-testid="day-running">@Format(day.RunningTotal, _days.CurrencyCode) so far</span>
+                                <span class="text-nowrap" data-testid="day-running">Running total <strong>@Format(day.RunningTotal, _days.CurrencyCode)</strong></span>
                             }
                         </h2>
                         <MudPaper Outlined="true" Class="px-3 py-1">

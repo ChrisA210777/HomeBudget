@@ -67,7 +67,7 @@ public sealed class CashFlowPageTests : IDisposable
 
         cut.WaitForAssertion(() => Assert.Equal((new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)), _api.Days.Single()));
         // The first account is shown to start with.
-        Assert.Equal(new[] { "£2,000.00 so far" }, Texts(cut, "day-running"));
+        Assert.Equal(new[] { "Running total £2,000.00" }, Texts(cut, "day-running"));
 
         // BUD-130: the account is a compact menu.
         cut.Find("[data-testid=day-account] button").Click();
