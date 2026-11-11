@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { choose, settled, signIn } from './helpers';
+import { choose, expectToolbarTidy, settled, signIn } from './helpers';
 
 // BUD-92: once transfers are on, Cash flow shows each account's money in and out, monthly and day by day.
 
@@ -38,4 +38,7 @@ test('cash flow shows each account in and out, and day by day', async ({ page })
   await settled(page);
   await expect(page.getByTestId('day-short').first()).toContainText('Short by £400.00');
   await expect(page.getByTestId('timing-gap')).toBeVisible();
+
+  // The toggles and the account menu line up, with space between them.
+  await expectToolbarTidy([page.getByTestId('view-toggle'), page.getByTestId('period-toggle'), page.getByTestId('day-account').getByRole('button')]);
 });

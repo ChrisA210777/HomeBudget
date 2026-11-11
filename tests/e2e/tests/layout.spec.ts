@@ -101,3 +101,19 @@ test('the income title and action stay at the top while scrolling', async ({ pag
     await expect(page.getByTestId('month-total')).toBeInViewport();
   }
 });
+
+// BUD-125, BUD-129: an item's actions are one row of tiles on a phone, and the usual buttons on larger screens. Either
+// way, Change amount is filled as the main action.
+test("an outgoing's actions fit on one line, with Change amount as the main action", async ({ page }, testInfo) => {
+  await signIn(page);
+  const url = await addOutgoing(page, 'Window cleaner', 'Home maintenance', '15');
+  await page.goto(url);
+  await settled(page);
+
+  const actions = page.locator('[data-testid=change-amount], [data-testid=pause], [data-testid=end-outgoing], [data-testid=edit-details], [data-testid=delete-outgoing]');
+  await expect(actions).toHaveCount(5);
+  const tops = await actions.evaluateAll(buttons => buttons.map(b => Math.round(b.getBoundingClientRect().top)));
+  expect(new Set(tops).size, 'the actions should share one line').toBe(1);
+  await expect(page.getByTestId('change-amount')).toHaveClass(/mud-button-filled/);
+  await expect(page.getByTestId('change-amount')).toHaveText(isPhone(testInfo) ? /^amount$/i : /^change amount$/i, { useInnerText: true });
+});

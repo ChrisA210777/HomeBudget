@@ -154,12 +154,13 @@
                                 @foreach (var renewal in _renewals)
                                 {
                                     <li class="py-2" data-testid="coming-up">
-                                        @* The name and chip share a line; what to do uses the full width under them (BUD-123). *@
-                                        <div class="d-flex align-start gap-2">
-                                            <MudLink Href="@BackLink.To($"/outgoings/{renewal.Id}", "/")" Typo="Typo.body1" Class="flex-grow-1" Style="min-width: 0; overflow-wrap: anywhere" data-testid="coming-up-name">@renewal.Name</MudLink>
-                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ma-0 flex-shrink-0" data-testid="coming-up-days">@OutgoingValidator.RenewsIn(renewal.DaysUntil)</MudChip>
+                                        @* Phones: name and chip on one line, what to do full width under them (BUD-123). Larger
+                                           screens: name and what to do on the left, the chip on the right (BUD-129). *@
+                                        <div class="coming-up-row">
+                                            <MudLink Href="@BackLink.To($"/outgoings/{renewal.Id}", "/")" Typo="Typo.body1" Class="coming-up-name" data-testid="coming-up-name">@renewal.Name</MudLink>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ma-0 coming-up-days" data-testid="coming-up-days">@OutgoingValidator.RenewsIn(renewal.DaysUntil)</MudChip>
+                                            <MudText Typo="Typo.body2" Class="coming-up-text" data-testid="coming-up-text">@OutgoingValidator.DescribeRenewal(renewal.RenewalDate, renewal.AutoRenews)</MudText>
                                         </div>
-                                        <MudText Typo="Typo.body2" data-testid="coming-up-text">@OutgoingValidator.DescribeRenewal(renewal.RenewalDate, renewal.AutoRenews)</MudText>
                                     </li>
                                 }
                             </ul>

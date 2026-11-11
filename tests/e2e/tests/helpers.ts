@@ -1,4 +1,4 @@
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 let counter = 0;
 
@@ -24,6 +24,28 @@ export async function settled(page: Page): Promise<void> {
 
 export function isPhone(testInfo: TestInfo): boolean {
   return testInfo.project.name === 'phone';
+}
+
+/**
+ * Checks a page's toolbar (BUD-124, BUD-130): controls on the same line are centred on one another and have a gap
+ * between them. Pass the locators of the visible controls, left to right.
+ */
+export async function expectToolbarTidy(controls: Locator[]): Promise<void> {
+  const boxes = [];
+  for (const control of controls) {
+    const box = await control.boundingBox();
+    expect(box, 'toolbar control should be visible').not.toBeNull();
+    boxes.push(box!);
+  }
+  for (let i = 1; i < boxes.length; i++) {
+    const [a, b] = [boxes[i - 1], boxes[i]];
+    const [aMiddle, bMiddle] = [a.y + a.height / 2, b.y + b.height / 2];
+    if (Math.abs(aMiddle - bMiddle) > a.height / 2) {
+      continue; // wrapped onto the next line
+    }
+    expect(Math.abs(aMiddle - bMiddle), 'toolbar controls should be centred on one line').toBeLessThanOrEqual(1);
+    expect(b.x - (a.x + a.width), 'toolbar controls should have a gap between them').toBeGreaterThanOrEqual(6);
+  }
 }
 
 /** Opens a page from the main navigation: the side drawer, or on phones the bottom bar or its More page (BUD-115, BUD-116). */

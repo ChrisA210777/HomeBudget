@@ -19,29 +19,30 @@
 
     @if (_canEdit && _mode == Mode.None)
     {
-        @* One row of matching buttons, icon over a short label, so they fit across a phone (BUD-125). Screen readers
-           get the full names, which start with the label shown. *@
-        <div class="action-tiles mb-4" role="group" aria-label="@($"Change this {Noun}")">
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="action-tile" OnClick="StartChangeAmount" aria-label="Change amount" data-testid="change-amount">
-                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" aria-hidden="true" /><span>Amount</span>
+        @* An item's actions (BUD-125, BUD-129). Larger screens: Change amount filled as the main action, Pause and End
+           outlined, Edit details and Delete as text. Phones: one row of matching tiles, icon over a short label, with
+           Amount still filled. Screen readers get the full names, which contain the label shown. *@
+        <div class="item-actions mb-4" role="group" aria-label="@($"Change this {Noun}")">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TrendingUp" OnClick="StartChangeAmount" aria-label="Change amount" data-testid="change-amount">
+                <span class="label-long">Change amount</span><span class="label-short">Amount</span>
             </MudButton>
             @if (d.EndsOn is null && d.UpcomingPayments.Count > 0)
             {
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="action-tile" OnClick="StartPause" aria-label="@($"Pause this {Noun}")" data-testid="pause">
-                    <MudIcon Icon="@Icons.Material.Filled.PauseCircle" aria-hidden="true" /><span>Pause</span>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PauseCircle" OnClick="StartPause" aria-label="@($"Pause this {Noun}")" data-testid="pause">
+                    <span>Pause</span>
                 </MudButton>
             }
             @if (d.EndsOn is null)
             {
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="action-tile" OnClick="() => Start(Mode.End)" aria-label="@($"End this {Noun}")" data-testid="@($"end-{Noun}")">
-                    <MudIcon Icon="@Icons.Material.Filled.Stop" aria-hidden="true" /><span>End</span>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Stop" OnClick="() => Start(Mode.End)" aria-label="@($"End this {Noun}")" data-testid="@($"end-{Noun}")">
+                    <span>End</span>
                 </MudButton>
             }
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="action-tile" Href="@EditHref" aria-label="Edit details" data-testid="edit-details">
-                <MudIcon Icon="@Icons.Material.Filled.Edit" aria-hidden="true" /><span>Edit</span>
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Edit" Href="@EditHref" aria-label="Edit details" data-testid="edit-details">
+                <span class="label-long">Edit details</span><span class="label-short">Edit</span>
             </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Error" Class="action-tile" OnClick="() => Start(Mode.DeleteItem)" aria-label="@($"Delete this {Noun}")" data-testid="@($"delete-{Noun}")">
-                <MudIcon Icon="@Icons.Material.Filled.Delete" aria-hidden="true" /><span>Delete</span>
+            <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="() => Start(Mode.DeleteItem)" aria-label="@($"Delete this {Noun}")" data-testid="@($"delete-{Noun}")">
+                <span>Delete</span>
             </MudButton>
         </div>
     }
