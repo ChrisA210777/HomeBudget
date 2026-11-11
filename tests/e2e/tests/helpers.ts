@@ -26,6 +26,21 @@ export function isPhone(testInfo: TestInfo): boolean {
   return testInfo.project.name === 'phone';
 }
 
+/** Opens a page from the main navigation: the side drawer, or on phones the bottom bar or its More page (BUD-115, BUD-116). */
+export async function openFromNav(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+  if (isPhone(testInfo)) {
+    const bar = page.getByTestId('bottom-nav').getByRole('link', { name, exact: true });
+    if (await bar.count() === 0) {
+      await page.getByTestId('bottom-nav').getByRole('link', { name: 'More', exact: true }).click();
+      await page.getByTestId('more-link').filter({ hasText: new RegExp(`^\\s*${name}\\s*$`) }).click();
+      return;
+    }
+    await bar.click();
+  } else {
+    await page.getByTestId('side-nav').getByRole('link', { name, exact: true }).click();
+  }
+}
+
 /** Adds an income through the form and returns its page URL. */
 export async function addIncome(page: Page, name: string, amount: string): Promise<string> {
   await page.goto('/income/new');

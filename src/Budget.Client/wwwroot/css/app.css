@@ -189,6 +189,36 @@ h1[tabindex="-1"]:focus-visible {
     min-height: 48px;
 }
 
+/* The side drawer's groups (BUD-115): pages under another are indented below it. */
+.side-nav-list .mud-nav-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.side-nav-list .mud-nav-link.nav-sub {
+    padding-left: 40px;
+}
+
+.side-nav-list .nav-section-title {
+    color: var(--mud-palette-text-secondary);
+}
+
+/* The phone's More page (BUD-116): one link per row, the whole row tappable. */
+.more-link {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 52px;
+    padding: 0 12px 0 16px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.more-link:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: -2px;
+}
+
 /* A list of rows with dividers, for content that has its own buttons (e.g. the People page). */
 .plain-list {
     list-style: none;

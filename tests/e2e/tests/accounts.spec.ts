@@ -1,13 +1,12 @@
 import { expect, test } from './fixtures';
-import { addIncome, choose, settled, signIn, typeOutgoingName } from './helpers';
+import { addIncome, choose, openFromNav, settled, signIn, typeOutgoingName } from './helpers';
 
 // BUD-89: accounts and pots, chosen as "Paid from" on outgoings.
 
-test('accounts and pots are added from the household menu', async ({ page }) => {
+test('accounts and pots are added from the main navigation', async ({ page }, testInfo) => {
   await signIn(page);
 
-  await page.getByTestId('appbar-household').getByRole('button').click();
-  await page.getByTestId('household-accounts').click();
+  await openFromNav(page, testInfo, 'Accounts');
   await expect(page.getByRole('heading', { level: 1, name: 'Accounts' })).toBeVisible();
   await settled(page);
 

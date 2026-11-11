@@ -1,0 +1,50 @@
+@page "/more"
+@attribute [Authorize]
+@inject UserSession Session
+
+<PageTitle>More · Home Budget</PageTitle>
+
+@* Everything that isn't in the phone's bottom bar (BUD-116). Larger screens have it all in the side drawer. *@
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 mb-16">
+    <h1 class="mud-typography mud-typography-h4 mb-3">More</h1>
+
+    @if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        @foreach (var (section, index) in NavItems.MorePage(_household).Select((s, i) => (s, i)))
+        {
+            @if (section.Title is { } title)
+            {
+                <h2 class="mud-typography mud-typography-subtitle1 mt-4 mb-1" style="font-weight: 600" id="@($"more-{index}")">@title</h2>
+            }
+            <MudPaper Outlined="true" Class="@(section.Title is null ? "mt-2" : null)">
+                <ul class="plain-list more-list" aria-labelledby="@(section.Title is null ? null : $"more-{index}")" data-testid="more-section">
+                    @foreach (var item in section.Items)
+                    {
+                        <li class="plain-list-item pa-0">
+                            <a href="@item.Href" class="more-link" data-testid="more-link">
+                                <MudIcon Icon="@item.Icon" Color="Color.Primary" aria-hidden="true" />
+                                <span class="flex-grow-1">@item.Label</span>
+                                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Secondary" aria-hidden="true" />
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    private HouseholdMembershipSummary? _household;
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        _loaded = true;
+    }
+}

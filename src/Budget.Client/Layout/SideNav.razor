@@ -1,0 +1,55 @@
+@* The side drawer's links, in groups (BUD-115). The current page's item is highlighted, including on pages under it
+   (an outgoing's page highlights Outgoings). *@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+<nav aria-label="Main" class="mud-navmenu mud-navmenu-default side-nav-list">
+    @foreach (var (section, index) in Sections.Select((s, i) => (s, i)))
+    {
+        @if (index > 0)
+        {
+            <MudDivider Class="my-2" />
+        }
+        @if (section.Title is { } title)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 d-block nav-section-title" id="@($"nav-section-{index}")">@title</MudText>
+        }
+        <ul class="plain-list" aria-labelledby="@(section.Title is null ? null : $"nav-section-{index}")">
+            @foreach (var item in section.Items)
+            {
+                var active = item.Href == _active;
+                <li class="mud-nav-item">
+                    <a href="@item.Href" class="mud-nav-link mud-ripple @(active ? "active" : "") @(item.Sub ? "nav-sub" : "")"
+                       aria-current="@(active ? "page" : null)" data-testid="nav-link">
+                        <MudIcon Icon="@item.Icon" Class="mud-nav-link-icon mud-nav-link-icon-default" aria-hidden="true" />
+                        <div class="mud-nav-link-text">@item.Label</div>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+</nav>
+
+@code {
+    [Parameter]
+    public HouseholdMembershipSummary? Household { get; set; }
+
+    private IReadOnlyList<NavSection> Sections => NavItems.Drawer(Household);
+
+    private string? _active;
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    protected override void OnParametersSet() => _active = ActiveFor(Navigation.Uri);
+
+    private string? ActiveFor(string uri) =>
+        NavItems.ActiveHref(Navigation.ToBaseRelativePath(uri), Sections.SelectMany(s => s.Items).Select(i => i.Href));
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _active = ActiveFor(e.Location);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}
