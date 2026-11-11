@@ -75,6 +75,10 @@
     transform: translateY(-50%);
     margin: 0;
     color: var(--mud-palette-primary);
+    /* Only as tall as the icon, so the icon itself is centred, not a line of text around it. */
+    display: flex;
+    align-items: center;
+    line-height: 0;
 }
 
 /* Phones: a slightly smaller name, so it fits beside "Go to today" more often. */

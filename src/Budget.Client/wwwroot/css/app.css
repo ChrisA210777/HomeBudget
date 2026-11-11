@@ -522,6 +522,10 @@ h1[tabindex="-1"]:focus-visible {
     top: 50%;
     transform: translateY(-50%);
     margin: 0;
+    /* Only as tall as the icon, so the icon itself is centred, not a line of text around it. */
+    display: flex;
+    align-items: center;
+    line-height: 0;
 }
 
 .page-toolbar .toolbar-menu .mud-button-icon-start {
