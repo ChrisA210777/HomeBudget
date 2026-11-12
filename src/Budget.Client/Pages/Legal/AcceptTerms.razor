@@ -12,7 +12,7 @@
 <LegalPage Title="Before you start" Version="@LegalDocuments.TermsVersion">
     <MudText Typo="Typo.body1" Class="mb-2" data-testid="accept-intro">
         Before you carry on, please read the terms of use below and the
-        <MudLink Href="@LegalDocuments.PrivacyPath" Target="_blank">privacy notice</MudLink>, which says how your information is used.
+        <MudLink Underline="Underline.Always" Href="@LegalDocuments.PrivacyPath" Target="_blank">privacy notice</MudLink>, which says how your information is used.
     </MudText>
 
     <TermsText />
@@ -30,7 +30,7 @@
             <MudButton Variant="Variant.Text" OnClick="SignOutAsync" data-testid="accept-sign-out">Sign out</MudButton>
         </div>
         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-3">
-            If you don't want to accept them, you can sign out, or <MudLink Href="/settings">delete your account</MudLink> in Settings.
+            If you don't want to accept them, you can sign out, or <MudLink Underline="Underline.Always" Href="/settings">delete your account</MudLink> in Settings.
         </MudText>
     </MudPaper>
 </LegalPage>
