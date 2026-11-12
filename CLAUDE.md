@@ -28,6 +28,7 @@ version. Don't leave it for later. If a decision is made in conversation, write 
 | What the app does, or what's in or out of scope | **Project Overview** (285605889) |
 | Ideas for later, or the status of ones listed there | **Future Ideas (to discuss)** (287899649) |
 | A UI pattern, layout rule or wording convention | **UI Conventions** (289603597) and the *UI conventions* section below |
+| A security finding: fixed, reviewed, or accepted (an accepted one also goes in `tests/security/zap-accepted.tsv`) | **Security Findings & Accepted Risks** (290455580) |
 | An architectural decision | A new ADR page under **Architecture Decision Records** (285769729), plus a row in its table |
 
 **ADRs are records of a decision.** Don't rewrite one when things change later: add a dated "Update" panel at the

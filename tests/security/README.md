@@ -23,7 +23,7 @@ Open the job summary (or the `zap-report` artifact) to see the alert, its rule i
 - **Fix it**, which is almost always the right answer; or
 - **Accept it**, by adding a line to `zap-accepted.tsv`: the rule id, the alert's name, and a specific reason, separated
   by tabs. Mention it in the pull request so the owner agrees, and record it on the **Security Findings & Accepted
-  Risks** page in Confluence (space SD). Remove both when the cause is fixed.
+  Risks** page in Confluence (space SD, page 290455580). Remove both when the cause is fixed.
 
 Low and informational alerts that have been looked at, and why no change was made, are on the same Confluence page.
 
