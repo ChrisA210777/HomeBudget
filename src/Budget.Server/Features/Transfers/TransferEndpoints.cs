@@ -8,6 +8,7 @@ using Budget.Server.Features.Accounts;
 using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Server.Features.Outgoings;
+using Budget.Server.Features.SignIn;
 using Budget.Shared.Households;
 using Budget.Shared.Outgoings;
 using Budget.Shared.Transfers;
@@ -397,7 +398,8 @@ public static class TransferEndpoints
             .Distinct()
             .ToList();
         var users = await db.Users.Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName);
-        string? NameOf(Guid? id) => id is { } userId ? users.GetValueOrDefault(userId) : null;
+        // Someone who has deleted their account is "a former member" (ADR-016).
+        string? NameOf(Guid? id) => id is { } userId ? users.GetValueOrDefault(userId) ?? AccountDeletionEndpoints.FormerMemberInText : null;
 
         var accounts = await AccountDirectory.LoadAsync(db, householdId);
         var version = db.Entry(transfer).Property<byte[]>(TransferConfiguration.RowVersion).CurrentValue;

@@ -4,6 +4,7 @@ using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Domain.Transfers;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.SignIn;
 using Budget.Shared.DataExport;
 using Microsoft.EntityFrameworkCore;
 
@@ -76,9 +77,9 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                 ? exported with
                 {
                     RecordedBy = (source as AuditableEntity)?.OriginallyRecordedBy
-                        ?? (source.CreatedBy is { } c ? users.GetValueOrDefault(c)?.DisplayName : null),
+                        ?? (source.CreatedBy is { } c ? users.GetValueOrDefault(c)?.DisplayName ?? AccountDeletionEndpoints.FormerMemberInText : null),
                     RecordedAt = (source as AuditableEntity)?.OriginallyRecordedAt ?? source.CreatedAt,
-                    ChangedBy = source.ModifiedBy is { } m ? users.GetValueOrDefault(m)?.DisplayName : null,
+                    ChangedBy = source.ModifiedBy is { } m ? users.GetValueOrDefault(m)?.DisplayName ?? AccountDeletionEndpoints.FormerMemberInText : null,
                     ChangedAt = source.ModifiedAt,
                 }
                 : exported;

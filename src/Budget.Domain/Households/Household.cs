@@ -164,6 +164,37 @@ public sealed class Household : AuditableEntity
         next.SetOwner(true);
     }
 
+    /// <summary>
+    /// Who becomes the owner if the owner leaves for good, e.g. by deleting their account (ADR-016): the longest-standing
+    /// other Admin, or failing that the longest-standing other member, who becomes an Admin. <c>null</c> if there's no one.
+    /// </summary>
+    /// <remarks>The household's members must be loaded.</remarks>
+    public HouseholdMember? NextOwner(Guid leavingUserId) =>
+        _members.Where(m => m.UserId != leavingUserId && m.Role == HouseholdRole.Admin).MinBy(m => m.JoinedAt)
+        ?? _members.Where(m => m.UserId != leavingUserId).MinBy(m => m.JoinedAt);
+
+    /// <summary>
+    /// Passes ownership on before the owner leaves for good (ADR-016), making the next owner an Admin first if needed.
+    /// </summary>
+    /// <returns>The new owner, and whether they were made an Admin; <c>null</c> if there's no one else.</returns>
+    /// <remarks>The household's members must be loaded.</remarks>
+    public (HouseholdMember NewOwner, bool MadeAdmin)? PassOwnershipOn(Guid leavingUserId)
+    {
+        if (NextOwner(leavingUserId) is not { } next)
+        {
+            return null;
+        }
+
+        var madeAdmin = next.Role != HouseholdRole.Admin;
+        if (madeAdmin)
+        {
+            next.ChangeRole(HouseholdRole.Admin);
+        }
+
+        TransferOwnership(next.UserId);
+        return (next, madeAdmin);
+    }
+
     private HouseholdMember FindMember(Guid userId) =>
         _members.SingleOrDefault(m => m.UserId == userId)
         ?? throw new KeyNotFoundException("That user isn't a member of this household.");

@@ -70,7 +70,7 @@ public sealed class SettingsTests : IDisposable
     [Fact]
     public void Deleting_the_account_says_what_happens_and_needs_DELETE_typed()
     {
-        _deletion.Check = new AccountDeletionCheck([new OwnedHousehold(Guid.NewGuid(), "Just me", 0)], [], HouseholdsToLeave: 2);
+        _deletion.Check = new AccountDeletionCheck([new OwnedHousehold(Guid.NewGuid(), "Just me")], [], HouseholdsToLeave: 2);
         var cut = _context.RenderComponent<Settings>();
         var navigation = _context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
 
@@ -88,23 +88,26 @@ public sealed class SettingsTests : IDisposable
     }
 
     [Fact]
-    public void Households_used_by_others_must_be_handed_on_first()
+    public void Says_who_becomes_owner_of_households_others_use()
     {
-        _deletion.Check = new AccountDeletionCheck([], [new OwnedHousehold(Guid.NewGuid(), "The Austins", 2)], HouseholdsToLeave: 0);
+        _deletion.Check = new AccountDeletionCheck(
+            [], [new PassedOnHousehold(Guid.NewGuid(), "The Austins", "Jane", BecomesAdmin: false), new PassedOnHousehold(Guid.NewGuid(), "Flat", "Sam", BecomesAdmin: true)], 0);
         var cut = _context.RenderComponent<Settings>();
 
         cut.Find("[data-testid=delete-account]").Click();
 
-        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=delete-account-blocked]")));
-        Assert.Equal("The Austins (2 other people besides you)", cut.Find("[data-testid=hand-on-household]").TextContent.Trim());
-        Assert.Empty(cut.FindAll("[data-testid=delete-account-yes]"));
+        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("[data-testid=household-to-pass-on]").Count));
+        var passed = cut.FindAll("[data-testid=household-to-pass-on]").Select(e => e.TextContent.Trim()).ToList();
+        Assert.Equal("makes Jane the owner of The Austins", passed[0]);
+        Assert.Equal("makes Sam the owner of Flat, and an Admin", passed[1]);
+        Assert.NotNull(cut.Find("[data-testid=delete-account-yes]"));
     }
 
     [Fact]
     public void A_refusal_from_the_server_is_shown_and_nothing_navigates()
     {
         _deletion.Check = new AccountDeletionCheck([], [], 0);
-        _deletion.Refusal = "Make another Admin the owner of The Austins, or delete it, first.";
+        _deletion.Refusal = "Your account couldn't be deleted.";
         var cut = _context.RenderComponent<Settings>();
         var navigation = _context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
 
@@ -112,7 +115,7 @@ public sealed class SettingsTests : IDisposable
         cut.WaitForAssertion(() => cut.Find("input[data-testid=delete-account-confirm]").Input("DELETE"));
         cut.Find("[data-testid=delete-account-yes]").Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("The Austins", cut.Find("[data-testid=delete-account-error]").TextContent, StringComparison.Ordinal));
+        cut.WaitForAssertion(() => Assert.Contains("couldn't be deleted", cut.Find("[data-testid=delete-account-error]").TextContent, StringComparison.Ordinal));
         Assert.Equal("http://localhost/", navigation.Uri);
     }
 
