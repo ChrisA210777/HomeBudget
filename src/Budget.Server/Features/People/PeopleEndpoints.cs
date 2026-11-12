@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Budget.Server.Features.People;
 
 /// <summary>
-/// People in a household (BUD-43). Anyone can see them; Users and Admins can add and rename.
+/// People in a household (BUD-43). Anyone can see them; Users and Admins can add and rename; Admins can remove (BUD-112).
 /// Queries are filtered to the current household by the database query filter.
 /// </summary>
 public static class PeopleEndpoints
@@ -24,6 +24,7 @@ public static class PeopleEndpoints
         people.MapGet("/", ListAsync).RequireAuthorization(HouseholdPolicies.Viewer);
         people.MapPost("/", AddAsync).RequireAuthorization(HouseholdPolicies.User);
         people.MapPut("/{personId:guid}", RenameAsync).RequireAuthorization(HouseholdPolicies.User);
+        people.MapPersonRemoval();
 
         return app;
     }

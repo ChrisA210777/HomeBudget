@@ -87,6 +87,39 @@ public sealed class PeopleListTests : IDisposable
         Assert.Equal(2, cut.FindAll("[data-testid=person]").Count);
     }
 
+    [Fact]
+    public void Admins_can_remove_someone_who_doesnt_sign_in_choosing_what_happens_to_their_items()
+    {
+        _peopleApi.Removal = new PersonRemovalCheck(IncomeCount: 1, OutgoingCount: 2, AccountCount: 1, LinkedToMember: false);
+        var cut = _context.RenderComponent<PeopleList>();
+
+        // Chris signs in, so only Jane can be removed.
+        var remove = Assert.Single(cut.FindAll("[data-testid=remove-person]"));
+        Assert.Equal("Remove Jane", remove.GetAttribute("aria-label"));
+        remove.Click();
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[data-testid=remove-person-panel]")));
+        Assert.Contains("Their income (1)", cut.Find("[data-testid=remove-person-panel]").TextContent, StringComparison.Ordinal);
+        cut.Find("[data-testid=remove-person-yes]").Click();
+
+        cut.WaitForAssertion(() => Assert.Single(_peopleApi.Removed));
+        var request = _peopleApi.Removed[0].Request;
+        Assert.Equal(RemovalChoices.Person, request.Income);
+        Assert.NotNull(request.IncomeTo);
+        Assert.Equal(RemovalChoices.Household, request.Outgoings);
+        Assert.False(request.ArchiveAccounts);
+    }
+
+    [Fact]
+    public void Users_who_arent_Admins_cant_remove_people()
+    {
+        UseRole("User", isOwner: false);
+
+        var cut = _context.RenderComponent<PeopleList>();
+
+        Assert.Empty(cut.FindAll("[data-testid=remove-person]"));
+    }
+
     public void Dispose() => _context.Dispose();
 
     private void UseRole(string role, bool isOwner = true)
@@ -126,5 +159,17 @@ public sealed class PeopleListTests : IDisposable
 
         public Task<SavePersonResult> RenameAsync(Guid householdId, Guid personId, SavePersonRequest request) =>
             Task.FromResult(new SavePersonResult(new PersonSummary(personId, request.DisplayName, null, null, false), new Dictionary<string, string[]>()));
+
+        public Budget.Shared.People.PersonRemovalCheck Removal { get; set; } = new(0, 0, 0, false);
+
+        public List<(Guid PersonId, Budget.Shared.People.RemovePersonRequest Request)> Removed { get; } = [];
+
+        public Task<Budget.Shared.People.PersonRemovalCheck> CheckRemovalAsync(Guid householdId, Guid personId) => Task.FromResult(Removal);
+
+        public Task<string?> RemoveAsync(Guid householdId, Guid personId, Budget.Shared.People.RemovePersonRequest request)
+        {
+            Removed.Add((personId, request));
+            return Task.FromResult<string?>(null);
+        }
     }
 }

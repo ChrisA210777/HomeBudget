@@ -55,6 +55,9 @@ public sealed class StaticPeopleApi : IPeopleApi
     public Task<SavePersonResult> AddAsync(Guid householdId, SavePersonRequest request) => throw new NotSupportedException();
 
     public Task<SavePersonResult> RenameAsync(Guid householdId, Guid personId, SavePersonRequest request) => throw new NotSupportedException();
+    public Task<Budget.Shared.People.PersonRemovalCheck> CheckRemovalAsync(Guid householdId, Guid personId) => throw new NotSupportedException();
+
+    public Task<string?> RemoveAsync(Guid householdId, Guid personId, Budget.Shared.People.RemovePersonRequest request) => throw new NotSupportedException();
 }
 
 /// <summary>An in-memory income API that records what the pages asked it to do.</summary>

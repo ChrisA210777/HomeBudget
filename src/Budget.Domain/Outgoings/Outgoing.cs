@@ -153,6 +153,9 @@ public sealed class Outgoing : AuditableEntity, IHouseholdOwned
         return outgoing;
     }
 
+    /// <summary>Who it's for: a person, or the whole household (<c>null</c>). Used when a person is removed (BUD-112).</summary>
+    public void AssignTo(Guid? personId) => PersonId = personId == Guid.Empty ? null : personId;
+
     public void UpdateDetails(OutgoingDetails details)
     {
         ArgumentNullException.ThrowIfNull(details);

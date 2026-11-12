@@ -140,6 +140,10 @@ public static class ActivityMessages
     public static ActivityEntry PersonAdded(Guid householdId, Guid personId, string name) =>
         Entry(householdId, ActivityArea.People, personId, $"added {name} to the household's people");
 
+    /// <summary>Without their name, which is being removed from the household (BUD-112).</summary>
+    public static ActivityEntry PersonRemoved(Guid householdId) =>
+        Entry(householdId, ActivityArea.People, null, "removed a person from the household's people");
+
     public static ActivityEntry PersonRenamed(Guid householdId, Guid personId, string from, string to) =>
         Entry(householdId, ActivityArea.People, personId, $"renamed {from} to {to}");
 

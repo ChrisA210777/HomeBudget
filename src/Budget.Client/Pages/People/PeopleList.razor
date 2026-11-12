@@ -59,7 +59,64 @@
                                 {
                                     <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="@($"Rename {person.DisplayName}")" OnClick="() => StartRename(person)" data-testid="rename" />
                                 }
+                                @if (_isAdmin && person.LinkedUserId is null)
+                                {
+                                    <MudTooltip Text="@($"Remove {person.DisplayName}")">
+                                        <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Color="Color.Error" aria-label="@($"Remove {person.DisplayName}")"
+                                                       OnClick="() => StartRemoveAsync(person)" Disabled="!Online" data-testid="remove-person" />
+                                    </MudTooltip>
+                                }
                             </div>
+
+                            @if (_removingId == person.Id && _removal is not null)
+                            {
+                                @* BUD-112, ADR-016: what happens to their items is chosen before they're removed. *@
+                                <div class="mt-3 pa-3 confirm-panel" role="group" aria-label="@($"Remove {person.DisplayName}")" data-testid="remove-person-panel">
+                                    <MudText Typo="Typo.body2" Class="mb-3">
+                                        Remove @person.DisplayName from the household's people? Their name goes from the household, and this can't be undone.
+                                    </MudText>
+                                    @if (_removal.IncomeCount > 0)
+                                    {
+                                        <MudSelect T="string" @bind-Value="_incomeChoice" Label="@($"Their income ({_removal.IncomeCount})")" Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense" Class="mb-3" data-testid="remove-income">
+                                            @foreach (var other in Others(person))
+                                            {
+                                                <MudSelectItem T="string" Value="@other.Id.ToString()">Move to @other.DisplayName</MudSelectItem>
+                                            }
+                                            <MudSelectItem T="string" Value="@RemovalChoices.Delete">Delete it</MudSelectItem>
+                                        </MudSelect>
+                                    }
+                                    @if (_removal.OutgoingCount > 0)
+                                    {
+                                        <MudSelect T="string" @bind-Value="_outgoingsChoice" Label="@($"Their outgoings ({_removal.OutgoingCount})")" Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense" Class="mb-3" data-testid="remove-outgoings">
+                                            <MudSelectItem T="string" Value="@RemovalChoices.Household">Make them the household's</MudSelectItem>
+                                            @foreach (var other in Others(person))
+                                            {
+                                                <MudSelectItem T="string" Value="@other.Id.ToString()">Move to @other.DisplayName</MudSelectItem>
+                                            }
+                                            <MudSelectItem T="string" Value="@RemovalChoices.Delete">Delete them</MudSelectItem>
+                                        </MudSelect>
+                                    }
+                                    @if (_removal.AccountCount > 0)
+                                    {
+                                        <MudSelect T="bool" @bind-Value="_archiveAccounts" Label="@($"Their accounts ({_removal.AccountCount})")" Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense" Class="mb-3" data-testid="remove-accounts">
+                                            <MudSelectItem T="bool" Value="false">Make them the household's</MudSelectItem>
+                                            <MudSelectItem T="bool" Value="true">Make them the household's, and archive them</MudSelectItem>
+                                        </MudSelect>
+                                    }
+                                    @if (_removeError is not null)
+                                    {
+                                        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="remove-person-error">@_removeError</MudAlert>
+                                    }
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="() => RemoveAsync(person)" Disabled="@(_saving || !Online)"
+                                                   data-testid="remove-person-yes">Remove</MudButton>
+                                        <MudButton Variant="Variant.Text" OnClick="CancelRemove" data-testid="remove-person-cancel">Cancel</MudButton>
+                                    </div>
+                                </div>
+                            }
                         }
                     </li>
                 }
@@ -95,6 +152,14 @@
     private HouseholdMembershipSummary? _household;
     private IReadOnlyList<PersonSummary>? _people;
     private bool _canEdit;
+    private bool _isAdmin;
+
+    private Guid? _removingId;
+    private PersonRemovalCheck? _removal;
+    private string? _incomeChoice;
+    private string? _outgoingsChoice;
+    private bool _archiveAccounts;
+    private string? _removeError;
     private bool _saving;
 
     private string? _newName;
@@ -108,6 +173,7 @@
     {
         _household = await Session.GetActiveHouseholdAsync();
         _canEdit = _household is not null && _household.Role != "Viewer";
+        _isAdmin = _household?.Role == "Admin";
         await LoadAsync();
     }
 
@@ -183,4 +249,52 @@
 
     private static string? FirstError(IReadOnlyDictionary<string, string[]> errors) =>
         errors.Values.SelectMany(v => v).FirstOrDefault();
+
+    private IEnumerable<PersonSummary> Others(PersonSummary person) => (_people ?? []).Where(p => p.Id != person.Id);
+
+    private async Task StartRemoveAsync(PersonSummary person)
+    {
+        _removeError = null;
+        _removal = await PeopleApi.CheckRemovalAsync(_household!.HouseholdId, person.Id);
+        _removingId = person.Id;
+
+        // Income always belongs to someone: move it to the first other person unless there's no one.
+        _incomeChoice = Others(person).FirstOrDefault()?.Id.ToString() ?? RemovalChoices.Delete;
+        _outgoingsChoice = RemovalChoices.Household;
+        _archiveAccounts = false;
+    }
+
+    private void CancelRemove()
+    {
+        _removingId = null;
+        _removal = null;
+    }
+
+    private async Task RemoveAsync(PersonSummary person)
+    {
+        var request = new RemovePersonRequest
+        {
+            Income = _incomeChoice == RemovalChoices.Delete ? RemovalChoices.Delete : RemovalChoices.Person,
+            IncomeTo = Guid.TryParse(_incomeChoice, out var incomeTo) ? incomeTo : null,
+            Outgoings = Guid.TryParse(_outgoingsChoice, out _) ? RemovalChoices.Person : _outgoingsChoice,
+            OutgoingsTo = Guid.TryParse(_outgoingsChoice, out var outgoingsTo) ? outgoingsTo : null,
+            ArchiveAccounts = _archiveAccounts,
+        };
+
+        _saving = true;
+        try
+        {
+            _removeError = await PeopleApi.RemoveAsync(_household!.HouseholdId, person.Id, request);
+            if (_removeError is null)
+            {
+                Snackbar.Add($"{person.DisplayName} was removed.", Severity.Success);
+                CancelRemove();
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
 }
