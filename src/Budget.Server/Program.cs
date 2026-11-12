@@ -43,6 +43,7 @@ var app = builder.Build();
 // First, so everything after sees the original scheme and host (e.g. a dev tunnel's https URL).
 app.UseForwardedHeadersIfEnabled();
 app.UseCorrelationIdHeader();
+app.UseSecurityHeaders(app.Environment);
 
 // In Development (and the end-to-end Testing environment) the database is created and migrated on startup. Deployed environments
 // apply migrations from the pipeline using the migration bundle instead (see ADR-003).

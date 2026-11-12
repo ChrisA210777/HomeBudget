@@ -54,6 +54,21 @@ public partial class ClientHostingTests(BudgetApiFactory factory) : IntegrationT
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    [Fact]
+    public async Task The_shell_has_no_inline_scripts_or_third_party_resources()
+    {
+        using var client = CreateClient();
+
+        using var response = await client.GetAsync(new Uri("/", UriKind.Relative));
+        var html = await response.Content.ReadAsStringAsync();
+
+        // The Content Security Policy (BUD-143) allows only the app's own scripts, styles and fonts.
+        Assert.True(response.Headers.Contains("Content-Security-Policy"));
+        Assert.DoesNotMatch(InlineScript(), html);
+        Assert.DoesNotContain("https://", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("http://", html, StringComparison.Ordinal);
+    }
+
     private static async Task<string> GetPageAsync(HttpClient client, string path)
     {
         using var response = await client.GetAsync(new Uri(path, UriKind.Relative));
@@ -63,6 +78,9 @@ public partial class ClientHostingTests(BudgetApiFactory factory) : IntegrationT
 
         return await response.Content.ReadAsStringAsync();
     }
+
+    [GeneratedRegex("<script(?![^>]*\\ssrc=)[^>]*>")]
+    private static partial Regex InlineScript();
 
     [GeneratedRegex("<script src=\"(?<src>_framework/blazor\\.webassembly[^\"]*\\.js)\"")]
     private static partial Regex FrameworkScript();
