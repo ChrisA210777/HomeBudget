@@ -7,6 +7,9 @@ public static class PeopleRoutes
 
     /// <summary>PUT: rename a person.</summary>
     public static string Person(Guid householdId, Guid personId) => $"{People(householdId)}/{personId}";
+
+    /// <summary>GET (Admins): what removing the person would affect. POST <see cref="RemovePersonRequest"/>: remove them (BUD-112).</summary>
+    public static string Removal(Guid householdId, Guid personId) => $"{Person(householdId, personId)}/removal";
 }
 
 /// <summary>A person in the household.</summary>
@@ -18,6 +21,37 @@ public sealed record PersonSummary(Guid Id, string DisplayName, Guid? LinkedUser
 public sealed record SavePersonRequest
 {
     public string DisplayName { get; init; } = string.Empty;
+}
+
+/// <summary>What removing a person would affect (BUD-112, ADR-016).</summary>
+/// <param name="LinkedToMember">They sign in as a current member, so they can't be removed until that member leaves.</param>
+public sealed record PersonRemovalCheck(int IncomeCount, int OutgoingCount, int AccountCount, bool LinkedToMember);
+
+/// <summary>
+/// Remove a person who doesn't sign in (BUD-112, ADR-016), saying what happens to their items. A choice is only needed
+/// for the kinds of item they have.
+/// </summary>
+public sealed record RemovePersonRequest
+{
+    /// <summary><see cref="RemovalChoices.Person"/> (to <see cref="IncomeTo"/>) or <see cref="RemovalChoices.Delete"/>. Income always belongs to a person.</summary>
+    public string? Income { get; init; }
+
+    public Guid? IncomeTo { get; init; }
+
+    /// <summary><see cref="RemovalChoices.Household"/>, <see cref="RemovalChoices.Person"/> (to <see cref="OutgoingsTo"/>) or <see cref="RemovalChoices.Delete"/>.</summary>
+    public string? Outgoings { get; init; }
+
+    public Guid? OutgoingsTo { get; init; }
+
+    /// <summary>Their accounts become the household's either way; this also archives them.</summary>
+    public bool ArchiveAccounts { get; init; }
+}
+
+public static class RemovalChoices
+{
+    public const string Household = "Household";
+    public const string Person = "Person";
+    public const string Delete = "Delete";
 }
 
 /// <summary>Shared by the form and the API.</summary>
