@@ -186,9 +186,9 @@ public sealed class MainLayoutTests : IDisposable
         var navigation = _context.Services.GetRequiredService<FakeNavigationManager>();
         navigation.NavigateTo("/outgoings?view=year");
 
-        Render();
+        var cut = Render();
 
-        navigation.WaitForAssertion(() => Assert.Equal("http://localhost/terms/accept?returnUrl=%2Foutgoings%3Fview%3Dyear", navigation.Uri));
+        cut.WaitForAssertion(() => Assert.Equal("http://localhost/terms/accept?returnUrl=%2Foutgoings%3Fview%3Dyear", navigation.Uri));
     }
 
     [Theory]
