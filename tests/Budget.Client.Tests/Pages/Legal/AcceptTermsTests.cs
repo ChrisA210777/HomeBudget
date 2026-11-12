@@ -26,7 +26,7 @@ public sealed class AcceptTermsTests : IDisposable
     }
 
     [Fact]
-    public void Accepting_needs_the_box_ticked_then_records_the_version_and_goes_back()
+    public async Task Accepting_needs_the_box_ticked_then_records_the_version_and_goes_back()
     {
         var navigation = _context.Services.GetRequiredService<FakeNavigationManager>();
         navigation.NavigateTo("/terms/accept?returnUrl=%2Foutgoings");
@@ -40,7 +40,7 @@ public sealed class AcceptTermsTests : IDisposable
 
         cut.WaitForAssertion(() => Assert.Equal(LegalDocuments.TermsVersion, _terms.Accepted));
         Assert.Equal("http://localhost/outgoings", navigation.Uri);
-        var user = _context.Services.GetRequiredService<UserSession>().GetCurrentUserAsync().Result;
+        var user = await _context.Services.GetRequiredService<UserSession>().GetCurrentUserAsync();
         Assert.False(user!.MustAcceptTerms);
     }
 
