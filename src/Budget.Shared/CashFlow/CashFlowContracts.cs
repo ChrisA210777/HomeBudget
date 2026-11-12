@@ -13,6 +13,13 @@ public static class CashFlowRoutes
         $"/api/households/{householdId}/cash-flow/month?month={year:D4}-{month:D2}";
 
     /// <summary>GET (Viewers): what goes in and out of each account, day by day, from <paramref name="from"/> to <paramref name="to"/>.</summary>
+    /// <param name="accountMonths">
+    /// From and to are a calendar month, and each account shows its own month that pays for it (BUD-138): from its last
+    /// month start on or before the 1st to the day before its last month start on or before the next month's 1st.
+    /// </param>
+    public static string Days(Guid householdId, DateOnly from, DateOnly to, bool accountMonths) =>
+        Days(householdId, from, to) + (accountMonths ? "&accountMonths=true" : string.Empty);
+
     public static string Days(Guid householdId, DateOnly from, DateOnly to) =>
         string.Create(CultureInfo.InvariantCulture, $"/api/households/{householdId}/cash-flow/days?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
 }
@@ -75,6 +82,12 @@ public sealed record CashFlowDay(DateOnly Date, IReadOnlyList<CashFlowEntry> Ent
 public sealed record CashFlowDaysAccount(Guid? AccountId, string Name, IReadOnlyList<CashFlowDay> Days, decimal TotalIn, decimal TotalOut)
 {
     public decimal Net => TotalIn - TotalOut;
+
+    /// <summary>The days shown for this account: the period asked for, or the account's own month (BUD-138).</summary>
+    public DateOnly From { get; init; }
+
+    /// <inheritdoc cref="From"/>
+    public DateOnly To { get; init; }
 
     /// <summary>
     /// What had come in less what had gone out since the account's month started, when that was before the period

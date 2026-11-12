@@ -126,6 +126,37 @@ public class CashFlowApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     }
 
     [Fact]
+    public async Task A_month_shows_each_accounts_own_month_for_it()
+    {
+        var (client, householdId) = await HouseholdAsync();
+        await ExecuteDbContextAsync(async db =>
+        {
+            var joint = await db.Accounts.IgnoreQueryFilters().SingleAsync(a => a.HouseholdId == householdId && a.Name == "Joint");
+            var topUp = await db.Transfers.IgnoreQueryFilters().SingleAsync(t => t.HouseholdId == householdId && t.Name == "Bills top-up");
+            joint.StartMonthWith(topUp.Id);
+            await db.SaveChangesAsync();
+        });
+
+        // BUD-138: Joint's month for November runs from the top-up on 25 Oct to the day before the next one; Current's
+        // starts on the 1st, so it's the calendar month.
+        var days = (await client.GetFromJsonAsync<CashFlowDaysResponse>(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30), accountMonths: true))))!;
+
+        var joint = days.Accounts.Single(a => a.Name == "Joint");
+        Assert.Equal((new DateOnly(2026, 10, 25), new DateOnly(2026, 11, 24), 0m, (DateOnly?)null), (joint.From, joint.To, joint.BroughtForward, joint.BroughtForwardSince));
+        Assert.Equal(
+            new (DateOnly, decimal, bool)[] { (new DateOnly(2026, 10, 25), 1000m, false), (new DateOnly(2026, 11, 1), 0m, false), (new DateOnly(2026, 11, 5), -150m, true) },
+            joint.Days.Select(d => (d.Date, d.RunningTotal, d.IsShort)));
+        Assert.All(joint.Days, d => Assert.Null(d.MonthStarted));
+
+        var current = days.Accounts.Single(a => a.Name == "Current");
+        Assert.Equal((new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)), (current.From, current.To));
+
+        // Only a calendar month can be shown by each account's own month.
+        using var notAMonth = await client.GetAsync(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 30), accountMonths: true)));
+        Assert.Equal(HttpStatusCode.BadRequest, notAMonth.StatusCode);
+    }
+
+    [Fact]
     public async Task A_four_weekly_payment_starts_the_month_each_time_it_arrives()
     {
         var (client, householdId) = await HouseholdAsync();
