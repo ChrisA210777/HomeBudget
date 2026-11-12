@@ -52,6 +52,10 @@ body {
 .user-menu .mud-menu-button-activator .mud-button-icon-start {
     display: inline-flex;
     vertical-align: middle;
+
+    /* MudBlazor pulls the icon 4px left, which the label's overflow: hidden (for the ellipsis) then cuts off. */
+    margin-left: 0;
+    margin-inline-start: 0;
 }
 
 /* Read by screen readers but not shown. */
