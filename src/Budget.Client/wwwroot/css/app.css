@@ -194,6 +194,12 @@ h1[tabindex="-1"]:focus-visible {
 }
 
 /* The side drawer's groups (BUD-115, BUD-119). */
+/* The first group (Home) has no title or divider above it, so it gets the same space the dividers leave between groups
+   rather than sitting against the app bar (BUD-158). */
+.side-nav-list {
+    padding-top: 8px;
+}
+
 .side-nav-list .mud-nav-link {
     color: inherit;
     text-decoration: none;
