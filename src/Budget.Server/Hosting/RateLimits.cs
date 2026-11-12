@@ -31,7 +31,7 @@ public sealed class RateLimitOptions
     public int WindowSeconds { get; set; } = 60;
 }
 
-public static class RateLimits
+public static partial class RateLimits
 {
     /// <summary>Policy for starting and finishing a sign-in.</summary>
     public const string SignIn = "sign-in";
@@ -97,6 +97,12 @@ public static class RateLimits
     private static async ValueTask RejectAsync(OnRejectedContext rejected, CancellationToken cancellationToken)
     {
         var context = rejected.HttpContext;
+
+        // Which limit and which route, never who: so it can be seen in Application Insights whether limits are reached.
+        var endpoint = context.GetEndpoint();
+        var policy = endpoint?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName ?? "api";
+        var route = (endpoint as RouteEndpoint)?.RoutePattern.RawText ?? "(none)";
+        LimitReached(context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(RateLimits)), policy, route);
         var wait = rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter) ? retryAfter : TimeSpan.FromMinutes(1);
         context.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
 
@@ -116,4 +122,7 @@ public static class RateLimits
             await context.Response.WriteAsync(TooManyRequestsDetail, cancellationToken);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Rate limit {RateLimitPolicy} reached on {Route}")]
+    private static partial void LimitReached(ILogger logger, string rateLimitPolicy, string route);
 }
