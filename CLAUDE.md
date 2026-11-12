@@ -28,8 +28,14 @@ version. Don't leave it for later. If a decision is made in conversation, write 
 | What the app does, or what's in or out of scope | **Project Overview** (285605889) |
 | Ideas for later, or the status of ones listed there | **Future Ideas (to discuss)** (287899649) |
 | A UI pattern, layout rule or wording convention | **UI Conventions** (289603597) and the *UI conventions* section below |
+| Anything about personal data: what's collected or shown, a right (export, edit, delete), retention, processors, cookies, the privacy notice or terms, or a step taken for UK GDPR | **Data Protection (UK GDPR)** (291274767): its *Proposed approach* table and its *Record of steps taken* |
 | A security finding: fixed, reviewed, or accepted (an accepted one also goes in `tests/security/zap-accepted.tsv`) | **Security Findings & Accepted Risks** (290455580) |
 | An architectural decision | A new ADR page under **Architecture Decision Records** (285769729), plus a row in its table |
+
+**Data protection is part of done.** Any change that touches personal data (adding a field about a person, a new
+export or deletion path, a new processor or service, a change to how long something is kept, logging or analytics)
+updates the Data Protection page in the same piece of work: the approach table if the approach changes, and a dated
+line in *Record of steps taken*. If it changes what people are told, the privacy notice (BUD-152) changes too.
 
 **ADRs are records of a decision.** Don't rewrite one when things change later: add a dated "Update" panel at the
 top saying what changed and where, or write a new ADR that supersedes it and update both statuses.
