@@ -1,0 +1,21 @@
+/* A change (BUD-140): what was done, then the time on the right; the time wraps under it on phones. */
+.activity-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 16px;
+}
+
+.activity-row + .activity-row {
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+.activity-row ::deep .activity-text {
+    flex: 1 1 16rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.activity-row ::deep .activity-when {
+    color: var(--mud-palette-text-secondary);
+}

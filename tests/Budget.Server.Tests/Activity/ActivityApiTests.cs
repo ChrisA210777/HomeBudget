@@ -69,5 +69,34 @@ public class ActivityApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, id => ActivityRoutes.Activity(id, take: 5));
     }
 
+    [Fact]
+    public async Task It_can_be_filtered_by_who_and_kind_of_change_and_read_a_page_at_a_time()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync("Chris Austin");
+        var memberId = await AddMemberAsync(householdId, HouseholdRole.User, "Sam Member");
+        using var owner = CreateClient(signedInAs: ownerId);
+        using var member = CreateClient(signedInAs: memberId);
+        using var person = await owner.PostAsJsonAsync(Url(PeopleRoutes.People(householdId)), new SavePersonRequest { DisplayName = "Alex" });
+        using var first = await member.PostAsJsonAsync(Url(OutgoingCategoryRoutes.Categories(householdId)), new AddCategoryRequest { Name = "Hobbies" });
+        using var second = await member.PostAsJsonAsync(Url(OutgoingCategoryRoutes.Categories(householdId)), new AddCategoryRequest { Name = "Garden" });
+
+        // BUD-140: by who, by kind, and a page at a time.
+        var bySam = (await owner.GetFromJsonAsync<ActivityResponse>(Url(ActivityRoutes.Activity(householdId, take: 10, who: memberId))))!;
+        Assert.Equal(new[] { "added the category Garden", "added the category Hobbies" }, bySam.Items.Select(i => i.Summary));
+        Assert.Equal(new[] { "Chris", "Sam Member" }, bySam.People.Select(p => p.Name));
+
+        var people = (await owner.GetFromJsonAsync<ActivityResponse>(Url(ActivityRoutes.Activity(householdId, take: 10, areas: [ActivityAreaDto.People]))))!;
+        Assert.Equal(new[] { "added Alex to the household's people" }, people.Items.Select(i => i.Summary));
+
+        var page = (await owner.GetFromJsonAsync<ActivityResponse>(Url(ActivityRoutes.Activity(householdId, take: 1))))!;
+        Assert.True(page.HasMore);
+        var next = (await owner.GetFromJsonAsync<ActivityResponse>(Url(ActivityRoutes.Activity(householdId, take: 5, before: page.Items.Single().At))))!;
+        Assert.Equal(new[] { "added the category Hobbies", "added Alex to the household's people" }, next.Items.Select(i => i.Summary));
+        Assert.False(next.HasMore);
+
+        using var badKind = await owner.GetAsync(Url($"/api/households/{householdId}/activity?take=5&areas=Holidays"));
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, badKind.StatusCode);
+    }
+
     private static Uri Url(string path) => new(path, UriKind.Relative);
 }
