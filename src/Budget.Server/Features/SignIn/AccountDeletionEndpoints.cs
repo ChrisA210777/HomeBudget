@@ -35,9 +35,9 @@ public static class AccountDeletionEndpoints
     }
 
     private static async Task<AccountDeletionCheck> CheckAsync(ClaimsPrincipal principal, BudgetDbContext db) =>
-        await CheckAsync(UserId(principal), db);
+        await WhatDeletingDoesAsync(UserId(principal), db);
 
-    private static async Task<AccountDeletionCheck> CheckAsync(Guid userId, BudgetDbContext db)
+    private static async Task<AccountDeletionCheck> WhatDeletingDoesAsync(Guid userId, BudgetDbContext db)
     {
         var owned = await db.HouseholdMembers
             .Where(m => m.UserId == userId && m.IsOwner)
@@ -79,7 +79,7 @@ public static class AccountDeletionEndpoints
             return Results.Unauthorized();
         }
 
-        var check = await CheckAsync(userId, db);
+        var check = await WhatDeletingDoesAsync(userId, db);
         if (!check.CanDelete)
         {
             var names = string.Join(", ", check.HouseholdsToHandOn.Select(h => h.Name));
