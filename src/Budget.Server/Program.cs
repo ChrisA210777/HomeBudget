@@ -34,6 +34,10 @@ builder.Services.AddHealthChecks()
 builder.Services.AddForwardedHeadersFromConfiguration(builder.Configuration);
 builder.Services.AddBudgetRateLimits();
 
+// Values marked [PersonalData] or [SecretData] in log messages are erased (BUD-146).
+builder.Logging.EnableRedaction();
+builder.Services.AddBudgetRedaction();
+
 // Requests, dependencies, logs and exceptions go to Application Insights in Azure (BUD-12).
 // The connection string is only set there, so nothing is sent when running locally or in tests.
 if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))

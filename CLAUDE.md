@@ -47,6 +47,10 @@ than replacing the whole page, so nothing is lost.
 - The Content Security Policy (`Hosting/SecurityHeaders.cs`) allows only the app's own files: no inline scripts or
   event handlers, and no scripts, fonts, images or API calls from other sites. Put scripts in `wwwroot/js`; if something
   truly needs another origin, change the policy deliberately and say why. Every e2e test fails on a policy violation.
+- Logs and telemetry never hold names, emails, amounts, anything people typed, or tokens (BUD-146). Log ids, not
+  values, with `[LoggerMessage]`. If a message must carry such a value, mark the parameter `[PersonalData]` or
+  `[SecretData]` (`Hosting/DataClassification.cs`) so it's erased. A new route or query parameter that can carry free
+  text or a secret is added to `Hosting/TelemetryRedaction.cs`. `NoPersonalDataInLogsTests` checks the main flows.
 - Server code is organised by feature; see `src/Budget.Server/Features/README.md`.
 - Styles for one page or component go in its own scoped `.razor.css` file (use `::deep` for MudBlazor's elements).
   `wwwroot/css/app.css` is only for app-wide rules, so features don't all add to the end of one file.
