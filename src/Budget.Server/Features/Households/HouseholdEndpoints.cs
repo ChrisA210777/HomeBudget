@@ -27,6 +27,7 @@ public static class HouseholdEndpoints
         household.MapPut("/members/{userId:guid}/role", ChangeRoleAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapDelete("/members/{userId:guid}", RemoveMemberAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapDelete("/membership", LeaveAsync).RequireAuthorization(HouseholdPolicies.Viewer);
+        household.MapPut("/owner", TransferOwnershipAsync).RequireAuthorization(HouseholdPolicies.Owner);
 
         return app;
     }
@@ -151,6 +152,34 @@ public static class HouseholdEndpoints
         }
 
         db.ActivityEntries.Add(ActivityMessages.MemberRoleChanged(householdId, await MemberNameAsync(db, householdId, userId), role));
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+    }
+
+    /// <summary>Hands ownership to another Admin (BUD-157). The previous owner stays as an Admin.</summary>
+    private static async Task<IResult> TransferOwnershipAsync(Guid householdId, TransferOwnershipRequest request, BudgetDbContext db)
+    {
+        var household = await db.Households.Include(h => h.Members).SingleAsync(h => h.Id == householdId);
+        if (household.Members.All(m => m.UserId != request.UserId))
+        {
+            return Results.NotFound();
+        }
+
+        if (household.Members.Single(m => m.UserId == request.UserId).IsOwner)
+        {
+            return Results.NoContent();
+        }
+
+        try
+        {
+            household.TransferOwnership(request.UserId);
+        }
+        catch (HouseholdMembershipException ex)
+        {
+            return Refused(ex);
+        }
+
+        db.ActivityEntries.Add(ActivityMessages.OwnershipTransferred(householdId, await MemberNameAsync(db, householdId, request.UserId)));
         await db.SaveChangesAsync();
         return Results.NoContent();
     }

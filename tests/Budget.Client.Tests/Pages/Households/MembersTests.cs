@@ -15,6 +15,7 @@ public sealed class MembersTests : IDisposable
 {
     private static readonly Guid JaneId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly Guid BobId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly Guid AnnId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
     private readonly TestContext _context = new();
     private readonly StubHouseholdApi _api = new();
@@ -143,6 +144,33 @@ public sealed class MembersTests : IDisposable
     }
 
     [Fact]
+    public void The_owner_can_make_another_Admin_the_owner_after_confirming()
+    {
+        _api.WithAnotherAdmin = true;
+        var cut = Render("Admin", isOwner: true);
+        var navigation = _context.Services.GetRequiredService<NavigationManager>();
+
+        // Only Admins can become the owner: Ann is one, Bob and Jane aren't.
+        var offered = Assert.Single(cut.FindAll("[data-testid=make-owner]"));
+        Assert.Equal("Make Ann Austin the owner", offered.GetAttribute("aria-label"));
+
+        offered.Click();
+        Assert.Null(_api.NewOwner);
+        cut.Find("[data-testid=owner-yes]").Click();
+
+        cut.WaitForAssertion(() => Assert.Equal(AnnId, _api.NewOwner));
+        Assert.Equal("http://localhost/members", navigation.Uri);
+    }
+
+    [Fact]
+    public void Only_the_owner_is_offered_handing_on_ownership()
+    {
+        var cut = Render("Admin", isOwner: false);
+
+        Assert.Empty(cut.FindAll("[data-testid=make-owner]"));
+    }
+
+    [Fact]
     public void Leaving_asks_first_then_reloads_the_app_at_home()
     {
         var cut = Render("Viewer", isOwner: false);
@@ -223,6 +251,9 @@ public sealed class MembersTests : IDisposable
 
         public bool YouOwn { get; set; }
 
+        /// <summary>Adds another Admin to the owner's household, who could become the owner.</summary>
+        public bool WithAnotherAdmin { get; set; }
+
         public Task<CreateHouseholdResult> CreateAsync(CreateHouseholdRequest request) => throw new NotSupportedException();
 
         public Task<HouseholdSetupResponse> GetSetupAsync(Guid householdId) => throw new NotSupportedException();
@@ -243,6 +274,7 @@ public sealed class MembersTests : IDisposable
                     new(FakeAccountApi.UserId, "Chris Austin", null, "Admin", true, new DateTimeOffset(2026, 11, 4, 9, 0, 0, TimeSpan.Zero)),
                     new(BobId, "Bob Austin", "bob@example.com", "User", false, new DateTimeOffset(2026, 11, 5, 9, 0, 0, TimeSpan.Zero)),
                     new(JaneId, "Jane Austin", "jane@example.com", "Viewer", false, new DateTimeOffset(2026, 11, 5, 9, 0, 0, TimeSpan.Zero)),
+                    .. WithAnotherAdmin ? new HouseholdMemberSummary[] { new(AnnId, "Ann Austin", "ann@example.com", "Admin", false, new DateTimeOffset(2026, 11, 5, 9, 0, 0, TimeSpan.Zero)) } : [],
                 ]
                 :
                 [
@@ -276,6 +308,14 @@ public sealed class MembersTests : IDisposable
         public Task<string?> LeaveAsync(Guid householdId)
         {
             Left = true;
+            return Task.FromResult(Refusal);
+        }
+
+        public Guid? NewOwner { get; private set; }
+
+        public Task<string?> TransferOwnershipAsync(Guid householdId, Guid userId)
+        {
+            NewOwner = userId;
             return Task.FromResult(Refusal);
         }
     }

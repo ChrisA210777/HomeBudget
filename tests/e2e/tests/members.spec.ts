@@ -54,3 +54,24 @@ test('a member can leave and goes back to their own household', async ({ page })
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByTestId('household-role')).toHaveText("You're the owner of this household.");
 });
+
+test('the owner can hand ownership to another Admin, then leave', async ({ page }) => {
+  const owner = await signIn(page);
+  const admin = await signInAsMemberOf(page, owner, 'Admin');
+  await signIn(page, owner);
+
+  await page.goto('/members');
+  await settled(page);
+  const row = page.getByTestId('member').filter({ hasText: admin });
+  await row.getByTestId('make-owner').click();
+  await expect(row.getByTestId('owner-confirm')).toContainText(`Make ${admin} the owner?`);
+  await row.getByTestId('owner-yes').click();
+
+  await expect(page).toHaveURL(/\/members$/);
+  await settled(page);
+  await expect(page.getByTestId('member').filter({ hasText: admin }).getByTestId('member-owner')).toHaveText('Owner');
+  await expect(page.getByTestId('owner-cant-leave')).toHaveCount(0);
+  await page.getByTestId('leave').click();
+  await page.getByTestId('leave-yes').click();
+  await expect(page).toHaveURL(/\/$/);
+});

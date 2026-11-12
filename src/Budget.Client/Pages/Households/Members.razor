@@ -61,7 +61,19 @@
 
                         @if (_isAdmin && !member.IsOwner)
                         {
-                            @if (_removingId == member.UserId)
+                            @if (_transferringId == member.UserId)
+                            {
+                                <div class="mt-3 pa-3 confirm-panel" role="group" aria-label="@($"Make {member.DisplayName} the owner")" data-testid="owner-confirm">
+                                    <MudText Typo="Typo.body2" Class="mb-2">
+                                        Make @member.DisplayName the owner? You'll stay an Admin. As owner, @member.DisplayName can delete the household or hand it on, and can't be removed.
+                                    </MudText>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => TransferOwnershipAsync(member)" Disabled="@(_saving || !Online)" data-testid="owner-yes">Make owner</MudButton>
+                                        <MudButton Variant="Variant.Text" OnClick="() => _transferringId = null" data-testid="owner-cancel">Cancel</MudButton>
+                                    </div>
+                                </div>
+                            }
+                            else if (_removingId == member.UserId)
                             {
                                 <div class="mt-3 pa-3 confirm-panel" role="group" aria-label="@($"Remove {member.DisplayName}")" data-testid="remove-confirm">
                                     <MudText Typo="Typo.body2" Class="mb-2">
@@ -88,6 +100,11 @@
                                     </div>
                                     <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.PersonRemove" OnClick="() => _removingId = member.UserId"
                                                Disabled="!Online" aria-label="@($"Remove {member.DisplayName}")" data-testid="remove-member">Remove</MudButton>
+                                    @if (_household?.IsOwner == true && member.Role == MemberRoles.Admin)
+                                    {
+                                        <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Star" OnClick="() => _transferringId = member.UserId"
+                                                   Disabled="!Online" aria-label="@($"Make {member.DisplayName} the owner")" data-testid="make-owner">Make owner</MudButton>
+                                    }
                                 </div>
                             }
                         }
@@ -108,7 +125,7 @@
                 @if (_household.IsOwner)
                 {
                     <MudText Typo="Typo.body2" data-testid="owner-cant-leave">
-                        As the owner, you can't leave. Handing ownership to someone else is coming later; until then you can delete the household instead.
+                        As the owner, you can't leave. Make another Admin the owner first (from their entry above), or delete the household.
                     </MudText>
                 }
                 else if (_confirmLeave)
@@ -178,6 +195,7 @@
     private bool _saving;
     private string? _error;
     private Guid? _removingId;
+    private Guid? _transferringId;
     private bool _confirmLeave;
     private bool _confirmDelete;
     private string? _deleteName;
@@ -215,6 +233,13 @@
             () => HouseholdApi.RemoveMemberAsync(_household!.HouseholdId, member.UserId),
             $"{member.DisplayName} was removed.",
             reloadAppAt: member.UserId == _userId ? "/" : null);
+
+    // You're no longer the owner, which changes what the app offers you, so reload it here.
+    private Task TransferOwnershipAsync(HouseholdMemberSummary member) =>
+        SaveAsync(
+            () => HouseholdApi.TransferOwnershipAsync(_household!.HouseholdId, member.UserId),
+            $"{member.DisplayName} is now the owner.",
+            reloadAppAt: "/members");
 
     // Back to the home page, which opens another of your households.
     private Task LeaveAsync() =>
@@ -256,6 +281,7 @@
         {
             _error = await save();
             _removingId = null;
+            _transferringId = null;
             _confirmLeave = false;
             if (_error is null)
             {

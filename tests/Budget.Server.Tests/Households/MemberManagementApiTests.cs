@@ -184,6 +184,62 @@ public class MemberManagementApiTests(BudgetApiFactory factory) : IntegrationTes
     public Task Other_households_cant_be_left() =>
         AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Delete, MemberRoutes.Membership);
 
+    [Fact]
+    public async Task The_owner_can_hand_ownership_to_an_Admin_and_then_leave()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var adminId = await AddMemberAsync(householdId, HouseholdRole.Admin);
+        using var owner = CreateClient(signedInAs: ownerId);
+
+        using var response = await owner.PutAsJsonAsync(Url(MemberRoutes.Owner(householdId)), new TransferOwnershipRequest { UserId = adminId });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var members = await owner.GetFromJsonAsync<List<HouseholdMemberSummary>>(Url(MemberRoutes.Members(householdId)));
+        Assert.True(members!.Single(m => m.UserId == adminId).IsOwner);
+        Assert.Equal(("Admin", false), members!.Where(m => m.UserId == ownerId).Select(m => (m.Role, m.IsOwner)).Single());
+
+        using var left = await owner.DeleteAsync(Url(MemberRoutes.Membership(householdId)));
+        Assert.Equal(HttpStatusCode.NoContent, left.StatusCode);
+    }
+
+    [Fact]
+    public async Task Only_an_Admin_can_become_the_owner()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var userId = await AddMemberAsync(householdId, HouseholdRole.User);
+        using var owner = CreateClient(signedInAs: ownerId);
+
+        using var response = await owner.PutAsJsonAsync(Url(MemberRoutes.Owner(householdId)), new TransferOwnershipRequest { UserId = userId });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Contains("Admin", problem!.Title, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Only_the_owner_can_hand_ownership_on()
+    {
+        var (_, householdId) = await CreateHouseholdOwnerAsync();
+        var adminId = await AddMemberAsync(householdId, HouseholdRole.Admin);
+        using var admin = CreateClient(signedInAs: adminId);
+
+        using var response = await admin.PutAsJsonAsync(Url(MemberRoutes.Owner(householdId)), new TransferOwnershipRequest { UserId = adminId });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Ownership_cant_go_to_someone_outside_the_household()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync();
+        var (outsiderId, _) = await CreateHouseholdOwnerAsync("Outsider");
+        using var owner = CreateClient(signedInAs: ownerId);
+
+        using var response = await owner.PutAsJsonAsync(Url(MemberRoutes.Owner(householdId)), new TransferOwnershipRequest { UserId = outsiderId });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private static Uri Url(string path) => new(path, UriKind.Relative);
 
     private async Task<Guid> AddPersonAsync(Guid householdId, string name, Guid linkedUserId)

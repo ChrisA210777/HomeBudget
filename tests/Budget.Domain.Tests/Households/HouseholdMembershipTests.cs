@@ -69,5 +69,42 @@ public class HouseholdMembershipTests
         Assert.Throws<KeyNotFoundException>(() => _household.ChangeRole(Guid.NewGuid(), HouseholdRole.User));
     }
 
+    [Fact]
+    public void Ownership_can_be_handed_to_another_Admin_and_the_old_owner_stays_an_Admin()
+    {
+        var nextId = _household.AddMember(Guid.NewGuid(), HouseholdRole.Admin, Now).UserId;
+
+        _household.TransferOwnership(nextId);
+
+        Assert.True(_household.Members.Single(m => m.UserId == nextId).IsOwner);
+        Assert.False(_household.Members.Single(m => m.UserId == _ownerId).IsOwner);
+        Assert.Equal(HouseholdRole.Admin, Role(_ownerId));
+        Assert.Single(_household.Members, m => m.IsOwner);
+    }
+
+    [Theory]
+    [InlineData(HouseholdRole.User)]
+    [InlineData(HouseholdRole.Viewer)]
+    public void Only_an_Admin_can_become_the_owner(HouseholdRole role)
+    {
+        var memberId = _household.AddMember(Guid.NewGuid(), role, Now).UserId;
+
+        var ex = Assert.Throws<HouseholdMembershipException>(() => _household.TransferOwnership(memberId));
+
+        Assert.Contains("Admin", ex.Message, StringComparison.Ordinal);
+        Assert.True(_household.Members.Single(m => m.UserId == _ownerId).IsOwner);
+    }
+
+    [Fact]
+    public void Once_ownership_is_handed_on_the_old_owner_can_leave()
+    {
+        var nextId = _household.AddMember(Guid.NewGuid(), HouseholdRole.Admin, Now).UserId;
+        _household.TransferOwnership(nextId);
+
+        _household.RemoveMember(_ownerId);
+
+        Assert.DoesNotContain(_household.Members, m => m.UserId == _ownerId);
+    }
+
     private HouseholdRole Role(Guid userId) => _household.Members.Single(m => m.UserId == userId).Role;
 }
