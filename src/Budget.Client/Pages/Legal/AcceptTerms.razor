@@ -1,0 +1,77 @@
+@page "/terms/accept"
+@attribute [Authorize]
+@inject ITermsApi TermsApi
+@inject UserSession Session
+@inject IAccountApi AccountApi
+@inject NavigationManager Navigation
+
+@* BUD-152: shown on first sign-in, and again whenever the terms change, before anything else in the app (MainLayout). *@
+
+<PageTitle>Accept the terms · Home Budget</PageTitle>
+
+<LegalPage Title="Before you start" Version="@LegalDocuments.TermsVersion">
+    <MudText Typo="Typo.body1" Class="mb-2" data-testid="accept-intro">
+        Before you carry on, please read the terms of use below and the
+        <MudLink Href="@LegalDocuments.PrivacyPath" Target="_blank">privacy notice</MudLink>, which says how your information is used.
+    </MudText>
+
+    <TermsText />
+
+    <MudPaper Outlined="true" Class="pa-4 mt-4">
+        <MudCheckBox T="bool" @bind-Value="_agreed" Color="Color.Primary" data-testid="accept-agree"
+                     Label="I'm 18 or over, and I accept these terms of use" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="my-2" data-testid="accept-error">@_error</MudAlert>
+        }
+        <div class="d-flex gap-2 flex-wrap mt-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AcceptAsync" Disabled="@(!_agreed || _saving || !Online)"
+                       data-testid="accept-terms">Accept and continue</MudButton>
+            <MudButton Variant="Variant.Text" OnClick="SignOutAsync" data-testid="accept-sign-out">Sign out</MudButton>
+        </div>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-3">
+            If you don't want to accept them, you can sign out, or <MudLink Href="/settings">delete your account</MudLink> in Settings.
+        </MudText>
+    </MudPaper>
+</LegalPage>
+
+@code {
+    /// <summary>False while the device is offline, when changes can't be saved (BUD-38).</summary>
+    [CascadingParameter(Name = "Online")]
+    public bool Online { get; set; } = true;
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private bool _agreed;
+    private bool _saving;
+    private string? _error;
+
+    private async Task AcceptAsync()
+    {
+        _saving = true;
+        try
+        {
+            _error = await TermsApi.AcceptAsync(LegalDocuments.TermsVersion);
+            if (_error is null)
+            {
+                await Session.SetTermsAcceptedAsync();
+                Navigation.NavigateTo(SafeReturnUrl());
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SignOutAsync()
+    {
+        await AccountApi.SignOutAsync();
+        Navigation.NavigateTo(AccountRoutes.LoginPageAfterSignOut, forceLoad: true);
+    }
+
+    // Only back to a page in this app.
+    private string SafeReturnUrl() =>
+        ReturnUrl is { Length: > 0 } url && url.StartsWith('/') && !url.StartsWith("//", StringComparison.Ordinal) ? url : "/";
+}

@@ -1,4 +1,4 @@
-@* The signed-in user's name with a menu holding the theme choice, Settings (BUD-87) and "Sign out". Shown in the app bar on every screen size.
+@* The signed-in user's name with a menu holding the theme choice, Settings (BUD-87), Privacy and Terms (BUD-152) and "Sign out". Shown in the app bar on every screen size.
    The name is their person's name in the household they're in (e.g. "Chris"), falling back to their login's name. *@
 @implements IDisposable
 @inject IAccountApi AccountApi
@@ -36,6 +36,8 @@
                 }
                 <MudDivider Class="my-1" />
                 <MudMenuItem Icon="@Icons.Material.Filled.Settings" Href="/settings" data-testid="settings">Settings</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.PrivacyTip" Href="@LegalDocuments.PrivacyPath" data-testid="privacy">Privacy</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Gavel" Href="@LegalDocuments.TermsPath" data-testid="terms">Terms</MudMenuItem>
                 <MudMenuItem Icon="@Icons.Material.Filled.Logout"
                              OnClick="SignOutAsync"
                              Disabled="_signingOut"

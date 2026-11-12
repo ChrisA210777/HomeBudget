@@ -1209,6 +1209,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTimeOffset?>("TermsAcceptedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TermsAcceptedVersion")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
 

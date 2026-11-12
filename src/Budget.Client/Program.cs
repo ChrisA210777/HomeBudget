@@ -29,6 +29,7 @@ builder.Services.AddScoped<IAccountApi, AccountApi>();
 builder.Services.AddScoped<UserSession>();
 builder.Services.AddScoped<IUserSettingsApi, UserSettingsApi>();
 builder.Services.AddScoped<IAccountDeletionApi, AccountDeletionApi>();
+builder.Services.AddScoped<ITermsApi, TermsApi>();
 builder.Services.AddScoped<UserSettingsStore>();
 builder.Services.AddScoped<IHouseholdApi, HouseholdApi>();
 builder.Services.AddScoped<IIncomeApi, IncomeApi>();

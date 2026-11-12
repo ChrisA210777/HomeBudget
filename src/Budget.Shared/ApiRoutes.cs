@@ -48,6 +48,9 @@ public static class AccountRoutes
     /// <summary>GET: the signed-in user's settings. PUT: change some of them (BUD-87).</summary>
     public const string Settings = "/bff/user/settings";
 
+    /// <summary>POST <c>AcceptTermsRequest</c>: records that the signed-in user accepts the current terms (BUD-152).</summary>
+    public const string AcceptTerms = "/bff/user/terms";
+
     /// <summary>GET: what deleting the signed-in user's account would do (BUD-151).</summary>
     public const string AccountDeletion = "/bff/user/deletion";
 

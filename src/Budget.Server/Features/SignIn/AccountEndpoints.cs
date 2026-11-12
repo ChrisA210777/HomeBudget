@@ -21,11 +21,40 @@ public static class AccountEndpoints
         app.MapPut(AccountRoutes.ActiveHousehold, SetActiveHouseholdAsync).RequireAuthorization();
         app.MapGet(AccountRoutes.Settings, GetSettingsAsync).RequireAuthorization();
         app.MapPut(AccountRoutes.Settings, UpdateSettingsAsync).RequireAuthorization();
+        app.MapPost(AccountRoutes.AcceptTerms, AcceptTermsAsync).RequireAuthorization();
 
         // Anonymous so that signing out always succeeds, even if the session has already expired.
         app.MapPost(AccountRoutes.Logout, LogoutAsync).AllowAnonymous();
 
         return app;
+    }
+
+    /// <summary>Records that the user accepts the current terms of use, and when (BUD-152).</summary>
+    private static async Task<IResult> AcceptTermsAsync(
+        AcceptTermsRequest request,
+        ClaimsPrincipal principal,
+        UserManager<ApplicationUser> users,
+        TimeProvider clock)
+    {
+        var user = await users.GetUserAsync(principal);
+        if (user is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // Accepting an older version, e.g. from a page left open, doesn't count.
+        if (request.Version != LegalDocuments.TermsVersion)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(AcceptTermsRequest.Version)] = ["The terms have changed. Reload the page to see the latest version."],
+            });
+        }
+
+        user.TermsAcceptedVersion = LegalDocuments.TermsVersion;
+        user.TermsAcceptedAt = clock.GetUtcNow();
+        await users.UpdateAsync(user);
+        return Results.NoContent();
     }
 
     /// <summary>Switches the user's active household (BUD-20). It's remembered for their next sign-in.</summary>
@@ -178,6 +207,7 @@ public static class AccountEndpoints
             ? user.LastActiveHouseholdId
             : households.FirstOrDefault()?.HouseholdId;
 
-        return Results.Ok(new CurrentUserResponse(user.Id, user.DisplayName, user.Email, households, activeHouseholdId));
+        return Results.Ok(new CurrentUserResponse(
+            user.Id, user.DisplayName, user.Email, households, activeHouseholdId, user.TermsAcceptedVersion != LegalDocuments.TermsVersion));
     }
 }

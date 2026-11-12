@@ -12,7 +12,7 @@ using Budget.Shared.People;
 namespace Budget.Client.Tests.TestDoubles;
 
 /// <summary>An account API whose signed-in user is a member of one household with the given role.</summary>
-public sealed class FakeAccountApi(string role = "Admin", bool isOwner = true, bool transfersEnabled = false) : IAccountApi
+public sealed class FakeAccountApi(string role = "Admin", bool isOwner = true, bool transfersEnabled = false, bool mustAcceptTerms = false) : IAccountApi
 {
     public static readonly Guid HouseholdId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     public static readonly Guid UserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -26,9 +26,16 @@ public sealed class FakeAccountApi(string role = "Admin", bool isOwner = true, b
             "Chris Austin",
             "chris@outlook.com",
             [new HouseholdMembershipSummary(HouseholdId, "My Household", role, isOwner, TransfersEnabled: transfersEnabled)],
-            HouseholdId));
+            HouseholdId,
+            MustAcceptTerms: mustAcceptTerms));
 
-    public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public bool SignedOut { get; private set; }
+
+    public Task SignOutAsync(CancellationToken cancellationToken = default)
+    {
+        SignedOut = true;
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>A clock fixed at a given UTC time, with UTC as the local time zone.</summary>

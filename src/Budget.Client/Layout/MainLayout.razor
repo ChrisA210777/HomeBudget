@@ -108,11 +108,46 @@
         Connectivity.Changed += OnConnectivityChanged;
         Connectivity.Reconnected += OnReconnected;
         Session.Changed += OnSessionChanged;
+        Navigation.LocationChanged += OnLocationChanged;
 
         await ThemePreference.LoadAsync();
         ApplyTheme();
         await LoadHouseholdAsync();
+        await AskForTermsIfNeededAsync();
     }
+
+    /// <summary>Pages someone can open before accepting the terms: the terms themselves, and Settings, to delete their account.</summary>
+    private static readonly string[] OpenBeforeAcceptingTerms =
+        [LegalDocuments.AcceptPath, LegalDocuments.TermsPath, LegalDocuments.PrivacyPath, "/settings", "/login"];
+
+    /// <summary>
+    /// Someone who hasn't accepted the current terms of use (BUD-152) is asked to before anything else, on their first
+    /// sign-in and whenever the terms change, then brought back to where they were going.
+    /// </summary>
+    private async Task AskForTermsIfNeededAsync()
+    {
+        try
+        {
+            if (await Session.GetCurrentUserAsync() is not { MustAcceptTerms: true })
+            {
+                return;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            return;
+        }
+
+        var here = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+        var path = here.Split('?', '#')[0];
+        if (!OpenBeforeAcceptingTerms.Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)))
+        {
+            Navigation.NavigateTo($"{LegalDocuments.AcceptPath}?returnUrl={Uri.EscapeDataString(here)}", replace: true);
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        _ = InvokeAsync(AskForTermsIfNeededAsync);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -232,5 +267,6 @@
         Connectivity.Changed -= OnConnectivityChanged;
         Connectivity.Reconnected -= OnReconnected;
         Session.Changed -= OnSessionChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }
