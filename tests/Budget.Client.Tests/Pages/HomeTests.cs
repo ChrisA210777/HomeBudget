@@ -379,6 +379,8 @@ public sealed class HomeTests : IDisposable
 
         public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
 
+        public Task<string?> TransferOwnershipAsync(Guid householdId, Guid userId) => throw new NotSupportedException();
+
         public Task DeleteAsync(Guid householdId) => throw new NotSupportedException();
 
         public Task<CreateHouseholdResult> CreateAsync(CreateHouseholdRequest request) => throw new NotSupportedException();

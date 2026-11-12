@@ -11,6 +11,9 @@ public static class MemberRoutes
     /// <summary>PUT (Admins): change a member's role.</summary>
     public static string Role(Guid householdId, Guid userId) => $"/api/households/{householdId}/members/{userId}/role";
 
+    /// <summary>PUT (owner): hand ownership to another Admin (BUD-157).</summary>
+    public static string Owner(Guid householdId) => $"/api/households/{householdId}/owner";
+
     /// <summary>DELETE (any member): leave the household.</summary>
     public static string Membership(Guid householdId) => $"/api/households/{householdId}/membership";
 }
@@ -41,3 +44,9 @@ public sealed record HouseholdMemberSummary(
     string Role,
     bool IsOwner,
     DateTimeOffset JoinedAt);
+
+/// <summary>Hand ownership of the household to another member, who must be an Admin (BUD-157).</summary>
+public sealed record TransferOwnershipRequest
+{
+    public Guid UserId { get; init; }
+}

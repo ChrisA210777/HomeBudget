@@ -246,6 +246,8 @@ public sealed class RecordingHouseholdApi : Budget.Client.Households.IHouseholdA
 
     public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
 
+    public Task<string?> TransferOwnershipAsync(Guid householdId, Guid userId) => throw new NotSupportedException();
+
     public Task DeleteAsync(Guid householdId) => throw new NotSupportedException();
 }
 
@@ -333,6 +335,8 @@ public sealed class SettingsHouseholdApi : Budget.Client.Households.IHouseholdAp
     public Task DeleteAsync(Guid householdId) => throw new NotSupportedException();
 
     public Task<string?> LeaveAsync(Guid householdId) => throw new NotSupportedException();
+
+    public Task<string?> TransferOwnershipAsync(Guid householdId, Guid userId) => throw new NotSupportedException();
 }
 
 /// <summary>Invitations (ADR-015): records what's created and revoked, and answers a link's preview.</summary>

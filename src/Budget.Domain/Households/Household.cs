@@ -127,7 +127,7 @@ public sealed class Household : AuditableEntity
         if (member.IsOwner)
         {
             throw new HouseholdMembershipException(
-                "The owner can't leave or be removed. Handing ownership to someone else is coming later; until then the owner can delete the household instead.");
+                "The owner can't leave or be removed. Make another Admin the owner first, or delete the household.");
         }
 
         if (member.Role == HouseholdRole.Admin && IsLastAdmin(member))
@@ -136,6 +136,32 @@ public sealed class Household : AuditableEntity
         }
 
         _members.Remove(member);
+    }
+
+    /// <summary>
+    /// Hands ownership to another member, who must be an Admin (BUD-157). The previous owner stays as an Admin.
+    /// </summary>
+    /// <remarks>The household's members must be loaded.</remarks>
+    /// <exception cref="HouseholdMembershipException">The change isn't allowed; the message explains why.</exception>
+    public void TransferOwnership(Guid toUserId)
+    {
+        var next = FindMember(toUserId);
+        if (next.IsOwner)
+        {
+            return;
+        }
+
+        if (next.Role != HouseholdRole.Admin)
+        {
+            throw new HouseholdMembershipException("Only an Admin can become the owner. Make them an Admin first.");
+        }
+
+        foreach (var member in _members.Where(m => m.IsOwner))
+        {
+            member.SetOwner(false);
+        }
+
+        next.SetOwner(true);
     }
 
     private HouseholdMember FindMember(Guid userId) =>

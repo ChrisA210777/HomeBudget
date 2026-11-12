@@ -174,6 +174,9 @@ public static class ActivityMessages
     public static ActivityEntry MemberRemoved(Guid householdId, string who) =>
         Entry(householdId, ActivityArea.Members, null, $"removed {who} from the household");
 
+    public static ActivityEntry OwnershipTransferred(Guid householdId, string who) =>
+        Entry(householdId, ActivityArea.Members, null, $"made {who} the owner");
+
     public static ActivityEntry MemberLeft(Guid householdId) =>
         Entry(householdId, ActivityArea.Members, null, "left the household");
 

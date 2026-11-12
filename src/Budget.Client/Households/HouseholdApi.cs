@@ -52,6 +52,10 @@ public interface IHouseholdApi
     /// <summary>Deletes the household and everything in it (owner only).</summary>
     Task DeleteAsync(Guid householdId);
 
+    /// <summary>Hands ownership to another Admin (owner only, BUD-157).</summary>
+    /// <returns><c>null</c> on success, otherwise why it was refused.</returns>
+    Task<string?> TransferOwnershipAsync(Guid householdId, Guid userId);
+
     /// <summary>The signed-in user leaves the household.</summary>
     /// <returns><c>null</c> on success, otherwise why it was refused.</returns>
     Task<string?> LeaveAsync(Guid householdId);
@@ -114,6 +118,12 @@ public sealed class HouseholdApi(HttpClient http) : IHouseholdApi
     {
         using var response = await http.DeleteAsync(new Uri(HouseholdRoutes.Household(householdId), UriKind.Relative));
         response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<string?> TransferOwnershipAsync(Guid householdId, Guid userId)
+    {
+        using var response = await http.PutAsJsonAsync(new Uri(MemberRoutes.Owner(householdId), UriKind.Relative), new TransferOwnershipRequest { UserId = userId });
+        return await RefusalAsync(response);
     }
 
     public async Task<string?> LeaveAsync(Guid householdId)
