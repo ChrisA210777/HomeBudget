@@ -72,20 +72,6 @@
             <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteForever" OnClick="StartDeleteAsync"
                        Disabled="@(!Online || _busy)" data-testid="delete-account">Delete my account</MudButton>
         }
-        else if (!_check.CanDelete)
-        {
-            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2" data-testid="delete-account-blocked">
-                You own households that other people use. Before you can delete your account, make another Admin the owner of each one
-                (on its Members page), or delete it.
-            </MudAlert>
-            <ul class="mud-typography mud-typography-body2 pl-5 mb-3">
-                @foreach (var household in _check.HouseholdsToHandOn)
-                {
-                    <li data-testid="hand-on-household">@household.Name (@People(household.OtherMembers) besides you)</li>
-                }
-            </ul>
-            <MudButton Variant="Variant.Text" OnClick="CancelDelete" data-testid="delete-account-cancel">Cancel</MudButton>
-        }
         else
         {
             <MudText Typo="Typo.body2" Class="mb-1">Deleting your account, straight away:</MudText>
@@ -96,6 +82,12 @@
                     <li data-testid="households-to-leave">
                         takes you out of the @Households(_check.HouseholdsToLeave) you share. Their budgets stay, and so does your person in each,
                         for the others to rename or delete
+                    </li>
+                }
+                @foreach (var household in _check.HouseholdsToPassOn)
+                {
+                    <li data-testid="household-to-pass-on">
+                        makes @household.NewOwner the owner of @household.Name@(household.BecomesAdmin ? $", and an Admin" : string.Empty)
                     </li>
                 }
                 @if (_check.HouseholdsToDelete.Count > 0)
@@ -199,5 +191,4 @@
 
     private static string Households(int count) => count == 1 ? "household" : $"{count} households";
 
-    private static string People(int count) => count == 1 ? "1 other person" : $"{count} other people";
 }

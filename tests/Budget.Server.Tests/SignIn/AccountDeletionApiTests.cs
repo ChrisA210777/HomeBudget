@@ -36,7 +36,6 @@ public class AccountDeletionApiTests(BudgetApiFactory factory) : IntegrationTest
         }
 
         var check = (await jane.GetFromJsonAsync<AccountDeletionCheck>(Url(AccountRoutes.AccountDeletion)))!;
-        Assert.True(check.CanDelete);
         Assert.Equal(janesOwnId, Assert.Single(check.HouseholdsToDelete).HouseholdId);
         Assert.Equal(1, check.HouseholdsToLeave);
 
@@ -69,23 +68,52 @@ public class AccountDeletionApiTests(BudgetApiFactory factory) : IntegrationTest
     }
 
     [Fact]
-    public async Task You_cant_delete_while_you_own_a_household_others_use()
+    public async Task A_household_others_use_passes_to_the_longest_standing_Admin()
     {
         var (ownerId, householdId) = await CreateHouseholdOwnerAsync("Chris Austin");
-        await AddMemberAsync(householdId, HouseholdRole.Viewer);
+        var viewerId = await AddMemberAsync(householdId, HouseholdRole.Viewer, "Early Viewer");
+        var adminId = await AddMemberAsync(householdId, HouseholdRole.Admin, "Later Admin");
         using var owner = CreateClient(signedInAs: ownerId);
 
         var check = (await owner.GetFromJsonAsync<AccountDeletionCheck>(Url(AccountRoutes.AccountDeletion)))!;
-        using var refused = await owner.PostAsJsonAsync(Url(AccountRoutes.DeleteAccount), new DeleteAccountRequest { Confirmation = "DELETE" });
+        var passed = Assert.Single(check.HouseholdsToPassOn);
+        Assert.Equal((householdId, "Later Admin", false), (passed.HouseholdId, passed.NewOwner, passed.BecomesAdmin));
+        Assert.Empty(check.HouseholdsToDelete);
 
-        Assert.False(check.CanDelete);
-        Assert.Equal((householdId, 1), (Assert.Single(check.HouseholdsToHandOn).HouseholdId, check.HouseholdsToHandOn[0].OtherMembers));
-        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        using var deleted = await owner.PostAsJsonAsync(Url(AccountRoutes.DeleteAccount), new DeleteAccountRequest { Confirmation = "DELETE" });
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         await ExecuteDbContextAsync(async db =>
         {
-            Assert.True(await db.Users.AnyAsync(u => u.Id == ownerId));
-            Assert.True(await db.Households.AnyAsync(h => h.Id == householdId));
+            var members = await db.HouseholdMembers.Where(m => m.HouseholdId == householdId).ToListAsync();
+            Assert.Equal(2, members.Count);
+            Assert.True(members.Single(m => m.UserId == adminId).IsOwner);
+            Assert.Equal(HouseholdRole.Viewer, members.Single(m => m.UserId == viewerId).Role);
         });
+    }
+
+    [Fact]
+    public async Task With_no_other_Admin_the_longest_standing_member_becomes_an_Admin_and_owner()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync("Chris Austin");
+        var firstId = await AddMemberAsync(householdId, HouseholdRole.Viewer, "First Member");
+        await AddMemberAsync(householdId, HouseholdRole.User, "Second Member");
+        using var owner = CreateClient(signedInAs: ownerId);
+
+        var check = (await owner.GetFromJsonAsync<AccountDeletionCheck>(Url(AccountRoutes.AccountDeletion)))!;
+        Assert.Equal(("First Member", true), (check.HouseholdsToPassOn[0].NewOwner, check.HouseholdsToPassOn[0].BecomesAdmin));
+
+        using var deleted = await owner.PostAsJsonAsync(Url(AccountRoutes.DeleteAccount), new DeleteAccountRequest { Confirmation = "DELETE" });
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        await ExecuteDbContextAsync(async db =>
+        {
+            var first = await db.HouseholdMembers.SingleAsync(m => m.HouseholdId == householdId && m.UserId == firstId);
+            Assert.Equal((HouseholdRole.Admin, true), (first.Role, first.IsOwner));
+        });
+        using var member = CreateClient(signedInAs: firstId);
+        var activity = (await member.GetFromJsonAsync<ActivityResponse>(Url(ActivityRoutes.Activity(householdId, take: 10))))!;
+        Assert.Contains(activity.Items, a => a.Who == AccountDeletionEndpoints.FormerMember && a.Summary == "made First Member the owner");
     }
 
     [Theory]

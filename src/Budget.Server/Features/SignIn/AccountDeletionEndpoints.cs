@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Budget.Domain.Households;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Activity;
@@ -11,21 +12,25 @@ using Microsoft.EntityFrameworkCore;
 namespace Budget.Server.Features.SignIn;
 
 /// <summary>
-/// Deleting your own account (BUD-151, UK GDPR right to erasure). Straight away, in one transaction:
+/// Deleting your own account (BUD-151, BUD-113, ADR-016, UK GDPR right to erasure). Straight away, in one transaction:
 /// <list type="bullet">
 /// <item>households you own that only you are in are deleted, with everything in them;</item>
+/// <item>households you own that others use pass to the longest-standing other Admin, or the longest-standing member,
+/// who's made an Admin;</item>
 /// <item>you leave every other household; the person linked to you stays, unlinked, with its income and outgoings, so
 /// the household's budget is intact;</item>
 /// <item>recent activity, and invitations you sent, show "A former member" instead of your name; pending invitations
 /// you sent, or that were sent to your email, are deleted;</item>
 /// <item>your user record, sign-in links and settings are deleted, and you're signed out.</item>
 /// </list>
-/// Households you own that have other members must be handed to another Admin (BUD-157) or deleted first.
 /// </summary>
 public static class AccountDeletionEndpoints
 {
-    /// <summary>Shown instead of the name of someone who has deleted their account.</summary>
+    /// <summary>Shown instead of the name of someone who has deleted their account, at the start of a sentence.</summary>
     public const string FormerMember = "A former member";
+
+    /// <summary>The same, within a sentence: "Recorded by a former member on 1 Nov 2026".</summary>
+    public const string FormerMemberInText = "a former member";
 
     public static IEndpointRouteBuilder MapAccountDeletionEndpoints(this IEndpointRouteBuilder app)
     {
@@ -39,22 +44,25 @@ public static class AccountDeletionEndpoints
 
     private static async Task<AccountDeletionCheck> WhatDeletingDoesAsync(Guid userId, BudgetDbContext db)
     {
-        var owned = await db.HouseholdMembers
-            .Where(m => m.UserId == userId && m.IsOwner)
-            .Join(db.Households, m => m.HouseholdId, h => h.Id, (m, h) => new
+        var ownedIds = await db.HouseholdMembers.Where(m => m.UserId == userId && m.IsOwner).Select(m => m.HouseholdId).ToListAsync();
+        var owned = await db.Households.Include(h => h.Members).Where(h => ownedIds.Contains(h.Id)).OrderBy(h => h.Name).ToListAsync();
+        var toDelete = new List<OwnedHousehold>();
+        var toPassOn = new List<PassedOnHousehold>();
+        foreach (var household in owned)
+        {
+            if (household.NextOwner(userId) is { } next)
             {
-                h.Id,
-                h.Name,
-                OtherMembers = db.HouseholdMembers.Count(o => o.HouseholdId == h.Id && o.UserId != userId),
-            })
-            .OrderBy(h => h.Name)
-            .ToListAsync();
-        var memberships = await db.HouseholdMembers.CountAsync(m => m.UserId == userId);
+                var name = await HouseholdEndpoints.MemberNameAsync(db, household.Id, next.UserId);
+                toPassOn.Add(new PassedOnHousehold(household.Id, household.Name, name, next.Role != HouseholdRole.Admin));
+            }
+            else
+            {
+                toDelete.Add(new OwnedHousehold(household.Id, household.Name));
+            }
+        }
 
-        return new AccountDeletionCheck(
-            owned.Where(h => h.OtherMembers == 0).Select(h => new OwnedHousehold(h.Id, h.Name, 0)).ToList(),
-            owned.Where(h => h.OtherMembers > 0).Select(h => new OwnedHousehold(h.Id, h.Name, h.OtherMembers)).ToList(),
-            memberships - owned.Count);
+        var memberships = await db.HouseholdMembers.CountAsync(m => m.UserId == userId);
+        return new AccountDeletionCheck(toDelete, toPassOn, memberships - owned.Count);
     }
 
     private static async Task<IResult> DeleteAsync(
@@ -80,14 +88,6 @@ public static class AccountDeletionEndpoints
         }
 
         var check = await WhatDeletingDoesAsync(userId, db);
-        if (!check.CanDelete)
-        {
-            var names = string.Join(", ", check.HouseholdsToHandOn.Select(h => h.Name));
-            return Results.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "You own households that other people use.",
-                detail: $"Make another Admin the owner of {names}, or delete it, first.");
-        }
 
         var strategy = db.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
@@ -97,6 +97,22 @@ public static class AccountDeletionEndpoints
             foreach (var household in check.HouseholdsToDelete)
             {
                 await HouseholdEndpoints.DeleteHouseholdContentsAsync(db, household.HouseholdId);
+            }
+
+            // Households others use pass to someone else (ADR-016), and their members see who and why.
+            foreach (var passed in check.HouseholdsToPassOn)
+            {
+                var household = await db.Households.Include(h => h.Members).SingleAsync(h => h.Id == passed.HouseholdId);
+                if (household.PassOwnershipOn(userId) is { } passedTo)
+                {
+                    var name = await HouseholdEndpoints.MemberNameAsync(db, household.Id, passedTo.NewOwner.UserId);
+                    if (passedTo.MadeAdmin)
+                    {
+                        db.ActivityEntries.Add(ActivityMessages.MemberRoleChanged(household.Id, name, HouseholdRole.Admin));
+                    }
+
+                    db.ActivityEntries.Add(ActivityMessages.OwnershipTransferred(household.Id, name));
+                }
             }
 
             // Leaving the other households: their members see that someone left, and the person linked to you stays.

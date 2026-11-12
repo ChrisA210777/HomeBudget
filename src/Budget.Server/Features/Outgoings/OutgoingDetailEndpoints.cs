@@ -6,6 +6,7 @@ using Budget.Infrastructure.Persistence.Configurations;
 using Budget.Server.Features.Accounts;
 using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
+using Budget.Server.Features.SignIn;
 using Budget.Shared.Outgoings;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -286,7 +287,8 @@ internal static class OutgoingDetailEndpoints
             .Distinct()
             .ToList();
         var users = await db.Users.Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName);
-        string? NameOf(Guid? id) => id is { } userId ? users.GetValueOrDefault(userId) : null;
+        // Someone who has deleted their account is "a former member" (ADR-016).
+        string? NameOf(Guid? id) => id is { } userId ? users.GetValueOrDefault(userId) ?? AccountDeletionEndpoints.FormerMemberInText : null;
 
         var categoryName = await db.OutgoingCategories.Where(c => c.Id == outgoing.CategoryId).Select(c => c.Name).SingleOrDefaultAsync();
         var personName = outgoing.PersonId is { } personId

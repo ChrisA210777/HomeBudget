@@ -96,6 +96,41 @@ public class HouseholdMembershipTests
     }
 
     [Fact]
+    public void When_the_owner_leaves_for_good_the_longest_standing_Admin_becomes_owner()
+    {
+        var userId = _household.AddMember(Guid.NewGuid(), HouseholdRole.User, Now.AddDays(1)).UserId;
+        var laterAdmin = _household.AddMember(Guid.NewGuid(), HouseholdRole.Admin, Now.AddDays(3)).UserId;
+        var earlierAdmin = _household.AddMember(Guid.NewGuid(), HouseholdRole.Admin, Now.AddDays(2)).UserId;
+
+        var result = _household.PassOwnershipOn(_ownerId);
+
+        Assert.Equal((earlierAdmin, false), (result!.Value.NewOwner.UserId, result.Value.MadeAdmin));
+        Assert.True(_household.Members.Single(m => m.UserId == earlierAdmin).IsOwner);
+        Assert.Equal(HouseholdRole.User, Role(userId));
+        Assert.NotEqual(laterAdmin, result.Value.NewOwner.UserId);
+    }
+
+    [Fact]
+    public void With_no_other_Admin_the_longest_standing_member_is_made_Admin_and_owner()
+    {
+        var later = _household.AddMember(Guid.NewGuid(), HouseholdRole.User, Now.AddDays(2)).UserId;
+        var earlier = _household.AddMember(Guid.NewGuid(), HouseholdRole.Viewer, Now.AddDays(1)).UserId;
+
+        var result = _household.PassOwnershipOn(_ownerId);
+
+        Assert.Equal((earlier, true), (result!.Value.NewOwner.UserId, result.Value.MadeAdmin));
+        Assert.Equal(HouseholdRole.Admin, Role(earlier));
+        Assert.Equal(HouseholdRole.User, Role(later));
+    }
+
+    [Fact]
+    public void With_no_one_else_there_is_no_one_to_pass_ownership_to()
+    {
+        Assert.Null(_household.NextOwner(_ownerId));
+        Assert.Null(_household.PassOwnershipOn(_ownerId));
+    }
+
+    [Fact]
     public void Once_ownership_is_handed_on_the_old_owner_can_leave()
     {
         var nextId = _household.AddMember(Guid.NewGuid(), HouseholdRole.Admin, Now).UserId;
