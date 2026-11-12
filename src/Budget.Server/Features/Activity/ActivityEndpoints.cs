@@ -41,8 +41,8 @@ public static class ActivityEndpoints
         var kept = (int)ActivityEntry.KeptFor.TotalDays;
         var since = time.GetUtcNow().AddDays(-Math.Clamp(days ?? kept, 1, kept));
 
-        var kept = db.ActivityEntries.AsNoTracking().Where(a => a.At >= since);
-        var query = kept;
+        var recent = db.ActivityEntries.AsNoTracking().Where(a => a.At >= since);
+        var query = recent;
         if (before is { } cursor)
         {
             query = query.Where(a => a.At < cursor);
@@ -63,7 +63,7 @@ public static class ActivityEndpoints
         var entries = page.Take(count).ToList();
 
         // Everyone who's made changes in the time kept, by the name on their latest change.
-        var people = (await kept.Where(a => a.UserId != null).Select(a => new { a.UserId, a.ActorName, a.At }).ToListAsync())
+        var people = (await recent.Where(a => a.UserId != null).Select(a => new { a.UserId, a.ActorName, a.At }).ToListAsync())
             .GroupBy(a => a.UserId!.Value)
             .Select(g => new ActivityPerson(g.Key, g.MaxBy(a => a.At)!.ActorName))
             .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
