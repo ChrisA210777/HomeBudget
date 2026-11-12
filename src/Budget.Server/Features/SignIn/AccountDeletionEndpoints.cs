@@ -103,10 +103,10 @@ public static class AccountDeletionEndpoints
             foreach (var passed in check.HouseholdsToPassOn)
             {
                 var household = await db.Households.Include(h => h.Members).SingleAsync(h => h.Id == passed.HouseholdId);
-                if (household.PassOwnershipOn(userId) is { } result)
+                if (household.PassOwnershipOn(userId) is { } passedTo)
                 {
-                    var name = await HouseholdEndpoints.MemberNameAsync(db, household.Id, result.NewOwner.UserId);
-                    if (result.MadeAdmin)
+                    var name = await HouseholdEndpoints.MemberNameAsync(db, household.Id, passedTo.NewOwner.UserId);
+                    if (passedTo.MadeAdmin)
                     {
                         db.ActivityEntries.Add(ActivityMessages.MemberRoleChanged(household.Id, name, HouseholdRole.Admin));
                     }
