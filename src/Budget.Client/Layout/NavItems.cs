@@ -21,6 +21,7 @@ public static class NavItems
     private static readonly NavItem Outgoings = new("Outgoings", "/outgoings", Icons.Material.Filled.ReceiptLong);
     private static readonly NavItem People = new("People", "/people", Icons.Material.Filled.People);
     private static readonly NavItem Members = new("Members", "/members", Icons.Material.Filled.ManageAccounts);
+    private static readonly NavItem Activity = new("Recent activity", "/activity", Icons.Material.Filled.History);
     private static readonly NavItem Data = new("Import or export data", "/household/data", Icons.Material.Filled.ImportExport);
     private static readonly NavItem Settings = new("Settings", "/settings", Icons.Material.Filled.Settings);
     private static readonly NavItem More = new("More", MoreHref, Icons.Material.Filled.Menu);
@@ -81,7 +82,7 @@ public static class NavItems
         household?.TransfersEnabled == true ? [Budget, Upcoming, Renewals, CashFlow] : [Budget, Upcoming, Renewals];
 
     private static IReadOnlyList<NavItem> HouseholdItems(HouseholdMembershipSummary? household) =>
-        household?.Role == "Admin" ? [People, Members, Data] : [People, Members];
+        household?.Role == "Admin" ? [People, Members, Activity, Data] : [People, Members, Activity];
 }
 
 /// <param name="Also">Other pages it's highlighted for, e.g. Accounts for Transfers.</param>

@@ -48,7 +48,7 @@ public sealed class MainLayoutTests : IDisposable
         var cut = Render();
 
         cut.WaitForAssertion(() => Assert.Equal(
-            new[] { "/", "/budget", "/outgoings/upcoming", "/outgoings/renewals", "/accounts", "/income", "/outgoings", "/people", "/members", "/household/data" },
+            new[] { "/", "/budget", "/outgoings/upcoming", "/outgoings/renewals", "/accounts", "/income", "/outgoings", "/people", "/members", "/activity", "/household/data" },
             cut.FindAll("[data-testid=side-nav] a").Select(a => a.GetAttribute("href")).ToArray()));
         Assert.Equal(new[] { "/", "/budget", "/income", "/outgoings", "/more" }, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.GetAttribute("href")).ToArray());
         Assert.Equal(new[] { "Home", "Budget", "Income", "Outgoings", "More" }, cut.FindAll("[data-testid=bottom-nav] a").Select(a => a.TextContent.Trim()).ToArray());

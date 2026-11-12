@@ -23,19 +23,51 @@ public static class ActivityEndpoints
         return app;
     }
 
-    private static async Task<IResult> ListAsync(Guid householdId, int? take, int? days, DateTimeOffset? before, BudgetDbContext db, TimeProvider time)
+    private static async Task<IResult> ListAsync(
+        Guid householdId, int? take, int? days, DateTimeOffset? before, Guid? who, string? areas, BudgetDbContext db, TimeProvider time)
     {
+        var areaFilter = new List<ActivityArea>();
+        foreach (var name in (areas ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!Enum.TryParse<ActivityArea>(name, ignoreCase: true, out var area) || !Enum.IsDefined(area))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["areas"] = [$"\"{name}\" isn't a kind of change."] });
+            }
+
+            areaFilter.Add(area);
+        }
+
         var count = Math.Clamp(take ?? 20, 1, MaxTake);
         var kept = (int)ActivityEntry.KeptFor.TotalDays;
         var since = time.GetUtcNow().AddDays(-Math.Clamp(days ?? kept, 1, kept));
 
-        var query = db.ActivityEntries.AsNoTracking().Where(a => a.At >= since);
+        var recent = db.ActivityEntries.AsNoTracking().Where(a => a.At >= since);
+        var query = recent;
         if (before is { } cursor)
         {
             query = query.Where(a => a.At < cursor);
         }
 
-        var entries = await query.OrderByDescending(a => a.At).ThenByDescending(a => a.Id).Take(count).ToListAsync();
+        if (who is { } userId)
+        {
+            query = query.Where(a => a.UserId == userId);
+        }
+
+        if (areaFilter.Count > 0)
+        {
+            query = query.Where(a => areaFilter.Contains(a.Area));
+        }
+
+        // One more than asked for says whether there are more.
+        var page = await query.OrderByDescending(a => a.At).ThenByDescending(a => a.Id).Take(count + 1).ToListAsync();
+        var entries = page.Take(count).ToList();
+
+        // Everyone who's made changes in the time kept, by the name on their latest change.
+        var people = (await recent.Where(a => a.UserId != null).Select(a => new { a.UserId, a.ActorName, a.At }).ToListAsync())
+            .GroupBy(a => a.UserId!.Value)
+            .Select(g => new ActivityPerson(g.Key, g.MaxBy(a => a.At)!.ActorName))
+            .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
 
         // Link to the item only while it still exists.
         var ids = entries.Select(e => e.SubjectId).OfType<Guid>().Distinct().ToList();
@@ -52,6 +84,6 @@ public static class ActivityEndpoints
             .Select(e => new ActivityItem(
                 e.Id, e.At, e.ActorName, e.Summary, (ActivityAreaDto)e.Area, e.SubjectId, e.SubjectId is { } id && existing.Contains(id)))
             .ToList();
-        return Results.Ok(new ActivityResponse(currency, items));
+        return Results.Ok(new ActivityResponse(currency, items) { People = people, HasMore = page.Count > count });
     }
 }

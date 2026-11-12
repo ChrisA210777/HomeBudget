@@ -1,0 +1,161 @@
+@page "/activity"
+@attribute [Authorize]
+@using System.Globalization
+@using Budget.Client.Activity
+@using Budget.Shared.Activity
+@inject UserSession Session
+@inject IActivityApi ActivityApi
+@inject TimeProvider Time
+
+<PageTitle>Recent activity · Home Budget</PageTitle>
+
+@* Everything changed in the household in the last three months, and by whom (BUD-140), newest first by day. *@
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-2 mb-16">
+    <h1 class="mud-typography mud-typography-h4 mb-1">Recent activity</h1>
+    <MudText Typo="Typo.body2" Class="mb-3">What's been changed in the household over the last three months, and by whom.</MudText>
+
+    @if (_loaded && _household is null)
+    {
+        <MudAlert Severity="Severity.Info">You're not in a household yet.</MudAlert>
+    }
+    else if (_data is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <div class="page-toolbar mb-3" data-testid="activity-filters">
+            <FilterMenu TValue="Guid?" Label="Who" Value="_who" ValueChanged="SetWhoAsync" TestId="filter-who" Options="@WhoOptions" />
+            <FilterMenu TValue="string" Label="Type" Value="_type" ValueChanged="SetTypeAsync" TestId="filter-type" Options="@TypeOptions" />
+        </div>
+
+        @if (_items.Count == 0)
+        {
+            <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" data-testid="activity-empty">
+                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.body1" Class="mt-2">@(_who is null && _type == AllTypes ? "No recent activity" : "No changes match these filters")</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            @foreach (var day in _items.GroupBy(i => DateOnly.FromDateTime(i.At.ToLocalTime().DateTime)))
+            {
+                <section class="mb-3" data-testid="activity-day" aria-label="@DayName(day.Key)">
+                    <h2 class="mud-typography mud-typography-subtitle2 mb-1" style="font-weight: 600" data-testid="activity-day-name">@DayName(day.Key)</h2>
+                    <MudPaper Outlined="true" Class="px-3">
+                        <ul class="plain-list">
+                            @foreach (var item in day)
+                            {
+                                <li class="py-2 activity-row" data-testid="activity">
+                                    @if (ActivityFormat.Link(item) is { } link)
+                                    {
+                                        <MudLink Href="@BackLink.To(link, "/activity")" Typo="Typo.body1" Class="activity-text" data-testid="activity-text">@ActivityFormat.Sentence(item, _data.CurrencyCode)</MudLink>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.body1" Class="activity-text" data-testid="activity-text">@ActivityFormat.Sentence(item, _data.CurrencyCode)</MudText>
+                                    }
+                                    <MudText Typo="Typo.caption" Class="activity-when text-nowrap" data-testid="activity-when">@item.At.ToLocalTime().ToString("HH:mm", Display)</MudText>
+                                </li>
+                            }
+                        </ul>
+                    </MudPaper>
+                </section>
+            }
+
+            @if (_hasMore)
+            {
+                <div class="d-flex justify-center">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="MoreAsync" Disabled="_loadingMore" data-testid="show-more">Show more</MudButton>
+                </div>
+            }
+        }
+    }
+</MudContainer>
+
+@code {
+    private const int PageSize = 30;
+    private const string AllTypes = "all";
+    private static readonly CultureInfo Display = CultureInfo.InvariantCulture;
+
+    /// <summary>The kinds of change to filter by, each covering one or more areas.</summary>
+    private static readonly IReadOnlyList<(string Key, string Name, ActivityAreaDto[] Areas)> Types =
+    [
+        (AllTypes, "All", []),
+        ("income", "Income", [ActivityAreaDto.Income]),
+        ("outgoings", "Outgoings", [ActivityAreaDto.Outgoings, ActivityAreaDto.Categories]),
+        ("accounts", "Accounts and transfers", [ActivityAreaDto.Accounts, ActivityAreaDto.Transfers]),
+        ("household", "Household and people", [ActivityAreaDto.Household, ActivityAreaDto.Members, ActivityAreaDto.People]),
+    ];
+
+    private HouseholdMembershipSummary? _household;
+    private bool _loaded;
+    private ActivityResponse? _data;
+    private readonly List<ActivityItem> _items = [];
+    private bool _hasMore;
+    private bool _loadingMore;
+    private Guid? _who;
+    private string _type = AllTypes;
+
+    private IReadOnlyList<(Guid? Value, string Name)> WhoOptions =>
+        [(null, "Everyone"), .. (_data?.People ?? []).Select(p => ((Guid?)p.UserId, p.Name))];
+
+    private static IReadOnlyList<(string Value, string Name)> TypeOptions => [.. Types.Select(t => (t.Key, t.Name))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _household = await Session.GetActiveHouseholdAsync();
+        _loaded = true;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_household is null)
+        {
+            return;
+        }
+
+        _data = await ActivityApi.GetAsync(_household.HouseholdId, PageSize, who: _who, areas: Areas());
+        _items.Clear();
+        _items.AddRange(_data.Items);
+        _hasMore = _data.HasMore;
+    }
+
+    private async Task MoreAsync()
+    {
+        if (_household is null || _items.Count == 0)
+        {
+            return;
+        }
+
+        _loadingMore = true;
+        var more = await ActivityApi.GetAsync(_household.HouseholdId, PageSize, before: _items[^1].At, who: _who, areas: Areas());
+        _items.AddRange(more.Items.Where(i => _items.All(shown => shown.Id != i.Id)));
+        _hasMore = more.HasMore;
+        _loadingMore = false;
+    }
+
+    private async Task SetWhoAsync(Guid? who)
+    {
+        _who = who;
+        await LoadAsync();
+    }
+
+    private async Task SetTypeAsync(string type)
+    {
+        _type = type;
+        await LoadAsync();
+    }
+
+    private ActivityAreaDto[] Areas() => Types.First(t => t.Key == _type).Areas;
+
+    /// <summary>"Today", "Yesterday", "Monday 9 November", or with the year when it isn't this year.</summary>
+    private string DayName(DateOnly day)
+    {
+        var today = DateOnly.FromDateTime(Time.GetUtcNow().ToLocalTime().DateTime);
+        return day == today ? "Today"
+            : day == today.AddDays(-1) ? "Yesterday"
+            : day.ToString(day.Year == today.Year ? "dddd d MMMM" : "dddd d MMMM yyyy", Display);
+    }
+}

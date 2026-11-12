@@ -15,7 +15,7 @@ public sealed class NavItemsTests
 
         Assert.Equal(new string?[] { null, "Planning", "Money", "Household" }, sections.Select(s => s.Title).ToArray());
         Assert.Equal(
-            new[] { "Home", "Budget", "Upcoming payments", "Renewals", "Cash flow", "Accounts", "Income", "Outgoings", "People", "Members", "Import or export data" },
+            new[] { "Home", "Budget", "Upcoming payments", "Renewals", "Cash flow", "Accounts", "Income", "Outgoings", "People", "Members", "Recent activity", "Import or export data" },
             sections.SelectMany(s => s.Items).Select(i => i.Label).ToArray());
     }
 
@@ -43,6 +43,7 @@ public sealed class NavItemsTests
     [InlineData("accounts", "/more")]
     [InlineData("transfers/1", "/more")]
     [InlineData("settings", "/more")]
+    [InlineData("activity", "/more")]
     [InlineData("more", "/more")]
     [InlineData("", "/")]
     public void On_phones_pages_listed_on_More_highlight_More(string path, string expected) =>

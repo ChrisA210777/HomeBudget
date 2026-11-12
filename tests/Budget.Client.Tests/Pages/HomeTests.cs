@@ -403,7 +403,8 @@ public sealed class HomeTests : IDisposable
 
         public List<(int Take, int? Days)> Requests { get; } = [];
 
-        public Task<ActivityResponse> GetAsync(Guid householdId, int take, int? days = null, DateTimeOffset? before = null)
+        public Task<ActivityResponse> GetAsync(
+            Guid householdId, int take, int? days = null, DateTimeOffset? before = null, Guid? who = null, IReadOnlyCollection<ActivityAreaDto>? areas = null)
         {
             Requests.Add((take, days));
             return Task.FromResult(Response);

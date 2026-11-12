@@ -21,6 +21,7 @@ public static class BackLink
         ["/accounts"] = "Accounts",
         ["/transfers"] = "Transfers",
         ["/cash-flow"] = "Cash flow",
+        ["/activity"] = "Recent activity",
     };
 
     /// <summary><paramref name="href"/>, remembering <paramref name="from"/> as the way back. Unchanged if there's no safe origin.</summary>
