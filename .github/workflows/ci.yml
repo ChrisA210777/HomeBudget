@@ -132,7 +132,7 @@ jobs:
           curl -sk -o /dev/null -w "/account/test-sign-in -> %{http_code}\n" "$E2E_BASE_URL/account/test-sign-in?name=Probe"
           curl -sk "$E2E_BASE_URL/" | head -c 3000
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
