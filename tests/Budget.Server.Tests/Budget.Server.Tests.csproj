@@ -8,6 +8,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- Its logging source generator understands [PersonalData] and [SecretData], as the server's does. -->
+    <PackageReference Include="Microsoft.Extensions.Telemetry.Abstractions" />
     <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />

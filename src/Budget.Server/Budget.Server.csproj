@@ -12,6 +12,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
     <!-- Needed by the dotnet-ef tools, which use this as the startup project. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" />
+    <PackageReference Include="Microsoft.Extensions.Telemetry" />
   </ItemGroup>
 
   <ItemGroup>
