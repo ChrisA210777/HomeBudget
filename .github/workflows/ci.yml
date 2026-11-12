@@ -177,3 +177,115 @@ jobs:
         with:
           name: e2e-screens
           path: tests/e2e/screens
+
+  # Security scan (BUD-145, OWASP review BUD-74): run the published app as for the end-to-end tests, sign in with the
+  # test sign-in, and let the ZAP baseline scan crawl it (with a browser, so the Blazor pages and their API calls are
+  # seen). The baseline scan is passive: it reads responses and doesn't attack the app. It fails on medium or high
+  # alerts that aren't accepted in tests/security/zap-accepted.tsv.
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      sql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "E2e_Only_Pa55!"
+          MSSQL_PID: Developer
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'E2e_Only_Pa55!' -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      APP_URL: https://localhost:7180
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Publish the app
+        run: dotnet publish src/Budget.Server --configuration Release --output artifacts/server
+
+      - name: Create a development HTTPS certificate
+        run: dotnet dev-certs https
+
+      - name: Start the app
+        working-directory: artifacts/server
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+          TestSignIn__Enabled: "true"
+          Database__MigrateOnStartup: "true"
+          ConnectionStrings__Budget: "Server=localhost,1433;Database=HomeBudgetZap;User Id=sa;Password=E2e_Only_Pa55!;TrustServerCertificate=True;Encrypt=False"
+          # Log each request, so the job can check the scan reached the API and not only the app's files.
+          Logging__LogLevel__Microsoft.AspNetCore.Hosting.Diagnostics: Information
+        run: |
+          nohup dotnet Budget.Server.dll --urls "$APP_URL" > ../server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -skf "$APP_URL/health" > /dev/null; then echo "App is up"; exit 0; fi
+            sleep 2
+          done
+          echo "The app didn't start"; cat ../server.log; exit 1
+
+      - name: Sign in with the test sign-in
+        id: sign-in
+        run: |
+          curl -sk -o /dev/null -c cookies.txt "$APP_URL/account/test-sign-in?name=Zap%20Scanner&returnUrl=%2F"
+          cookie=$(awk '$6 == "__Host-budget" { print $7 }' cookies.txt)
+          if [ -z "$cookie" ]; then echo "Signing in didn't give a cookie"; cat cookies.txt; exit 1; fi
+          echo "::add-mask::$cookie"
+          echo "cookie=$cookie" >> "$GITHUB_OUTPUT"
+
+      - name: Run the ZAP baseline scan
+        env:
+          SESSION_COOKIE: ${{ steps.sign-in.outputs.cookie }}
+          SCAN_URL: https://budget.test:7180
+        run: |
+          mkdir -p zap && chmod 777 zap
+          # Every request ZAP makes carries the signed-in cookie, so it sees the pages and API as a member would.
+          # -j crawls with a browser as well; -I leaves deciding pass or fail to check-zap-report.py.
+          # Scanned as budget.test rather than localhost: the app (like browsers) treats localhost as a special case and
+          # leaves out Strict-Transport-Security there, so a real host name shows the headers a deployed app sends.
+          docker run --rm --network host --add-host budget.test:127.0.0.1 -v "$PWD/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t "$SCAN_URL" -j -m 3 -I -J report.json -r report.html \
+            -z "-config replacer.full_list(0).description=signed-in \
+                -config replacer.full_list(0).enabled=true \
+                -config replacer.full_list(0).matchtype=REQ_HEADER \
+                -config replacer.full_list(0).matchstr=Cookie \
+                -config replacer.full_list(0).regex=false \
+                -config replacer.full_list(0).replacement=__Host-budget=$SESSION_COOKIE \
+                -config ajaxSpider.maxDuration=3"
+
+      - name: Check the scan reached the API signed in
+        run: |
+          # Ids are replaced, so the list shows which endpoints were scanned rather than every household.
+          grep -oE "Request starting HTTP/[0-9.]+ [A-Z]+ https://[^/ ]+/(api|bff)/[^ ]*" artifacts/server.log \
+            | sed -E 's#https://[^/]+##; s#[0-9a-f]{8}-[0-9a-f-]{27}#{id}#g; s#\?.*##' | sort | uniq -c | sort -rn > zap/api-requests.txt || true
+          echo "API endpoints the scan requested:"; cat zap/api-requests.txt
+          if ! grep -q "/api/households/" zap/api-requests.txt; then
+            echo "::error::The scan didn't reach the household API, so it probably wasn't signed in."
+            exit 1
+          fi
+
+      - name: Check the alerts
+        if: success() || failure()
+        run: python3 tests/security/check-zap-report.py zap/report.json tests/security/zap-accepted.tsv
+
+      - name: Show the app's log
+        if: failure()
+        run: tail -n 100 artifacts/server.log
+
+      - name: Upload the ZAP report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zap-report
+          path: |
+            zap/report.html
+            zap/report.json
+            zap/api-requests.txt

@@ -19,6 +19,8 @@ public class SecurityHeadersTests(BudgetApiFactory factory) : IntegrationTestBas
         Assert.Equal("DENY", Header(response, "X-Frame-Options"));
         Assert.Equal("strict-origin-when-cross-origin", Header(response, "Referrer-Policy"));
         Assert.Equal("same-origin", Header(response, "Cross-Origin-Opener-Policy"));
+        Assert.Equal("require-corp", Header(response, "Cross-Origin-Embedder-Policy"));
+        Assert.Equal("same-origin", Header(response, "Cross-Origin-Resource-Policy"));
         Assert.Equal(SecurityHeaders.PermissionsPolicy, Header(response, "Permissions-Policy"));
         // The test host runs as Development.
         Assert.Equal(SecurityHeaders.DevelopmentContentSecurityPolicy, Header(response, "Content-Security-Policy"));
@@ -34,6 +36,20 @@ public class SecurityHeadersTests(BudgetApiFactory factory) : IntegrationTestBas
         Assert.False(response.IsSuccessStatusCode);
         Assert.Equal("nosniff", Header(response, "X-Content-Type-Options"));
         Assert.NotNull(Header(response, "Content-Security-Policy"));
+    }
+
+    [Fact]
+    public async Task Server_responses_are_never_cached_but_the_app_files_can_be()
+    {
+        var (ownerId, _) = await CreateHouseholdOwnerAsync();
+        using var client = CreateClient(signedInAs: ownerId);
+
+        using var user = await client.GetAsync(new Uri(AccountRoutes.CurrentUser, UriKind.Relative));
+        using var app = await client.GetAsync(new Uri("/manifest.webmanifest", UriKind.Relative));
+
+        Assert.Equal("no-store", Header(user, "Cache-Control"));
+        Assert.Equal("require-corp", Header(app, "Cross-Origin-Embedder-Policy"));
+        Assert.DoesNotContain("no-store", Header(app, "Cache-Control") ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]

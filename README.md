@@ -112,6 +112,8 @@ The integration tests start their own SQL Server in Docker (Testcontainers), so 
 
 End-to-end and accessibility tests (Playwright with axe-core) live in `tests/e2e`. They run the published app at phone and desktop sizes in the CI `e2e` job; see [tests/e2e/README.md](tests/e2e/README.md) to run them locally.
 
+A security scan (OWASP ZAP's baseline scan) runs against the published app, signed in, in the CI `security-scan` job. It fails on medium or high alerts that haven't been accepted; see [tests/security/README.md](tests/security/README.md).
+
 ## Database migrations
 
 EF Core migrations live in `src/Budget.Infrastructure/Persistence/Migrations`. After changing the model, add a migration in one of two ways:

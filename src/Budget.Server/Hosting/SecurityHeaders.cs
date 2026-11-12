@@ -61,10 +61,29 @@ public static class SecurityHeaders
                 headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
                 headers["Permissions-Policy"] = PermissionsPolicy;
                 headers["Cross-Origin-Opener-Policy"] = "same-origin";
+
+                // Everything the app loads is its own, so it can refuse anything another site hasn't opted in to
+                // sharing (BUD-145). With the opener policy, this isolates the app from other sites' windows.
+                headers["Cross-Origin-Embedder-Policy"] = "require-corp";
+                // And other sites can't load the app's files or responses into their pages.
+                headers["Cross-Origin-Resource-Policy"] = "same-origin";
+
+                // Responses from the server hold household data, so they're never kept in a browser's or proxy's
+                // cache (BUD-145). The app's own files keep the caching MapStaticAssets gives them.
+                if (IsServerResponse(context.Request.Path))
+                {
+                    headers.CacheControl = "no-store";
+                    headers.Pragma = "no-cache";
+                }
                 return Task.CompletedTask;
             });
 
             await next(context);
         });
     }
+
+    private static bool IsServerResponse(PathString path) =>
+        path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/bff", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/account", StringComparison.OrdinalIgnoreCase);
 }
