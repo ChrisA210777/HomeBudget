@@ -17,6 +17,18 @@ public sealed class ServerErrorHandlerTests
         Assert.IsAssignableFrom<HttpRequestException>(error);
     }
 
+    [Fact]
+    public async Task Too_many_requests_becomes_an_exception_that_says_to_wait()
+    {
+        using var client = Client(HttpStatusCode.TooManyRequests, "abc");
+
+        var error = await Assert.ThrowsAsync<TooManyRequestsException>(() => client.GetAsync(new Uri("/api/thing", UriKind.Relative)));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, error.StatusCode);
+        Assert.Equal(TooManyRequestsException.WaitMessage, error.Message);
+        Assert.IsAssignableFrom<HttpRequestException>(error);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.OK)]
     [InlineData(HttpStatusCode.NotFound)]

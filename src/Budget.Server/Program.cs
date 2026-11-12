@@ -30,6 +30,7 @@ builder.Services.AddProblemDetailsWithCorrelationId();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [DatabaseHealthCheck.ReadyTag]);
 builder.Services.AddForwardedHeadersFromConfiguration(builder.Configuration);
+builder.Services.AddBudgetRateLimits();
 
 // Requests, dependencies, logs and exceptions go to Application Insights in Azure (BUD-12).
 // The connection string is only set there, so nothing is sent when running locally or in tests.
@@ -66,6 +67,10 @@ else
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
+
+// After authentication, so limits are per person; before authorisation, so signed-out requests count too (BUD-144).
+app.UseRateLimiter();
+app.UseRequestSizeLimits();
 app.UseAuthorization();
 app.UseCsrfHeaderCheck();
 

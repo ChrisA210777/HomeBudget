@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Hosting;
 using Budget.Shared;
 using Budget.Shared.Account;
 using Microsoft.AspNetCore.Authentication;
@@ -14,8 +15,8 @@ public static class AccountEndpoints
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet(AccountRoutes.Providers, GetProvidersAsync).AllowAnonymous();
-        app.MapGet(AccountRoutes.LoginTemplate, LoginAsync).AllowAnonymous();
-        app.MapGet(AccountRoutes.ExternalCallback, ExternalCallbackAsync).AllowAnonymous();
+        app.MapGet(AccountRoutes.LoginTemplate, LoginAsync).AllowAnonymous().RequireRateLimiting(RateLimits.SignIn);
+        app.MapGet(AccountRoutes.ExternalCallback, ExternalCallbackAsync).AllowAnonymous().RequireRateLimiting(RateLimits.SignIn);
         app.MapGet(AccountRoutes.CurrentUser, GetCurrentUserAsync).RequireAuthorization();
         app.MapPut(AccountRoutes.ActiveHousehold, SetActiveHouseholdAsync).RequireAuthorization();
         app.MapGet(AccountRoutes.Settings, GetSettingsAsync).RequireAuthorization();

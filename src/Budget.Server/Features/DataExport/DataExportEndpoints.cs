@@ -5,6 +5,7 @@ using Budget.Domain.Households;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
+using Budget.Server.Hosting;
 using Budget.Shared.DataExport;
 using Budget.Shared.Households;
 using Microsoft.EntityFrameworkCore;
@@ -13,18 +14,27 @@ namespace Budget.Server.Features.DataExport;
 
 public static class DataExportEndpoints
 {
+    /// <summary>
+    /// The most an import request may send (BUD-144). A little over the file limit, so a file just over it reaches the
+    /// endpoint and gets its friendly "too big" message; anything far bigger is refused before it's read.
+    /// </summary>
+    public const long MaxUploadBytes = ExportFormat.MaxFileBytes + (1024 * 1024);
+
     public static IEndpointRouteBuilder MapDataExportEndpoints(this IEndpointRouteBuilder app)
     {
         var household = app.MapGroup(HouseholdRoutes.Base);
 
         // Admins only: the file holds everyone's personal and financial details (ADR-012).
-        household.MapGet("/export", ExportAsync).RequireAuthorization(HouseholdPolicies.Admin);
-        household.MapGet("/export/csv", ExportCsvAsync).RequireAuthorization(HouseholdPolicies.Admin);
-        household.MapPost("/import/preview", PreviewAsync).RequireAuthorization(HouseholdPolicies.Admin);
+        household.MapGet("/export", ExportAsync).RequireAuthorization(HouseholdPolicies.Admin).RequireRateLimiting(RateLimits.Data);
+        household.MapGet("/export/csv", ExportCsvAsync).RequireAuthorization(HouseholdPolicies.Admin).RequireRateLimiting(RateLimits.Data);
+        household.MapPost("/import/preview", PreviewAsync).RequireAuthorization(HouseholdPolicies.Admin)
+            .RequireRateLimiting(RateLimits.Data).WithMaxRequestSize(MaxUploadBytes);
 
         // Admins of the household they're in (confirmed 6 Nov 2026); they become the new household's owner.
-        household.MapPost("/import/new-household", ImportAsNewHouseholdAsync).RequireAuthorization(HouseholdPolicies.Admin);
-        household.MapPost("/import/replace", ReplaceAsync).RequireAuthorization(HouseholdPolicies.Admin);
+        household.MapPost("/import/new-household", ImportAsNewHouseholdAsync).RequireAuthorization(HouseholdPolicies.Admin)
+            .RequireRateLimiting(RateLimits.Data).WithMaxRequestSize(MaxUploadBytes);
+        household.MapPost("/import/replace", ReplaceAsync).RequireAuthorization(HouseholdPolicies.Admin)
+            .RequireRateLimiting(RateLimits.Data).WithMaxRequestSize(MaxUploadBytes);
 
         return app;
     }

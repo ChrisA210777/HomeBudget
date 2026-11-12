@@ -237,6 +237,10 @@
             _me = _preview.People.FirstOrDefault(p => p.IsYou)?.Id;
             _importErrors = null;
         }
+        catch (TooManyRequestsException tooMany)
+        {
+            _preview = Refused(tooMany.Message);
+        }
         catch (HttpRequestException)
         {
             _preview = Refused("The file couldn't be checked. Check your connection and try again.");
@@ -262,6 +266,10 @@
 
             // It's now the active household: reload so every part of the app uses it.
             Navigation.NavigateTo("/?imported=true", forceLoad: true);
+        }
+        catch (TooManyRequestsException tooMany)
+        {
+            _importErrors = [new ImportProblem(string.Empty, tooMany.Message)];
         }
         catch (HttpRequestException)
         {
@@ -292,6 +300,10 @@
             }
 
             Navigation.NavigateTo("/?replaced=true", forceLoad: true);
+        }
+        catch (TooManyRequestsException tooMany)
+        {
+            _importErrors = [new ImportProblem(string.Empty, tooMany.Message)];
         }
         catch (HttpRequestException)
         {

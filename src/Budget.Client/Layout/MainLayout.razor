@@ -65,9 +65,11 @@
                 <ErrorContent Context="error">
                     <MudContainer MaxWidth="MaxWidth.Small" Class="mt-6">
                         <MudAlert Severity="Severity.Error" data-testid="page-error">
-                            @(Connectivity.IsOnline
-                                ? "Something went wrong loading this page."
-                                : "This page couldn't load because you're offline.")
+                            @(!Connectivity.IsOnline
+                                ? "This page couldn't load because you're offline."
+                                : IsTooManyRequests(error)
+                                    ? TooManyRequestsException.WaitMessage
+                                    : "Something went wrong loading this page.")
                             @if (CorrelationIdOf(error) is { } reference)
                             {
                                 @* BUD-12: quoted when reporting the problem, to find it in the logs. *@
@@ -145,6 +147,20 @@
     }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    /// <summary>Whether the server turned the request away for coming too often (BUD-144).</summary>
+    private static bool IsTooManyRequests(Exception? error)
+    {
+        for (var e = error; e is not null; e = e.InnerException)
+        {
+            if (e is TooManyRequestsException)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>The server's correlation id, if a server error caused this one.</summary>
     private static string? CorrelationIdOf(Exception? error)
