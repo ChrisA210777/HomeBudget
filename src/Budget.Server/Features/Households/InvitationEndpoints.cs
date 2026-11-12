@@ -4,6 +4,7 @@ using Budget.Domain.People;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Activity;
+using Budget.Server.Hosting;
 using Budget.Shared.Households;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -26,8 +27,8 @@ public static class InvitationEndpoints
         household.MapPost("/", CreateAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapDelete("/{invitationId:guid}", RevokeAsync).RequireAuthorization(HouseholdPolicies.Admin);
 
-        app.MapGet("/api/invitations/{token}", PreviewAsync).RequireAuthorization();
-        app.MapPost("/api/invitations/{token}/accept", AcceptAsync).RequireAuthorization();
+        app.MapGet("/api/invitations/{token}", PreviewAsync).RequireAuthorization().RequireRateLimiting(RateLimits.Invitations);
+        app.MapPost("/api/invitations/{token}/accept", AcceptAsync).RequireAuthorization().RequireRateLimiting(RateLimits.Invitations);
         return app;
     }
 
