@@ -139,6 +139,11 @@
                                   data-testid="add-name" />
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AddAsync" Disabled="@(_saving || !Online)" Class="mt-2" data-testid="add-person">Add</MudButton>
                 </div>
+                @* BUD-154: they're recording someone else's details, who can't see the privacy notice. *@
+                <MudText Typo="Typo.body2" Class="mt-2" data-testid="add-person-note">
+                    You're recording someone else's details, so let them know. Only add what the budget needs: a first name or
+                    nickname is enough, especially for children.
+                </MudText>
             </MudPaper>
         }
     }

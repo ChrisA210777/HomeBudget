@@ -10,7 +10,7 @@ namespace Budget.Server.Features.People;
 /// Admins remove a person who doesn't sign in (BUD-112, ADR-016). Their items are moved or deleted first, as chosen:
 /// income to another person or deleted; outgoings to the household or another person, or deleted. Their accounts become
 /// the household's, and can be archived too. Invitations to join as them go. Recent activity records the removal
-/// without their name.
+/// without their name, and earlier activity about them loses their name too (BUD-154).
 /// </summary>
 public static class PersonRemoval
 {
@@ -142,6 +142,15 @@ public static class PersonRemoval
             await db.Invitations.IgnoreQueryFilters()
                 .Where(i => i.PersonId == personId)
                 .ExecuteUpdateAsync(i => i.SetProperty(x => x.PersonId, (Guid?)null));
+
+            // Earlier activity about them keeps what happened, without their name (BUD-154).
+            await db.ActivityEntries.IgnoreQueryFilters()
+                .Where(a => a.SubjectId == personId)
+                .ExecuteUpdateAsync(a => a
+                    .SetProperty(x => x.Summary, x => x.Summary.StartsWith("added ")
+                        ? ActivityMessages.RemovedPersonAdded
+                        : ActivityMessages.RemovedPersonRenamed)
+                    .SetProperty(x => x.SubjectId, (Guid?)null));
 
             db.People.Remove(person);
             db.ActivityEntries.Add(ActivityMessages.PersonRemoved(householdId));

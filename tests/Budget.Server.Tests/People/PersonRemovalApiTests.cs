@@ -57,6 +57,24 @@ public class PersonRemovalApiTests(BudgetApiFactory factory) : IntegrationTestBa
     }
 
     [Fact]
+    public async Task Earlier_activity_about_them_loses_their_name()
+    {
+        var (ownerId, householdId) = await CreateHouseholdOwnerAsync("Chris Austin");
+        using var owner = CreateClient(signedInAs: ownerId);
+        using var added = await owner.PostAsJsonAsync(Url(PeopleRoutes.People(householdId)), new SavePersonRequest { DisplayName = "Qzvk Sam" });
+        var sam = (await added.Content.ReadFromJsonAsync<PersonSummary>())!.Id;
+        (await owner.PutAsJsonAsync(Url(PeopleRoutes.Person(householdId, sam)), new SavePersonRequest { DisplayName = "Qzvk Samuel" })).Dispose();
+
+        using var removed = await owner.PostAsJsonAsync(Url(PeopleRoutes.Removal(householdId, sam)), new RemovePersonRequest());
+
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        var activity = (await owner.GetFromJsonAsync<ActivityResponse>(Url(ActivityRoutes.Activity(householdId, take: 20))))!;
+        Assert.DoesNotContain(activity.Items, a => a.Summary.Contains("Qzvk", StringComparison.Ordinal));
+        // Adding then renaming within a few minutes may be one entry, so either wording will do.
+        Assert.Contains(activity.Items, a => a.Summary is "renamed a person who has since been removed" or "added a person who has since been removed");
+    }
+
+    [Fact]
     public async Task Outgoings_can_become_the_households_and_accounts_stay_open()
     {
         var (ownerId, householdId) = await CreateHouseholdOwnerAsync("Chris Austin");

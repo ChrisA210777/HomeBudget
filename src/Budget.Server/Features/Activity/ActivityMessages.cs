@@ -147,6 +147,12 @@ public static class ActivityMessages
     public static ActivityEntry PersonRenamed(Guid householdId, Guid personId, string from, string to) =>
         Entry(householdId, ActivityArea.People, personId, $"renamed {from} to {to}");
 
+    /// <summary>Earlier "added Sam…" once Sam has been removed (BUD-154): the name goes too.</summary>
+    public const string RemovedPersonAdded = "added a person who has since been removed";
+
+    /// <summary>Earlier "renamed Sam to Samuel" once Sam has been removed (BUD-154).</summary>
+    public const string RemovedPersonRenamed = "renamed a person who has since been removed";
+
     // ---- The household and its members ----
 
     public static ActivityEntry HouseholdCreated(Guid householdId, string name) =>
