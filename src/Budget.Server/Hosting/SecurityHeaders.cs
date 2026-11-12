@@ -65,6 +65,8 @@ public static class SecurityHeaders
                 // Everything the app loads is its own, so it can refuse anything another site hasn't opted in to
                 // sharing (BUD-145). With the opener policy, this isolates the app from other sites' windows.
                 headers["Cross-Origin-Embedder-Policy"] = "require-corp";
+                // And other sites can't load the app's files or responses into their pages.
+                headers["Cross-Origin-Resource-Policy"] = "same-origin";
 
                 // Responses from the server hold household data, so they're never kept in a browser's or proxy's
                 // cache (BUD-145). The app's own files keep the caching MapStaticAssets gives them.

@@ -20,6 +20,7 @@ public class SecurityHeadersTests(BudgetApiFactory factory) : IntegrationTestBas
         Assert.Equal("strict-origin-when-cross-origin", Header(response, "Referrer-Policy"));
         Assert.Equal("same-origin", Header(response, "Cross-Origin-Opener-Policy"));
         Assert.Equal("require-corp", Header(response, "Cross-Origin-Embedder-Policy"));
+        Assert.Equal("same-origin", Header(response, "Cross-Origin-Resource-Policy"));
         Assert.Equal(SecurityHeaders.PermissionsPolicy, Header(response, "Permissions-Policy"));
         // The test host runs as Development.
         Assert.Equal(SecurityHeaders.DevelopmentContentSecurityPolicy, Header(response, "Content-Security-Policy"));
