@@ -49,9 +49,11 @@ public static class CsvExporter
                 c => [c.Id, c.Name, c.SortOrder, c.IsHidden, c.Icon], c => c);
 
             // Accounts and pots, one row each; a pot names its account (BUD-89). Outgoings name theirs in paidFrom.
-            Table("accounts.csv", ["name", "pot", "provider", "ownerPersonId", "archived"],
+            // monthStartsWith is the id of the income or transfer whose arrival starts the account's month (BUD-136).
+            Table("accounts.csv", ["name", "pot", "provider", "ownerPersonId", "archived", "monthStartsWith"],
                 export.Accounts.SelectMany(a => new[] { (Account: a, Pot: (ExportedPot?)null) }.Concat(a.Pots.Select(p => (Account: a, Pot: (ExportedPot?)p)))),
-                x => [x.Account.Name, x.Pot?.Name, x.Pot is null ? x.Account.Provider : null, x.Account.OwnerPersonId, x.Pot?.Archived ?? x.Account.Archived]);
+                x => [x.Account.Name, x.Pot?.Name, x.Pot is null ? x.Account.Provider : null, x.Account.OwnerPersonId, x.Pot?.Archived ?? x.Account.Archived,
+                    x.Pot is null ? x.Account.MonthStartsWith : null]);
 
             Table("incomes.csv", ["id", "name", "personId", "paidInto"], export.Incomes,
                 i => [i.Id, i.Name, i.PersonId, i.PaidInto], i => i);

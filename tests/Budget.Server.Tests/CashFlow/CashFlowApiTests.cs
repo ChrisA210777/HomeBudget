@@ -58,6 +58,100 @@ public class CashFlowApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     }
 
     [Fact]
+    public async Task A_week_carries_on_from_the_start_of_the_accounts_month()
+    {
+        var (client, householdId) = await HouseholdAsync();
+
+        // BUD-136: the week from 22 Nov brings forward the mortgage and council tax since the 1st, so the 25th shows
+        // the same running total as the month does.
+        var days = (await client.GetFromJsonAsync<CashFlowDaysResponse>(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 11, 22), new DateOnly(2026, 11, 28)))))!;
+
+        var joint = days.Accounts.Single(a => a.Name == "Joint");
+        Assert.Equal((-1150m, (DateOnly?)new DateOnly(2026, 11, 1)), (joint.BroughtForward, joint.BroughtForwardSince));
+        Assert.Equal(new[] { (new DateOnly(2026, 11, 25), -150m, true) }, joint.Days.Select(d => (d.Date, d.RunningTotal, d.IsShort)));
+        Assert.Null(joint.MonthStartsWith);
+
+        // It's short until the top-up arrives, so Cash flow suggests starting its month then.
+        var month = (await client.GetFromJsonAsync<CashFlowDaysResponse>(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)))))!;
+        var suggestion = month.Accounts.Single(a => a.Name == "Joint").Suggestion;
+        Assert.NotNull(suggestion);
+        Assert.Equal(("Bills top-up", new DateOnly(2026, 11, 25)), (suggestion.Name, suggestion.Date));
+        Assert.Null(month.Accounts.Single(a => a.Name == "Current").Suggestion);
+    }
+
+    [Fact]
+    public async Task An_accounts_month_can_start_when_its_money_arrives()
+    {
+        var (client, householdId) = await HouseholdAsync();
+        var (jointId, billsId, topUpId, gymId) = (Guid.Empty, Guid.Empty, Guid.Empty, Guid.Empty);
+        await ExecuteDbContextAsync(async db =>
+        {
+            jointId = await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.Name == "Joint").Select(a => a.Id).SingleAsync();
+            billsId = await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.Name == "Bills").Select(a => a.Id).SingleAsync();
+            topUpId = await db.Transfers.IgnoreQueryFilters().Where(t => t.HouseholdId == householdId && t.Name == "Bills top-up").Select(t => t.Id).SingleAsync();
+            gymId = await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId && o.Name == "Gym").Select(o => o.Id).SingleAsync();
+        });
+
+        // The choices are the money into the account: the top-up into its Bills pot, not the move into its own Holiday pot.
+        var accounts = (await client.GetFromJsonAsync<List<Budget.Shared.Accounts.AccountSummary>>(Url(Budget.Shared.Accounts.HouseholdAccountRoutes.Accounts(householdId))))!;
+        Assert.Equal(new[] { "Bills top-up" }, accounts.Single(a => a.Id == jointId).MonthStartOptions.Select(o => o.Name));
+        Assert.Empty(accounts.Single(a => a.Id == billsId).MonthStartOptions);
+
+        using var notMoneyIn = await client.PutAsJsonAsync(Url(Budget.Shared.Accounts.HouseholdAccountRoutes.MonthStart(householdId, jointId)), new Budget.Shared.Accounts.SetMonthStartRequest { MonthStartsWithId = gymId });
+        Assert.Equal(HttpStatusCode.BadRequest, notMoneyIn.StatusCode);
+        using var pot = await client.PutAsJsonAsync(Url(Budget.Shared.Accounts.HouseholdAccountRoutes.MonthStart(householdId, billsId)), new Budget.Shared.Accounts.SetMonthStartRequest { MonthStartsWithId = topUpId });
+        Assert.Equal(HttpStatusCode.NotFound, pot.StatusCode);
+
+        using var set = await client.PutAsJsonAsync(Url(Budget.Shared.Accounts.HouseholdAccountRoutes.MonthStart(householdId, jointId)), new Budget.Shared.Accounts.SetMonthStartRequest { MonthStartsWithId = topUpId });
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        Assert.Equal("Bills top-up", (await set.Content.ReadFromJsonAsync<Budget.Shared.Accounts.AccountSummary>())!.MonthStartsWithName);
+
+        // November now carries on from the top-up on 25 Oct, and starts again when it arrives on 25 Nov.
+        var days = (await client.GetFromJsonAsync<CashFlowDaysResponse>(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)))))!;
+        var joint = days.Accounts.Single(a => a.Name == "Joint");
+        Assert.Equal((1000m, (DateOnly?)new DateOnly(2026, 10, 25), "Bills top-up"), (joint.BroughtForward, joint.BroughtForwardSince, joint.MonthStartsWith));
+        Assert.Equal(
+            new (DateOnly, decimal, bool, DateOnly?)[] { (new DateOnly(2026, 11, 1), 0m, false, null), (new DateOnly(2026, 11, 5), -150m, true, null), (new DateOnly(2026, 11, 25), 1000m, false, new DateOnly(2026, 11, 25)) },
+            joint.Days.Select(d => (d.Date, d.RunningTotal, d.IsShort, d.MonthStarted)));
+        Assert.Null(joint.Suggestion);
+
+        // A week across the top-up shows the same totals.
+        var week = (await client.GetFromJsonAsync<CashFlowDaysResponse>(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 11, 22), new DateOnly(2026, 11, 28)))))!;
+        Assert.Equal((-150m, (DateOnly?)new DateOnly(2026, 10, 25)), (week.Accounts.Single(a => a.Name == "Joint").BroughtForward, week.Accounts.Single(a => a.Name == "Joint").BroughtForwardSince));
+        Assert.Equal(1000m, week.Accounts.Single(a => a.Name == "Joint").Days.Single().RunningTotal);
+
+        // Back to the 1st.
+        using var reset = await client.PutAsJsonAsync(Url(Budget.Shared.Accounts.HouseholdAccountRoutes.MonthStart(householdId, jointId)), new Budget.Shared.Accounts.SetMonthStartRequest());
+        Assert.Null((await reset.Content.ReadFromJsonAsync<Budget.Shared.Accounts.AccountSummary>())!.MonthStartsWithId);
+    }
+
+    [Fact]
+    public async Task A_four_weekly_payment_starts_the_month_each_time_it_arrives()
+    {
+        var (client, householdId) = await HouseholdAsync();
+        Guid currentId = Guid.Empty;
+        await ExecuteDbContextAsync(async db =>
+        {
+            var person = await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId).Select(p => p.Id).FirstAsync();
+            var current = await db.Accounts.IgnoreQueryFilters().SingleAsync(a => a.HouseholdId == householdId && a.Name == "Current");
+            currentId = current.Id;
+            var pension = IncomeStream.Create(householdId, person, "State pension", 900m, new DateOnly(2026, 10, 12), "Start", new PaymentSchedule(4, PaymentUnit.Week));
+            pension.PayInto(current.Id);
+            db.IncomeStreams.Add(pension);
+            current.StartMonthWith(pension.Id);
+            await db.SaveChangesAsync();
+        });
+
+        // Paid on 12 Oct, 9 Nov and 7 Dec: November's days run on from 12 Oct, and start again on 9 Nov.
+        var days = (await client.GetFromJsonAsync<CashFlowDaysResponse>(Url(CashFlowRoutes.Days(householdId, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)))))!;
+        var current = days.Accounts.Single(a => a.AccountId == currentId);
+        Assert.Equal(("State pension", (DateOnly?)new DateOnly(2026, 10, 12)), (current.MonthStartsWith, current.BroughtForwardSince));
+        Assert.Equal(
+            new (DateOnly, decimal, DateOnly?)[] { (new DateOnly(2026, 11, 9), 900m, new DateOnly(2026, 11, 9)), (new DateOnly(2026, 11, 25), 2900m, null) },
+            current.Days.Select(d => (d.Date, d.RunningTotal, d.MonthStarted)));
+    }
+
+    [Fact]
     public async Task Savings_go_into_an_account_picked_or_typed_and_arrive_there_in_the_cash_flow()
     {
         var (client, householdId) = await HouseholdAsync();

@@ -19,6 +19,9 @@ public static class CashFlowEndpoints
 {
     private const int MaxDays = 62;
 
+    /// <summary>How far back to look for when an account's month started: a month, or a 4-weekly payment, is within this.</summary>
+    private const int LookBackDays = 62;
+
     public static IEndpointRouteBuilder MapCashFlowEndpoints(this IEndpointRouteBuilder app)
     {
         var cashFlow = app.MapGroup(HouseholdRoutes.Base + "/cash-flow");
@@ -118,6 +121,21 @@ public static class CashFlowEndpoints
         }
 
         var data = await LoadAsync(db, householdId);
+
+        // An account's month may have started before the period shown (BUD-136).
+        var lookFrom = start.AddDays(-LookBackDays);
+        var entries = Entries(data, lookFrom, end);
+
+        var accounts = Ordered(entries.Where(e => e.Date >= start).Select(e => e.Account), data)
+            .Select(g => DaysFor(g.Id, g.Name, entries.Where(e => e.Account == g.Id).ToList(), data, start, end, lookFrom))
+            .ToList();
+
+        return Results.Ok(new CashFlowDaysResponse(start, end, data.Currency, accounts));
+    }
+
+    /// <summary>Every payment in and out of each account between two dates, with pots counted in their account.</summary>
+    private static List<(Guid? Account, string? Pot, CashFlowEntry Entry, DateOnly Date)> Entries(Data data, DateOnly start, DateOnly end)
+    {
         var entries = new List<(Guid? Account, string? Pot, CashFlowEntry Entry, DateOnly Date)>();
 
         foreach (var income in data.Incomes)
@@ -149,27 +167,111 @@ public static class CashFlowEndpoints
             }
         }
 
-        var accounts = Ordered(entries.Select(e => e.Account), data)
-            .Select(g =>
-            {
-                var running = 0m;
-                var days = entries.Where(e => e.Account == g.Id)
-                    .GroupBy(e => e.Date)
-                    .OrderBy(d => d.Key)
-                    .Select(d =>
-                    {
-                        var dayIn = d.Where(e => e.Entry.IsIn).Sum(e => e.Entry.Amount);
-                        var dayOut = d.Where(e => !e.Entry.IsIn).Sum(e => e.Entry.Amount);
-                        running += dayIn - dayOut;
-                        var list = d.Select(e => e.Entry).OrderByDescending(e => e.IsIn).ThenBy(e => e.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-                        return new CashFlowDay(d.Key, list, dayIn, dayOut, running, running < 0m);
-                    })
-                    .ToList();
-                return new CashFlowDaysAccount(g.Id, g.Name, days, days.Sum(d => d.In), days.Sum(d => d.Out));
-            })
-            .ToList();
+        return entries;
+    }
 
-        return Results.Ok(new CashFlowDaysResponse(start, end, data.Currency, accounts));
+    /// <summary>
+    /// One account's days in the period. The running total starts again at £0 each time the account's month starts
+    /// (BUD-136): on the 1st, or when its chosen income or transfer arrives. What came in and went out between the
+    /// month's start and the period's is brought forward, so a day shows the same total in a week as in a month.
+    /// </summary>
+    private static CashFlowDaysAccount DaysFor(
+        Guid? accountId,
+        string name,
+        List<(Guid? Account, string? Pot, CashFlowEntry Entry, DateOnly Date)> entries,
+        Data data,
+        DateOnly start,
+        DateOnly end,
+        DateOnly lookFrom)
+    {
+        var account = data.Accounts.Find(accountId);
+        var (startsWith, starts) = MonthStartsFor(account, data, lookFrom, end, start);
+        var opening = starts.Where(d => d <= start).Max();
+
+        static decimal Net(IEnumerable<CashFlowEntry> list) => list.Sum(e => e.IsIn ? e.Amount : -e.Amount);
+
+        var broughtForward = Net(entries.Where(e => e.Date >= opening && e.Date < start).Select(e => e.Entry));
+        var running = broughtForward;
+        var shownBefore = start.AddDays(-1);
+        var days = new List<CashFlowDay>();
+        foreach (var day in entries.Where(e => e.Date >= start).GroupBy(e => e.Date).OrderBy(d => d.Key))
+        {
+            var started = starts.Where(d => d > opening && d > shownBefore && d <= day.Key).DefaultIfEmpty().Max();
+            if (started != default)
+            {
+                running = 0m;
+            }
+
+            var dayIn = day.Where(e => e.Entry.IsIn).Sum(e => e.Entry.Amount);
+            var dayOut = day.Where(e => !e.Entry.IsIn).Sum(e => e.Entry.Amount);
+            running += dayIn - dayOut;
+            var list = day.Select(e => e.Entry).OrderByDescending(e => e.IsIn).ThenBy(e => e.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            days.Add(new CashFlowDay(day.Key, list, dayIn, dayOut, running, running < 0m) { MonthStarted = started == default ? null : started });
+            shownBefore = day.Key;
+        }
+
+        return new CashFlowDaysAccount(accountId, name, days, days.Sum(d => d.In), days.Sum(d => d.Out))
+        {
+            BroughtForward = opening < start ? Values.RoundForDisplay(broughtForward) : 0m,
+            BroughtForwardSince = opening < start ? opening : null,
+            MonthStartsWith = startsWith,
+            Suggestion = startsWith is null ? Suggest(account, days, entries, data) : null,
+        };
+    }
+
+    /// <summary>
+    /// The days an account's month starts between two dates, and the payment it starts with (<c>null</c> for the 1st).
+    /// If the chosen payment hasn't arrived by the start of the period (it's new, paused or has ended), the month is
+    /// taken to start on the 1st until it does.
+    /// </summary>
+    private static (string? StartsWith, SortedSet<DateOnly> Starts) MonthStartsFor(Account? account, Data data, DateOnly from, DateOnly to, DateOnly periodStart)
+    {
+        var option = account is { MonthStartsWithId: { } id }
+            ? MonthStarts.Options(account, data.Accounts, data.Incomes, data.Transfers).FirstOrDefault(o => o.Id == id)
+            : null;
+        var firstOfMonth = new DateOnly(periodStart.Year, periodStart.Month, 1);
+        if (option is null)
+        {
+            var firsts = new SortedSet<DateOnly>();
+            for (var month = new DateOnly(from.Year, from.Month, 1); month <= to; month = month.AddMonths(1))
+            {
+                firsts.Add(month);
+            }
+
+            firsts.Add(firstOfMonth);
+            return (null, firsts);
+        }
+
+        var dates = data.Incomes.FirstOrDefault(i => i.Id == option.Id)?.PaymentsBetween(from, to).Select(p => p.Date)
+            ?? data.Transfers.First(t => t.Id == option.Id).PaymentsBetween(from, to).Select(p => p.Date);
+        var starts = new SortedSet<DateOnly>(dates);
+        if (!starts.Any(d => d <= periodStart))
+        {
+            starts.Add(firstOfMonth);
+        }
+
+        return (option.Name, starts);
+    }
+
+    /// <summary>
+    /// For an account whose month starts on the 1st but is short until regular money arrives later in the period:
+    /// the biggest such payment, to start the month with instead (BUD-136).
+    /// </summary>
+    private static MonthStartSuggestion? Suggest(
+        Account? account, List<CashFlowDay> days, List<(Guid? Account, string? Pot, CashFlowEntry Entry, DateOnly Date)> entries, Data data)
+    {
+        if (account is null || days.FirstOrDefault(d => d.IsShort) is not { } firstShort)
+        {
+            return null;
+        }
+
+        var options = MonthStarts.Options(account, data.Accounts, data.Incomes, data.Transfers).ToDictionary(o => o.Id, o => o.Name);
+        var arriving = entries
+            .Where(e => e.Date > firstShort.Date && e.Entry.IsIn && options.ContainsKey(e.Entry.Id))
+            .OrderByDescending(e => e.Entry.Amount)
+            .ThenBy(e => e.Date)
+            .FirstOrDefault();
+        return arriving.Entry is null ? null : new MonthStartSuggestion(arriving.Entry.Id, options[arriving.Entry.Id], arriving.Date);
     }
 
     /// <summary>

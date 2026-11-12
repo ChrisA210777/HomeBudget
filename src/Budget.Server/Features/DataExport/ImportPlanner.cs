@@ -131,6 +131,8 @@ public static class ImportPlanner
         // Accounts and pots in the file (version 2); income and outgoings then find theirs by name, and names from older
         // files become accounts and pots the same way existing households' did (BUD-89, ADR-014).
         var accounts = AccountDirectory.InMemory(householdId, plan.Accounts);
+        var accountsByIndex = new Dictionary<int, Account>();
+        var paymentIds = new Dictionary<Guid, Guid>();
         for (var i = 0; i < export.Accounts.Count; i++)
         {
             var source = export.Accounts[i];
@@ -142,6 +144,7 @@ public static class ImportPlanner
             }
 
             plan.Accounts.Add(account);
+            accountsByIndex[i] = account;
             if (source.Archived)
             {
                 account.Archive();
@@ -183,6 +186,7 @@ public static class ImportPlanner
             }
 
             income.PayInto(accounts.Resolve(source.PaidInto, restoreArchived: false)?.Id);
+            paymentIds[source.Id] = income.Id;
 
             entryIds[first.Id] = Keep(income.AmountChanges.Single(), first)!.Id;
             foreach (var change in changes.Skip(1))
@@ -399,6 +403,16 @@ public static class ImportPlanner
             }
 
             plan.Transfers.Add(transfer);
+            paymentIds[source.Id] = transfer.Id;
+        }
+
+        // When each account's month starts (version 5, BUD-136): the new id of the income or transfer it starts with.
+        foreach (var (index, imported) in accountsByIndex)
+        {
+            if (export.Accounts[index].MonthStartsWith is { } fileId && paymentIds.TryGetValue(fileId, out var paymentId))
+            {
+                imported.StartMonthWith(paymentId);
+            }
         }
 
         return (problems.Count == 0 ? plan : null, problems);

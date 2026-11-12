@@ -83,7 +83,7 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                 }
                 : exported;
 
-        return new HouseholdExport
+        var export = new HouseholdExport
         {
             ExportedAt = now,
             AppVersion = AppVersion,
@@ -139,6 +139,7 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                     Provider = a.Provider,
                     OwnerPersonId = a.OwnerPersonId,
                     Archived = a.IsArchived,
+                    MonthStartsWith = a.MonthStartsWithId,
                     Pots = accounts.Where(p => p.ParentAccountId == a.Id).Select(p => new ExportedPot { Name = p.Name, Archived = p.IsArchived }).ToList(),
                 })
                 .ToList(),
@@ -214,6 +215,15 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
                             .Select(c => Audit(Correction(c.EntryType.ToString(), c.EntryId, c.Action.ToString(), c.Before, c.After, c.Reason), c)).ToList()
                         : [],
                 }, t)).ToList(),
+        };
+
+        // An account's month can only start with income or a transfer that's in the file (BUD-136).
+        var payments = export.Incomes.Select(x => x.Id).Concat(export.Transfers.Select(x => x.Id)).ToHashSet();
+        return export with
+        {
+            Accounts = export.Accounts
+                .Select(x => x.MonthStartsWith is { } paymentId && !payments.Contains(paymentId) ? x with { MonthStartsWith = null } : x)
+                .ToList(),
         };
     }
 

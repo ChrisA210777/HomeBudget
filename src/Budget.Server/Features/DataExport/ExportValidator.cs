@@ -284,6 +284,16 @@ public static class ExportValidator
             Corrections(path, transfer.Corrections, TransferCorrection.DescriptionMaxLength);
         }
 
+        // When each account's month starts (version 5, BUD-136): income or a transfer in the file.
+        var payments = export.Incomes.Select(x => x.Id).Concat(export.Transfers.Select(x => x.Id)).ToHashSet();
+        for (var i = 0; i < export.Accounts.Count; i++)
+        {
+            if (export.Accounts[i].MonthStartsWith is { } paymentId && !payments.Contains(paymentId))
+            {
+                Add($"accounts[{i}].monthStartsWith", "isn't an income or transfer in this file.");
+            }
+        }
+
         return problems;
 
         void AmountChanges(string parent, IReadOnlyList<ExportedAmountChange> changes, int commentMax)

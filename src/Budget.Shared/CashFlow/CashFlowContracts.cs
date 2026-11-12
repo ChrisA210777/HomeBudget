@@ -57,14 +57,45 @@ public sealed record CashFlowMonthAccount(
 
 public sealed record CashFlowMonthResponse(int Year, int Month, string CurrencyCode, IReadOnlyList<CashFlowMonthAccount> Accounts);
 
-/// <summary>One day for an account: what comes in and goes out, and the running total from the start of the period.</summary>
-/// <param name="IsShort">More has gone out than come in so far: a timing gap.</param>
-public sealed record CashFlowDay(DateOnly Date, IReadOnlyList<CashFlowEntry> Entries, decimal In, decimal Out, decimal RunningTotal, bool IsShort);
+/// <summary>
+/// One day for an account: what comes in and goes out, and the running total since the account's month started
+/// (BUD-136): on the 1st, or when its chosen income or transfer arrived.
+/// </summary>
+/// <param name="IsShort">More has gone out than come in so far this month: a timing gap.</param>
+public sealed record CashFlowDay(DateOnly Date, IReadOnlyList<CashFlowEntry> Entries, decimal In, decimal Out, decimal RunningTotal, bool IsShort)
+{
+    /// <summary>
+    /// The account's month started again (on this day, or since the day shown before it), so the running total
+    /// started again from £0 that day.
+    /// </summary>
+    public DateOnly? MonthStarted { get; init; }
+}
 
 /// <summary>An account's payments day by day (ADR-013), only on days something happens.</summary>
 public sealed record CashFlowDaysAccount(Guid? AccountId, string Name, IReadOnlyList<CashFlowDay> Days, decimal TotalIn, decimal TotalOut)
 {
     public decimal Net => TotalIn - TotalOut;
+
+    /// <summary>
+    /// What had come in less what had gone out since the account's month started, when that was before the period
+    /// shown (BUD-136). The running totals carry on from it.
+    /// </summary>
+    public decimal BroughtForward { get; init; }
+
+    /// <summary>When the account's month started, if before the period shown; otherwise <c>null</c>.</summary>
+    public DateOnly? BroughtForwardSince { get; init; }
+
+    /// <summary>The income or transfer whose arrival starts the account's month, e.g. "Salary"; <c>null</c> for the 1st.</summary>
+    public string? MonthStartsWith { get; init; }
+
+    /// <summary>
+    /// For an account whose month starts on the 1st but is short until regular money arrives later: starting its month
+    /// with that payment instead (BUD-136).
+    /// </summary>
+    public MonthStartSuggestion? Suggestion { get; init; }
 }
+
+/// <summary>A payment into an account that its month could start with, and when it next arrives in the period shown.</summary>
+public sealed record MonthStartSuggestion(Guid PaymentId, string Name, DateOnly Date);
 
 public sealed record CashFlowDaysResponse(DateOnly From, DateOnly To, string CurrencyCode, IReadOnlyList<CashFlowDaysAccount> Accounts);
