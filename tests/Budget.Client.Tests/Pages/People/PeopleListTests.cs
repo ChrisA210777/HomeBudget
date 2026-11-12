@@ -120,6 +120,14 @@ public sealed class PeopleListTests : IDisposable
         Assert.Empty(cut.FindAll("[data-testid=remove-person]"));
     }
 
+    [Fact]
+    public void Adding_someone_reminds_you_it_is_their_data()
+    {
+        var cut = _context.RenderComponent<PeopleList>();
+
+        Assert.Contains("let them know", cut.Find("[data-testid=add-person-note]").TextContent, StringComparison.Ordinal);
+    }
+
     public void Dispose() => _context.Dispose();
 
     private void UseRole(string role, bool isOwner = true)
