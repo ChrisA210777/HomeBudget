@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Budget.Domain.People;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Shared.Households;
 using Budget.Shared.People;
@@ -57,6 +58,7 @@ public static class PeopleEndpoints
 
         var person = Person.Create(householdId, request.DisplayName);
         db.People.Add(person);
+        db.ActivityEntries.Add(ActivityMessages.PersonAdded(householdId, person.Id, person.DisplayName));
         await db.SaveChangesAsync();
 
         return Results.Created(
@@ -65,6 +67,7 @@ public static class PeopleEndpoints
     }
 
     private static async Task<IResult> RenameAsync(
+        Guid householdId,
         Guid personId,
         SavePersonRequest request,
         ClaimsPrincipal principal,
@@ -82,7 +85,13 @@ public static class PeopleEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        var previousName = person.DisplayName;
         person.Rename(request.DisplayName);
+        if (previousName != person.DisplayName)
+        {
+            db.ActivityEntries.Add(ActivityMessages.PersonRenamed(householdId, person.Id, previousName, person.DisplayName));
+        }
+
         await db.SaveChangesAsync();
 
         var linkedUserName = person.LinkedUserId is { } linkedId

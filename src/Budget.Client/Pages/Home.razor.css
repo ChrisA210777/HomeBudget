@@ -37,3 +37,21 @@
         align-self: start;
     }
 }
+
+/* A recent change (BUD-139): what was done, then when, on the right; when wraps under it on phones. */
+.activity-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 16px;
+}
+
+.activity-row ::deep .activity-text {
+    flex: 1 1 16rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.activity-row ::deep .activity-when {
+    color: var(--mud-palette-text-secondary);
+}

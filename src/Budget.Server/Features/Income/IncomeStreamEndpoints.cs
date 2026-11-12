@@ -1,9 +1,11 @@
 using System.Globalization;
+using Budget.Domain.Activity;
 using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
 using Budget.Infrastructure.Persistence.Configurations;
 using Budget.Server.Features.Accounts;
+using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Shared.Households;
 using Budget.Shared.Income;
@@ -129,6 +131,7 @@ public static class IncomeStreamEndpoints
         // A new account name adds the account, or a pot in one (BUD-90).
         stream.PayInto((await AccountDirectory.LoadAsync(db, householdId)).Resolve(request.PaidInto)?.Id);
         db.IncomeStreams.Add(stream);
+        db.ActivityEntries.Add(ActivityMessages.IncomeAdded(householdId, stream, request.Amount!.Value, Schedule(request.Every, request.Unit)));
         await db.SaveChangesAsync();
 
         return Results.Created(IncomeRoutes.IncomeStream(householdId, stream.Id), await DetailsAsync(db, householdId, stream, time));
@@ -146,10 +149,10 @@ public static class IncomeStreamEndpoints
             stream.Rename(request.Name);
             stream.ChangePerson(request.PersonId);
             stream.PayInto(accounts.Resolve(request.PaidInto)?.Id);
-        });
+        }, stream => ActivityMessages.IncomeUpdated(householdId, stream));
     }
 
-    private static async Task<IResult> DeleteAsync(Guid incomeStreamId, BudgetDbContext db)
+    private static async Task<IResult> DeleteAsync(Guid householdId, Guid incomeStreamId, BudgetDbContext db)
     {
         var stream = await db.IncomeStreams.SingleOrDefaultAsync(s => s.Id == incomeStreamId);
         if (stream is null)
@@ -158,6 +161,7 @@ public static class IncomeStreamEndpoints
         }
 
         db.IncomeStreams.Remove(stream);
+        db.ActivityEntries.Add(ActivityMessages.IncomeDeleted(householdId, stream));
         await db.SaveChangesAsync();
         return Results.NoContent();
     }
@@ -168,19 +172,22 @@ public static class IncomeStreamEndpoints
         Guid householdId, Guid incomeStreamId, SaveAmountChangeRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, incomeStreamId, request.Version, Errors(IncomeValidator.Validate(request, isCorrection: false)), time,
             errorKey: nameof(request.EffectiveFrom),
-            stream => stream.ChangeAmount(request.EffectiveFrom!.Value, request.Amount!.Value, request.Comment, Schedule(request.Every, request.Unit)));
+            stream => stream.ChangeAmount(request.EffectiveFrom!.Value, request.Amount!.Value, request.Comment, Schedule(request.Every, request.Unit)),
+            stream => ActivityMessages.IncomeAmountChanged(householdId, stream, request.Amount!.Value, Schedule(request.Every, request.Unit), request.EffectiveFrom!.Value));
 
     private static Task<IResult> CorrectAmountChangeAsync(
         Guid householdId, Guid incomeStreamId, Guid entryId, SaveAmountChangeRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, incomeStreamId, request.Version, Errors(IncomeValidator.Validate(request, isCorrection: true)), time,
             errorKey: nameof(request.EffectiveFrom),
-            stream => stream.CorrectAmountChange(entryId, request.EffectiveFrom!.Value, request.Amount!.Value, request.Comment, request.CorrectionReason!, Schedule(request.Every, request.Unit)));
+            stream => stream.CorrectAmountChange(entryId, request.EffectiveFrom!.Value, request.Amount!.Value, request.Comment, request.CorrectionReason!, Schedule(request.Every, request.Unit)),
+            stream => ActivityMessages.IncomeCorrected(householdId, stream, "an amount", request.CorrectionReason!));
 
     private static Task<IResult> DeleteAmountChangeAsync(
         Guid householdId, Guid incomeStreamId, Guid entryId, [FromBody] DeleteEntryRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, incomeStreamId, request.Version, Errors(IncomeValidator.Validate(request)), time,
             errorKey: nameof(request.Reason),
-            stream => stream.DeleteAmountChange(entryId, request.Reason));
+            stream => stream.DeleteAmountChange(entryId, request.Reason),
+            stream => ActivityMessages.IncomeEntryDeleted(householdId, stream, "an amount", request.Reason));
 
     // ---- Status periods ----
 
@@ -188,20 +195,23 @@ public static class IncomeStreamEndpoints
         Guid householdId, Guid incomeStreamId, SaveStatusPeriodRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, incomeStreamId, request.Version, Errors(IncomeValidator.Validate(request, isCorrection: false)), time,
             errorKey: nameof(request.StartDate),
-            stream => stream.AddStatusPeriod(ToDomain(request.Reason), request.StartDate!.Value, request.EndDate, request.ReducedMonthlyAmount, request.Comment));
+            stream => stream.AddStatusPeriod(ToDomain(request.Reason), request.StartDate!.Value, request.EndDate, request.ReducedMonthlyAmount, request.Comment),
+            stream => ActivityMessages.IncomeLeaveAdded(householdId, stream, ToDomain(request.Reason), request.StartDate!.Value, request.EndDate));
 
     private static Task<IResult> CorrectStatusPeriodAsync(
         Guid householdId, Guid incomeStreamId, Guid entryId, SaveStatusPeriodRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, incomeStreamId, request.Version, Errors(IncomeValidator.Validate(request, isCorrection: true)), time,
             errorKey: nameof(request.StartDate),
             stream => stream.CorrectStatusPeriod(
-                entryId, ToDomain(request.Reason), request.StartDate!.Value, request.EndDate, request.ReducedMonthlyAmount, request.Comment, request.CorrectionReason!));
+                entryId, ToDomain(request.Reason), request.StartDate!.Value, request.EndDate, request.ReducedMonthlyAmount, request.Comment, request.CorrectionReason!),
+            stream => ActivityMessages.IncomeCorrected(householdId, stream, "leave or a break", request.CorrectionReason!));
 
     private static Task<IResult> DeleteStatusPeriodAsync(
         Guid householdId, Guid incomeStreamId, Guid entryId, [FromBody] DeleteEntryRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, incomeStreamId, request.Version, Errors(IncomeValidator.Validate(request)), time,
             errorKey: nameof(request.Reason),
-            stream => stream.DeleteStatusPeriod(entryId, request.Reason));
+            stream => stream.DeleteStatusPeriod(entryId, request.Reason),
+            stream => ActivityMessages.IncomeEntryDeleted(householdId, stream, "leave or a break", request.Reason));
 
     // ---- Helpers ----
 
@@ -218,7 +228,8 @@ public static class IncomeStreamEndpoints
         Dictionary<string, string[]> errors,
         TimeProvider time,
         string errorKey,
-        Action<IncomeStream> change)
+        Action<IncomeStream> change,
+        Func<IncomeStream, ActivityEntry> activity)
     {
         var stream = await LoadStreams(db, includeCorrections: true).SingleOrDefaultAsync(s => s.Id == incomeStreamId);
         if (stream is null)
@@ -249,6 +260,9 @@ public static class IncomeStreamEndpoints
         {
             return Results.ValidationProblem(new Dictionary<string, string[]> { [errorKey] = [ex.Message] });
         }
+
+        // Recent activity (BUD-139), saved with the change.
+        db.ActivityEntries.Add(activity(stream));
 
         // Saving the stream itself (even when only its timeline changed) checks and bumps its version.
         var entry = db.Entry(stream);

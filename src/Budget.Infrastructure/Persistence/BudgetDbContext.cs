@@ -1,4 +1,5 @@
 using Budget.Domain.Accounts;
+using Budget.Domain.Activity;
 using Budget.Domain.Common;
 using Budget.Domain.Households;
 using Budget.Domain.Income;
@@ -56,6 +57,9 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
 
     /// <summary>Transfers between accounts (BUD-91). Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
     public DbSet<Transfer> Transfers => Set<Transfer>();
+
+    /// <summary>Recent activity (BUD-139). Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
+    public DbSet<ActivityEntry> ActivityEntries => Set<ActivityEntry>();
 
     /// <summary>Read by the household query filters each time a query runs.</summary>
     private Guid? CurrentHouseholdId => _currentHousehold.HouseholdId;

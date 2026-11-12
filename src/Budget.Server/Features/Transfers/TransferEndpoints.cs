@@ -1,9 +1,11 @@
+using Budget.Domain.Activity;
 using Budget.Domain.Common;
 using Budget.Domain.Outgoings;
 using Budget.Domain.Transfers;
 using Budget.Infrastructure.Persistence;
 using Budget.Infrastructure.Persistence.Configurations;
 using Budget.Server.Features.Accounts;
+using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Server.Features.Outgoings;
 using Budget.Shared.Households;
@@ -144,6 +146,9 @@ public static class TransferEndpoints
         }
 
         db.Transfers.Add(transfer);
+        var directory = await AccountDirectory.LoadAsync(db, householdId);
+        db.ActivityEntries.Add(ActivityMessages.TransferAdded(
+            householdId, transfer.Id, Label(transfer, directory), request.Amount!.Value, new PaymentSchedule(request.Every, (PaymentUnit)request.Unit)));
         await db.SaveChangesAsync();
         return Results.Created(TransferRoutes.Transfer(householdId, transfer.Id), await DetailsAsync(db, householdId, transfer, time));
     }
@@ -167,10 +172,11 @@ public static class TransferEndpoints
                 ToAccountId = request.ToAccountId!.Value,
                 FirstPaymentDate = transfer.FirstPaymentDate,
                 Notes = request.Notes,
-            }));
+            }),
+            (transfer, label) => ActivityMessages.TransferUpdated(householdId, transfer.Id, label));
     }
 
-    private static async Task<IResult> DeleteAsync(Guid transferId, BudgetDbContext db)
+    private static async Task<IResult> DeleteAsync(Guid householdId, Guid transferId, BudgetDbContext db)
     {
         var transfer = await db.Transfers.SingleOrDefaultAsync(t => t.Id == transferId);
         if (transfer is null)
@@ -179,6 +185,7 @@ public static class TransferEndpoints
         }
 
         db.Transfers.Remove(transfer);
+        db.ActivityEntries.Add(ActivityMessages.TransferDeleted(householdId, transfer.Id, Label(transfer, await AccountDirectory.LoadAsync(db, householdId))));
         await db.SaveChangesAsync();
         return Results.NoContent();
     }
@@ -189,19 +196,22 @@ public static class TransferEndpoints
         Guid householdId, Guid transferId, SaveOutgoingAmountRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, transferId, request.Version, Errors(OutgoingValidator.Validate(request, isCorrection: false)), time,
             errorKey: nameof(request.EffectiveFrom),
-            transfer => transfer.ChangeAmount(request.EffectiveFrom!.Value, request.Amount!.Value, Schedule(request), request.Comment));
+            transfer => transfer.ChangeAmount(request.EffectiveFrom!.Value, request.Amount!.Value, Schedule(request), request.Comment),
+            (transfer, label) => ActivityMessages.TransferAmountChanged(householdId, transfer.Id, label, request.Amount!.Value, Schedule(request), request.EffectiveFrom!.Value));
 
     private static Task<IResult> CorrectAmountChangeAsync(
         Guid householdId, Guid transferId, Guid entryId, SaveOutgoingAmountRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, transferId, request.Version, Errors(OutgoingValidator.Validate(request, isCorrection: true)), time,
             errorKey: nameof(request.EffectiveFrom),
-            transfer => transfer.CorrectAmountChange(entryId, request.EffectiveFrom!.Value, request.Amount!.Value, Schedule(request), request.Comment, request.CorrectionReason!));
+            transfer => transfer.CorrectAmountChange(entryId, request.EffectiveFrom!.Value, request.Amount!.Value, Schedule(request), request.Comment, request.CorrectionReason!),
+            (transfer, label) => ActivityMessages.TransferCorrected(householdId, transfer.Id, label, "an amount", request.CorrectionReason!));
 
     private static Task<IResult> DeleteAmountChangeAsync(
         Guid householdId, Guid transferId, Guid entryId, [FromBody] DeleteOutgoingEntryRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, transferId, request.Version, Errors(OutgoingValidator.Validate(request)), time,
             errorKey: nameof(request.Reason),
-            transfer => transfer.DeleteAmountChange(entryId, request.Reason));
+            transfer => transfer.DeleteAmountChange(entryId, request.Reason),
+            (transfer, label) => ActivityMessages.TransferEntryDeleted(householdId, transfer.Id, label, "an amount", request.Reason));
 
     // ---- Pauses and ending ----
 
@@ -220,7 +230,11 @@ public static class TransferEndpoints
                 {
                     transfer.Pause(start, ResumesOn(transfer, request), request.Comment);
                 }
-            });
+            },
+            (transfer, label) => request.Reason == OutgoingStatusReasonDto.Ended
+                ? ActivityMessages.TransferEnded(householdId, transfer.Id, label, request.StartDate!.Value)
+                : ActivityMessages.TransferPaused(householdId, transfer.Id, label, request.StartDate!.Value,
+                    transfer.StatusPeriods.FirstOrDefault(p => p.Reason == OutgoingStatusReason.Paused && p.StartDate == request.StartDate)?.ResumesOn));
 
     private static Task<IResult> CorrectStatusPeriodAsync(
         Guid householdId, Guid transferId, Guid entryId, SaveOutgoingStatusRequest request, BudgetDbContext db, TimeProvider time) =>
@@ -232,17 +246,24 @@ public static class TransferEndpoints
                 request.StartDate!.Value,
                 request.Reason == OutgoingStatusReasonDto.Ended ? null : ResumesOn(transfer, request),
                 request.Comment,
-                request.CorrectionReason!));
+                request.CorrectionReason!),
+            (transfer, label) => ActivityMessages.TransferCorrected(
+                householdId, transfer.Id, label, request.Reason == OutgoingStatusReasonDto.Ended ? "its end" : "a pause", request.CorrectionReason!));
 
     private static Task<IResult> DeleteStatusPeriodAsync(
         Guid householdId, Guid transferId, Guid entryId, [FromBody] DeleteOutgoingEntryRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, transferId, request.Version, Errors(OutgoingValidator.Validate(request)), time,
             errorKey: nameof(request.Reason),
-            transfer => transfer.DeleteStatusPeriod(entryId, request.Reason));
+            transfer => transfer.DeleteStatusPeriod(entryId, request.Reason),
+            (transfer, label) => ActivityMessages.TransferEntryDeleted(householdId, transfer.Id, label, "a pause or end", request.Reason));
 
     // ---- Helpers ----
 
     private static DateOnly Today(TimeProvider time) => DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+
+    /// <summary>How recent activity names a transfer: its name, or "from Chris current to Joint".</summary>
+    private static string Label(Transfer transfer, AccountDirectory accounts) =>
+        ActivityMessages.TransferLabel(transfer.Name, accounts.DisplayName(transfer.FromAccountId), accounts.DisplayName(transfer.ToAccountId));
 
     private static Task<string> CurrencyAsync(BudgetDbContext db, Guid householdId) =>
         db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
@@ -304,7 +325,8 @@ public static class TransferEndpoints
         Dictionary<string, string[]> errors,
         TimeProvider time,
         string errorKey,
-        Action<Transfer> change)
+        Action<Transfer> change,
+        Func<Transfer, string, ActivityEntry> activity)
     {
         var transfer = await Load(db).SingleOrDefaultAsync(t => t.Id == transferId);
         if (transfer is null)
@@ -339,6 +361,9 @@ public static class TransferEndpoints
         {
             return Results.ValidationProblem(new Dictionary<string, string[]> { [errorKey] = [ex.Message] });
         }
+
+        // Recent activity (BUD-139), saved with the change.
+        db.ActivityEntries.Add(activity(transfer, Label(transfer, await AccountDirectory.LoadAsync(db, householdId))));
 
         var entry = db.Entry(transfer);
         entry.Property(TransferConfiguration.RowVersion).OriginalValue = originalVersion;

@@ -3,6 +3,7 @@ using Budget.Domain.Households;
 using Budget.Domain.Outgoings;
 using Budget.Domain.People;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.Activity;
 using Budget.Shared.Households;
 using Microsoft.EntityFrameworkCore;
 
@@ -77,6 +78,7 @@ public static class HouseholdEndpoints
         db.Households.Add(household);
         db.People.Add(Person.CreateForUser(household.Id, userId, user.DisplayName));
         db.OutgoingCategories.AddRange(OutgoingCategory.CreateDefaults(household.Id));
+        db.ActivityEntries.Add(ActivityMessages.HouseholdCreated(household.Id, household.Name));
         user.LastActiveHouseholdId = household.Id;
         await db.SaveChangesAsync();
 
@@ -148,21 +150,22 @@ public static class HouseholdEndpoints
             return Refused(ex);
         }
 
+        db.ActivityEntries.Add(ActivityMessages.MemberRoleChanged(householdId, await MemberNameAsync(db, householdId, userId), role));
         await db.SaveChangesAsync();
         return Results.NoContent();
     }
 
-    private static Task<IResult> RemoveMemberAsync(Guid householdId, Guid userId, BudgetDbContext db) =>
-        RemoveAsync(householdId, userId, db);
+    private static Task<IResult> RemoveMemberAsync(Guid householdId, Guid userId, ClaimsPrincipal principal, BudgetDbContext db) =>
+        RemoveAsync(householdId, userId, leaving: userId == Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!), db);
 
     private static Task<IResult> LeaveAsync(Guid householdId, ClaimsPrincipal principal, BudgetDbContext db) =>
-        RemoveAsync(householdId, Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!), db);
+        RemoveAsync(householdId, Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!), leaving: true, db);
 
     /// <summary>
     /// Removes a member. Their linked person stays, with its income and outgoings, but is no longer linked
     /// to their login. If this was their active household, they're moved to another of theirs.
     /// </summary>
-    private static async Task<IResult> RemoveAsync(Guid householdId, Guid userId, BudgetDbContext db)
+    private static async Task<IResult> RemoveAsync(Guid householdId, Guid userId, bool leaving, BudgetDbContext db)
     {
         var household = await db.Households.Include(h => h.Members).SingleAsync(h => h.Id == householdId);
         if (household.Members.All(m => m.UserId != userId))
@@ -178,6 +181,10 @@ public static class HouseholdEndpoints
         {
             return Refused(ex);
         }
+
+        db.ActivityEntries.Add(leaving
+            ? ActivityMessages.MemberLeft(householdId)
+            : ActivityMessages.MemberRemoved(householdId, await MemberNameAsync(db, householdId, userId)));
 
         foreach (var person in await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId == userId).ToListAsync())
         {
@@ -199,6 +206,12 @@ public static class HouseholdEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>A member's name in the household (their person), or their login's name.</summary>
+    internal static async Task<string> MemberNameAsync(BudgetDbContext db, Guid householdId, Guid userId) =>
+        await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId && p.LinkedUserId == userId).Select(p => p.DisplayName).FirstOrDefaultAsync()
+            ?? await db.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstOrDefaultAsync()
+            ?? "someone";
+
     private static IResult Refused(HouseholdMembershipException ex) =>
         Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: ex.Message);
 
@@ -219,7 +232,13 @@ public static class HouseholdEndpoints
                 detail: $"It's now called \"{household.Name}\".");
         }
 
+        var previousName = household.Name;
         household.Rename(request.Name);
+        if (previousName != household.Name)
+        {
+            db.ActivityEntries.Add(ActivityMessages.HouseholdRenamed(householdId, previousName, household.Name));
+        }
+
         await db.SaveChangesAsync();
 
         return await GetHouseholdAsync(householdId, principal, db);
@@ -228,6 +247,11 @@ public static class HouseholdEndpoints
     private static async Task<IResult> SaveSettingsAsync(Guid householdId, HouseholdSettingsRequest request, ClaimsPrincipal principal, BudgetDbContext db)
     {
         var household = await db.Households.SingleAsync(h => h.Id == householdId);
+        if (household.TransfersEnabled != request.TransfersEnabled)
+        {
+            db.ActivityEntries.Add(ActivityMessages.TransfersTurned(householdId, request.TransfersEnabled));
+        }
+
         household.SetTransfersEnabled(request.TransfersEnabled);
         await db.SaveChangesAsync();
 

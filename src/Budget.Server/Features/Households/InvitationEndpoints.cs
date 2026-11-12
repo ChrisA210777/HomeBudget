@@ -3,6 +3,7 @@ using Budget.Domain.Households;
 using Budget.Domain.People;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.Activity;
 using Budget.Shared.Households;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -115,6 +116,9 @@ public static class InvitationEndpoints
         var (invitation, token) = Invitation.Create(
             householdId, email!, role, person?.Id, request.RequireEmailMatch, inviter.Id, inviter.DisplayName, now, protector.Protect);
         db.Invitations.Add(invitation);
+
+        // The email isn't kept in recent activity: it's only kept while the invitation is pending (ADR-015).
+        db.ActivityEntries.Add(ActivityMessages.MemberInvited(householdId, person?.DisplayName ?? "someone new", role));
         await db.SaveChangesAsync();
 
         var people = person is null ? new Dictionary<Guid, string>() : new Dictionary<Guid, string> { [person.Id] = person.DisplayName };
@@ -138,6 +142,10 @@ public static class InvitationEndpoints
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Can't revoke this invitation", detail: ex.Message);
         }
 
+        var invited = invitation.PersonId is { } personId
+            ? await db.People.IgnoreQueryFilters().Where(p => p.Id == personId).Select(p => p.DisplayName).FirstOrDefaultAsync()
+            : null;
+        db.ActivityEntries.Add(ActivityMessages.InvitationCancelled(householdId, invited ?? "someone new"));
         await db.SaveChangesAsync();
         return Results.NoContent();
     }
@@ -203,6 +211,7 @@ public static class InvitationEndpoints
         if (household.Members.All(m => m.UserId != user.Id))
         {
             household.AddMember(user.Id, invitation.Role, now);
+            db.ActivityEntries.Add(ActivityMessages.MemberJoined(household.Id, invitation.Role));
 
             // They become the Person they were invited as, or someone new (BUD-44).
             var person = invitation.PersonId is { } personId

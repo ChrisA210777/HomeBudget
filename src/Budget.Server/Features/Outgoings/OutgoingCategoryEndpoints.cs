@@ -1,5 +1,6 @@
 using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Shared.Households;
 using Budget.Shared.Outgoings;
@@ -45,6 +46,7 @@ public static class OutgoingCategoryEndpoints
         var last = await db.OutgoingCategories.MaxAsync(c => (int?)c.SortOrder) ?? 0;
         var category = OutgoingCategory.Create(householdId, request.Name, last + 10, request.Icon);
         db.OutgoingCategories.Add(category);
+        db.ActivityEntries.Add(ActivityMessages.CategoryAdded(householdId, category.Id, category.Name));
         await db.SaveChangesAsync();
 
         return Results.Created(
@@ -52,7 +54,7 @@ public static class OutgoingCategoryEndpoints
             new OutgoingCategorySummary(category.Id, category.Name, category.IsHidden, 0, category.Icon));
     }
 
-    private static async Task<IResult> UpdateAsync(Guid categoryId, UpdateCategoryRequest request, BudgetDbContext db)
+    private static async Task<IResult> UpdateAsync(Guid householdId, Guid categoryId, UpdateCategoryRequest request, BudgetDbContext db)
     {
         var category = await db.OutgoingCategories.SingleOrDefaultAsync(c => c.Id == categoryId);
         if (category is null)
@@ -66,6 +68,7 @@ public static class OutgoingCategoryEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        bool? hidden = request.IsHidden != category.IsHidden ? request.IsHidden : null;
         category.Rename(request.Name);
         if (request.Icon is not null)
         {
@@ -81,6 +84,7 @@ public static class OutgoingCategoryEndpoints
             category.Show();
         }
 
+        db.ActivityEntries.Add(ActivityMessages.CategoryUpdated(householdId, category.Id, category.Name, hidden));
         await db.SaveChangesAsync();
 
         var count = await db.Outgoings.CountAsync(o => o.CategoryId == categoryId);
@@ -90,7 +94,7 @@ public static class OutgoingCategoryEndpoints
     private static Dictionary<string, string[]> Merge(params IReadOnlyDictionary<string, string[]>[] errors) =>
         errors.SelectMany(e => e).ToDictionary(e => e.Key, e => e.Value);
 
-    private static async Task<IResult> DeleteAsync(Guid categoryId, BudgetDbContext db)
+    private static async Task<IResult> DeleteAsync(Guid householdId, Guid categoryId, BudgetDbContext db)
     {
         var category = await db.OutgoingCategories.SingleOrDefaultAsync(c => c.Id == categoryId);
         if (category is null)
@@ -108,6 +112,7 @@ public static class OutgoingCategoryEndpoints
         }
 
         db.OutgoingCategories.Remove(category);
+        db.ActivityEntries.Add(ActivityMessages.CategoryDeleted(householdId, category.Id, category.Name));
         await db.SaveChangesAsync();
         return Results.NoContent();
     }

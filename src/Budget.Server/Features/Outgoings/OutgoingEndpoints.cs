@@ -3,6 +3,7 @@ using Budget.Domain.Common;
 using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Accounts;
+using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Shared.Households;
 using Budget.Shared.Income;
@@ -392,6 +393,7 @@ public static class OutgoingEndpoints
         var schedule = new PaymentSchedule(request.Every, (PaymentUnit)request.Unit);
         var outgoing = Outgoing.Create(householdId, details, request.Amount!.Value, schedule, comment);
         db.Outgoings.Add(outgoing);
+        db.ActivityEntries.Add(ActivityMessages.OutgoingAdded(householdId, outgoing, request.Amount.Value, schedule));
         await db.SaveChangesAsync();
 
         return Results.Created(
