@@ -101,29 +101,33 @@ public static class HouseholdEndpoints
     /// <summary>Deletes a household and everything in it, in one transaction.</summary>
     public static async Task DeleteHouseholdAsync(BudgetDbContext db, Guid householdId)
     {
-        // Children first: income and outgoings refer to people and categories without cascading.
-        // Their own history (amounts, pauses, corrections) cascades in the database.
         var strategy = db.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
             await using var transaction = await db.Database.BeginTransactionAsync();
-
-            await db.Users
-                .Where(u => u.LastActiveHouseholdId == householdId)
-                .ExecuteUpdateAsync(u => u.SetProperty(x => x.LastActiveHouseholdId, (Guid?)null));
-            await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.Transfers.IgnoreQueryFilters().Where(t => t.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.IncomeStreams.IgnoreQueryFilters().Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.ParentAccountId != null).ExecuteDeleteAsync();
-            await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.OutgoingCategories.IgnoreQueryFilters().Where(c => c.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.Invitations.Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.HouseholdMembers.Where(m => m.HouseholdId == householdId).ExecuteDeleteAsync();
-            await db.Households.Where(h => h.Id == householdId).ExecuteDeleteAsync();
-
+            await DeleteHouseholdContentsAsync(db, householdId);
             await transaction.CommitAsync();
         });
+    }
+
+    /// <summary>Deletes a household and everything in it. The caller runs it in a transaction.</summary>
+    internal static async Task DeleteHouseholdContentsAsync(BudgetDbContext db, Guid householdId)
+    {
+        // Children first: income and outgoings refer to people and categories without cascading.
+        // Their own history (amounts, pauses, corrections) cascades in the database.
+        await db.Users
+            .Where(u => u.LastActiveHouseholdId == householdId)
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.LastActiveHouseholdId, (Guid?)null));
+        await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId).ExecuteDeleteAsync();
+        await db.Transfers.IgnoreQueryFilters().Where(t => t.HouseholdId == householdId).ExecuteDeleteAsync();
+        await db.IncomeStreams.IgnoreQueryFilters().Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
+        await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.ParentAccountId != null).ExecuteDeleteAsync();
+        await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ExecuteDeleteAsync();
+        await db.OutgoingCategories.IgnoreQueryFilters().Where(c => c.HouseholdId == householdId).ExecuteDeleteAsync();
+        await db.Invitations.Where(i => i.HouseholdId == householdId).ExecuteDeleteAsync();
+        await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId).ExecuteDeleteAsync();
+        await db.HouseholdMembers.Where(m => m.HouseholdId == householdId).ExecuteDeleteAsync();
+        await db.Households.Where(h => h.Id == householdId).ExecuteDeleteAsync();
     }
 
     private static async Task<IResult> ChangeRoleAsync(Guid householdId, Guid userId, ChangeRoleRequest request, BudgetDbContext db)

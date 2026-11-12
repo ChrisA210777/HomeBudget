@@ -3,6 +3,8 @@
 @using Budget.Shared.Account
 @inject UserSettingsStore Store
 @inject ISnackbar Snackbar
+@inject IAccountDeletionApi DeletionApi
+@inject NavigationManager Navigation
 
 <PageTitle>Settings · Home Budget</PageTitle>
 
@@ -60,6 +62,66 @@
 
         <MudText Typo="Typo.caption" Color="Color.Secondary">The Outgoings and Income pages also remember the last choice you made on them.</MudText>
     }
+
+    @* BUD-151: the right to erasure. Straight away, after the person types DELETE. *@
+    <MudPaper Outlined="true" Class="pa-4 mt-6 confirm-panel" data-testid="delete-account-section">
+        <h2 class="mud-typography mud-typography-subtitle1 mb-2" style="font-weight: 600">Delete my account</h2>
+        @if (_check is null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">Deletes your account and how you sign in. Households you share with other people keep their budgets.</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteForever" OnClick="StartDeleteAsync"
+                       Disabled="@(!Online || _busy)" data-testid="delete-account">Delete my account</MudButton>
+        }
+        else if (!_check.CanDelete)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2" data-testid="delete-account-blocked">
+                You own households that other people use. Before you can delete your account, make another Admin the owner of each one
+                (on its Members page), or delete it.
+            </MudAlert>
+            <ul class="mud-typography mud-typography-body2 pl-5 mb-3">
+                @foreach (var household in _check.HouseholdsToHandOn)
+                {
+                    <li data-testid="hand-on-household">@household.Name (@People(household.OtherMembers) besides you)</li>
+                }
+            </ul>
+            <MudButton Variant="Variant.Text" OnClick="CancelDelete" data-testid="delete-account-cancel">Cancel</MudButton>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-1">Deleting your account, straight away:</MudText>
+            <ul class="mud-typography mud-typography-body2 pl-5 mb-2" data-testid="delete-account-effects">
+                <li>deletes your account, how you sign in, and your settings</li>
+                @if (_check.HouseholdsToLeave > 0)
+                {
+                    <li data-testid="households-to-leave">
+                        takes you out of the @Households(_check.HouseholdsToLeave) you share. Their budgets stay, and so does your person in each,
+                        for the others to rename or delete
+                    </li>
+                }
+                @if (_check.HouseholdsToDelete.Count > 0)
+                {
+                    <li data-testid="households-to-delete">
+                        deletes @string.Join(", ", _check.HouseholdsToDelete.Select(h => h.Name)), which only you are in, with everything in them
+                    </li>
+                }
+                <li>shows "A former member" instead of your name in recent activity</li>
+            </ul>
+            <MudText Typo="Typo.body2" Class="mb-3">
+                This can't be undone. To keep a copy, download each household's data first from <MudLink Href="/household/data">Household data</MudLink>.
+            </MudText>
+            <MudTextField T="string" @bind-Value="_typed" Immediate="true" Label="@($"Type {DeleteAccountRequest.Expected} to confirm")" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Class="mb-3" autocomplete="off" data-testid="delete-account-confirm" />
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="delete-account-error">@_error</MudAlert>
+            }
+            <div class="d-flex gap-2 flex-wrap">
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteAsync"
+                           Disabled="@(_busy || !Online || !DeleteAccountRequest.IsConfirmed(_typed))" data-testid="delete-account-yes">Delete my account</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="CancelDelete" data-testid="delete-account-cancel">Cancel</MudButton>
+            </div>
+        }
+    </MudPaper>
 </MudContainer>
 
 @code {
@@ -71,6 +133,10 @@
         [DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday];
 
     private UserSettings? _settings;
+    private AccountDeletionCheck? _check;
+    private string? _typed;
+    private string? _error;
+    private bool _busy;
 
     protected override async Task OnInitializedAsync() => _settings = await Store.GetAsync();
 
@@ -91,4 +157,47 @@
     private static string PeriodName(ListPeriodDto period) => period == ListPeriodDto.Year ? "12 months" : "A month";
 
     private static string GroupingName(OutgoingsGroupingDto grouping) => grouping == OutgoingsGroupingDto.PaidFrom ? "Paid from" : "Category";
+
+    private async Task StartDeleteAsync()
+    {
+        _busy = true;
+        try
+        {
+            _check = await DeletionApi.CheckAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void CancelDelete()
+    {
+        _check = null;
+        _typed = null;
+        _error = null;
+    }
+
+    private async Task DeleteAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _error = await DeletionApi.DeleteAsync(_typed ?? string.Empty);
+            if (_error is null)
+            {
+                // Signed out by the server: start again on the sign-in page, which says the account has gone.
+                Navigation.NavigateTo(AccountRoutes.LoginPageAfterAccountDeleted, forceLoad: true);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Households(int count) => count == 1 ? "household" : $"{count} households";
+
+    private static string People(int count) => count == 1 ? "1 other person" : $"{count} other people";
 }

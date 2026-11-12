@@ -80,6 +80,16 @@ public sealed class LoginTests : IDisposable
     }
 
     [Fact]
+    public void Confirms_when_the_account_has_been_deleted()
+    {
+        Navigation.NavigateTo(Budget.Shared.AccountRoutes.LoginPageAfterAccountDeleted);
+
+        var cut = _context.RenderComponent<Login>();
+
+        Assert.Equal("Your account has been deleted.", cut.Find("[data-testid=account-deleted]").TextContent.Trim());
+    }
+
+    [Fact]
     public void Says_so_when_no_providers_are_configured()
     {
         _accountApi.Providers = [];

@@ -95,6 +95,7 @@ app.MapHealthChecks(ApiRoutes.Ready, DatabaseHealthCheck.Readiness);
 
 // Feature endpoints, one group per feature folder (see ADR-004).
 app.MapAccountEndpoints();
+app.MapAccountDeletionEndpoints();
 if (TestSignInEndpoint.IsEnabled(app.Environment, app.Configuration))
 {
     app.MapTestSignIn();

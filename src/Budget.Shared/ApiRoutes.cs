@@ -48,6 +48,12 @@ public static class AccountRoutes
     /// <summary>GET: the signed-in user's settings. PUT: change some of them (BUD-87).</summary>
     public const string Settings = "/bff/user/settings";
 
+    /// <summary>GET: what deleting the signed-in user's account would do (BUD-151).</summary>
+    public const string AccountDeletion = "/bff/user/deletion";
+
+    /// <summary>POST <c>DeleteAccountRequest</c>: deletes the signed-in user's account and signs them out (BUD-151).</summary>
+    public const string DeleteAccount = "/bff/user/delete";
+
     /// <summary>POST: signs out by clearing the session cookie. Returns 204.</summary>
     public const string Logout = "/bff/logout";
 
@@ -61,6 +67,9 @@ public static class AccountRoutes
 
     /// <summary>The sign-in page, confirming the person has signed out.</summary>
     public const string LoginPageAfterSignOut = LoginPage + "?signedOut=true";
+
+    /// <summary>The sign-in page, confirming the person's account has been deleted (BUD-151).</summary>
+    public const string LoginPageAfterAccountDeleted = LoginPage + "?accountDeleted=true";
 }
 
 /// <summary>Values of the <c>error</c> query parameter on the sign-in page.</summary>
