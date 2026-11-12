@@ -124,8 +124,17 @@ public class PersonRemovalApiTests(BudgetApiFactory factory) : IntegrationTestBa
         var (_, householdId) = await CreateHouseholdOwnerAsync();
         var (sam, _, _) = await SetUpSamAsync(householdId);
 
-        await AssertMinimumRoleAsync(HttpMethod.Post, h => PeopleRoutes.Removal(h, sam), HouseholdRole.Admin, () => new RemovePersonRequest());
+        // Sam belongs to this household, so the shared role check (which makes its own household) can't be used.
+        foreach (var role in new[] { HouseholdRole.Viewer, HouseholdRole.User })
+        {
+            using var member = CreateClient(signedInAs: await AddMemberAsync(householdId, role, $"{role} member"));
+            using var check = await member.GetAsync(Url(PeopleRoutes.Removal(householdId, sam)));
+            using var remove = await member.PostAsJsonAsync(Url(PeopleRoutes.Removal(householdId, sam)), new RemovePersonRequest { Income = RemovalChoices.Delete, Outgoings = RemovalChoices.Delete });
+            Assert.Equal((HttpStatusCode.Forbidden, HttpStatusCode.Forbidden), (check.StatusCode, remove.StatusCode));
+        }
+
         await AssertOtherHouseholdsCannotAccessAsync(HttpMethod.Get, h => PeopleRoutes.Removal(h, sam));
+        await ExecuteDbContextAsync(async db => Assert.True(await db.People.IgnoreQueryFilters().AnyAsync(p => p.Id == sam)));
     }
 
     /// <summary>Sam, who doesn't sign in, has a paper round, a phone bill and a gym membership, and a savings account.</summary>
