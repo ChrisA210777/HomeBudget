@@ -1,0 +1,4 @@
+# ZAP alerts of medium or high risk that have been looked at and accepted (BUD-145).
+# The scan fails on any other medium or high alert. One line per rule: the ZAP rule id, its name, and why it's accepted.
+# Keep the reason specific, and remove the line when the cause is fixed.
+# rule id	name	reason
