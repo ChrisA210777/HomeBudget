@@ -18,7 +18,7 @@ test('someone new accepts the terms first, then carries on to where they were go
 
   await expect(page).toHaveURL(/\/terms\/accept\?returnUrl=%2Fbudget$/);
   await expect(page.getByTestId('accept-terms')).toBeDisabled();
-  await page.getByTestId('accept-agree').getByRole('checkbox').check();
+  await page.getByRole('checkbox', { name: /I'm 18 or over/ }).check();
   await page.getByTestId('accept-terms').click();
 
   await expect(page).toHaveURL(/\/budget$/);

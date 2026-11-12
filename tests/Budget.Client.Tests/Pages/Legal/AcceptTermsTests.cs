@@ -35,7 +35,7 @@ public sealed class AcceptTermsTests : IDisposable
         Assert.Contains("Version " + LegalDocuments.TermsVersion, cut.Find("[data-testid=legal-version]").TextContent, StringComparison.Ordinal);
         Assert.True(cut.Find("[data-testid=accept-terms]").HasAttribute("disabled"));
 
-        cut.Find("[data-testid=accept-agree] input").Change(true);
+        cut.Find("input[type=checkbox]").Change(true);
         cut.Find("[data-testid=accept-terms]").Click();
 
         cut.WaitForAssertion(() => Assert.Equal(LegalDocuments.TermsVersion, _terms.Accepted));
@@ -53,7 +53,7 @@ public sealed class AcceptTermsTests : IDisposable
         navigation.NavigateTo("/terms/accept?returnUrl=" + Uri.EscapeDataString(returnUrl));
         var cut = _context.RenderComponent<AcceptTerms>();
 
-        cut.Find("[data-testid=accept-agree] input").Change(true);
+        cut.Find("input[type=checkbox]").Change(true);
         cut.Find("[data-testid=accept-terms]").Click();
 
         cut.WaitForAssertion(() => Assert.Equal("http://localhost/", navigation.Uri));
