@@ -6,9 +6,12 @@ The CI `security-scan` job (BUD-145, part of the OWASP review in BUD-74) runs
 1. It publishes the app and runs it in the Testing environment against a throwaway SQL Server, as the end-to-end
    tests do.
 2. It signs in with the test sign-in and gives ZAP the session cookie, so every request ZAP makes is signed in.
-3. ZAP crawls the app, with a browser as well (`-j`), so it sees the Blazor pages and the API calls they make. The
+3. ZAP scans the app as `https://budget.test:7180` (mapped to the same machine) rather than `localhost`, because
+   `localhost` is treated specially and doesn't get the Strict-Transport-Security header a deployed app sends.
+4. ZAP crawls the app, with a browser as well (`-j`), so it sees the Blazor pages and the API calls they make. The
    baseline scan is **passive**: it reads the responses (headers, cookies, content) and doesn't attack the app.
-4. `check-zap-report.py` reads the report. The job fails on any **medium or high** alert that isn't listed in
+5. The job checks the scan reached the household API (so it was signed in), and lists the endpoints it requested.
+6. `check-zap-report.py` reads the report. The job fails on any **medium or high** alert that isn't listed in
    `zap-accepted.tsv`. Low and informational alerts are listed in the job summary but don't fail it.
 
 The HTML and JSON reports are kept as the `zap-report` artifact on each run.
@@ -19,7 +22,10 @@ Open the job summary (or the `zap-report` artifact) to see the alert, its rule i
 
 - **Fix it**, which is almost always the right answer; or
 - **Accept it**, by adding a line to `zap-accepted.tsv`: the rule id, the alert's name, and a specific reason, separated
-  by tabs. Mention it in the pull request so the owner agrees. Remove the line when the cause is fixed.
+  by tabs. Mention it in the pull request so the owner agrees, and record it on the **Security Findings & Accepted
+  Risks** page in Confluence (space SD). Remove both when the cause is fixed.
+
+Low and informational alerts that have been looked at, and why no change was made, are on the same Confluence page.
 
 ## Running it locally
 

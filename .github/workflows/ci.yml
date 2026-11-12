@@ -243,12 +243,16 @@ jobs:
       - name: Run the ZAP baseline scan
         env:
           SESSION_COOKIE: ${{ steps.sign-in.outputs.cookie }}
+          SCAN_URL: https://budget.test:7180
         run: |
           mkdir -p zap && chmod 777 zap
           # Every request ZAP makes carries the signed-in cookie, so it sees the pages and API as a member would.
           # -j crawls with a browser as well; -I leaves deciding pass or fail to check-zap-report.py.
-          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t "$APP_URL" -j -m 3 -I -J report.json -r report.html \
+          # Scanned as budget.test rather than localhost: the app (like browsers) treats localhost as a special case and
+          # leaves out Strict-Transport-Security there, so a real host name shows the headers a deployed app sends.
+          docker run --rm --network host --add-host budget.test:127.0.0.1 -v "$PWD/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t "$SCAN_URL" -j -m 3 -I -J report.json -r report.html \
             -z "-config replacer.full_list(0).description=signed-in \
                 -config replacer.full_list(0).enabled=true \
                 -config replacer.full_list(0).matchtype=REQ_HEADER \
@@ -260,8 +264,8 @@ jobs:
       - name: Check the scan reached the API signed in
         run: |
           # Ids are replaced, so the list shows which endpoints were scanned rather than every household.
-          grep -oE "Request starting HTTP/[0-9.]+ [A-Z]+ https://localhost:7180/(api|bff)/[^ ]*" artifacts/server.log \
-            | sed -E 's#https://localhost:7180##; s#[0-9a-f]{8}-[0-9a-f-]{27}#{id}#g; s#\?.*##' | sort | uniq -c | sort -rn > zap/api-requests.txt || true
+          grep -oE "Request starting HTTP/[0-9.]+ [A-Z]+ https://[^/ ]+/(api|bff)/[^ ]*" artifacts/server.log \
+            | sed -E 's#https://[^/]+##; s#[0-9a-f]{8}-[0-9a-f-]{27}#{id}#g; s#\?.*##' | sort | uniq -c | sort -rn > zap/api-requests.txt || true
           echo "API endpoints the scan requested:"; cat zap/api-requests.txt
           if ! grep -q "/api/households/" zap/api-requests.txt; then
             echo "::error::The scan didn't reach the household API, so it probably wasn't signed in."
