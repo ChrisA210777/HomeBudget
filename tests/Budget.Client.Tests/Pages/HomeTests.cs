@@ -1,10 +1,12 @@
 using Budget.Client.Account;
+using Budget.Client.Activity;
 using Budget.Client.Budgeting;
 using Budget.Client.Households;
 using Budget.Client.Outgoings;
 using Budget.Client.Pages;
 using Budget.Client.Tests.TestDoubles;
 using Budget.Shared.Account;
+using Budget.Shared.Activity;
 using Budget.Shared.Households;
 using Budget.Shared.Outgoings;
 using Bunit.TestDoubles;
@@ -21,6 +23,7 @@ public sealed class HomeTests : IDisposable
     private readonly FakeHouseholdApi _householdApi = new();
     private readonly FakeBudgetApi _budgetApi = new();
     private readonly FakeRenewalApi _renewalApi = new();
+    private readonly FakeActivityApi _activityApi = new();
 
     public HomeTests()
     {
@@ -29,6 +32,8 @@ public sealed class HomeTests : IDisposable
         _context.Services.AddSingleton<IHouseholdApi>(_householdApi);
         _context.Services.AddSingleton<IBudgetApi>(_budgetApi);
         _context.Services.AddSingleton<IRenewalApi>(_renewalApi);
+        _context.Services.AddSingleton<IActivityApi>(_activityApi);
+        _context.Services.AddSingleton<TimeProvider>(new FixedClock(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero)));
         _context.Services.AddScoped<UserSession>();
         _context.JSInterop.Mode = JSRuntimeMode.Loose;
         _context.AddTestAuthorization().SetAuthorized("Chris Austin");
@@ -45,6 +50,41 @@ public sealed class HomeTests : IDisposable
         Assert.Equal("£1,290.00", cut.Find("[data-testid=home-left]").TextContent.Trim());
         Assert.Contains("£3,000.00 in, £1,710.00 out", cut.Find("[data-testid=budget-card]").TextContent, StringComparison.Ordinal);
         Assert.Equal((null, null), _budgetApi.Requests.Single());
+    }
+
+    [Fact]
+    public void Recent_activity_shows_the_latest_changes_with_who_and_when()
+    {
+        var householdId = Guid.NewGuid();
+        var netflix = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", "Viewer", IsOwner: false));
+        _activityApi.Response = new ActivityResponse("GBP",
+        [
+            new(Guid.NewGuid(), new DateTimeOffset(2026, 11, 12, 9, 30, 0, TimeSpan.Zero), "Chris", "paused Netflix from 1 Dec 2026", ActivityAreaDto.Outgoings, netflix, Exists: true),
+            new(Guid.NewGuid(), new DateTimeOffset(2026, 11, 11, 18, 5, 0, TimeSpan.Zero), "Sam", "added a new yearly bill: Car insurance, {{480.00}}", ActivityAreaDto.Outgoings, Guid.NewGuid(), Exists: false),
+        ]);
+
+        var cut = _context.RenderComponent<Home>();
+
+        // BUD-139: the 5 most recent from the last week, linked to the item while it exists, with money in the household's currency.
+        Assert.Equal((5, 7), _activityApi.Requests.Single());
+        Assert.Equal(
+            new[] { "Chris paused Netflix from 1 Dec 2026", "Sam added a new yearly bill: Car insurance, £480.00" },
+            cut.FindAll("[data-testid=activity-text]").Select(e => e.TextContent.Trim()));
+        Assert.StartsWith($"/outgoings/{netflix}", cut.Find("a[data-testid=activity-text]").GetAttribute("href"), StringComparison.Ordinal);
+        Assert.Single(cut.FindAll("a[data-testid=activity-text]"));
+        Assert.Empty(cut.FindAll("[data-testid=no-activity]"));
+    }
+
+    [Fact]
+    public void Recent_activity_says_so_when_nothing_has_changed()
+    {
+        var householdId = Guid.NewGuid();
+        _accountApi.User = UserWith(householdId, new HouseholdMembershipSummary(householdId, "My Household", "Admin", IsOwner: true));
+
+        var cut = _context.RenderComponent<Home>();
+
+        Assert.Equal("No recent activity", cut.Find("[data-testid=no-activity]").TextContent.Trim());
     }
 
     [Fact]
@@ -354,6 +394,19 @@ public sealed class HomeTests : IDisposable
             return Task.FromResult(ConflictName is { } current
                 ? new RenameHouseholdResult(null, noErrors, current)
                 : new RenameHouseholdResult(new HouseholdResponse(householdId, request.Name.Trim(), "GBP", "Admin", true, 1), noErrors));
+        }
+    }
+
+    private sealed class FakeActivityApi : IActivityApi
+    {
+        public ActivityResponse Response { get; set; } = new("GBP", []);
+
+        public List<(int Take, int? Days)> Requests { get; } = [];
+
+        public Task<ActivityResponse> GetAsync(Guid householdId, int take, int? days = null, DateTimeOffset? before = null)
+        {
+            Requests.Add((take, days));
+            return Task.FromResult(Response);
         }
     }
 

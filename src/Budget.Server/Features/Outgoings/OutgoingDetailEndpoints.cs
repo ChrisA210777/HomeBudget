@@ -1,8 +1,10 @@
+using Budget.Domain.Activity;
 using Budget.Domain.Common;
 using Budget.Domain.Outgoings;
 using Budget.Infrastructure.Persistence;
 using Budget.Infrastructure.Persistence.Configurations;
 using Budget.Server.Features.Accounts;
+using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Shared.Outgoings;
 using Microsoft.AspNetCore.Mvc;
@@ -62,7 +64,12 @@ internal static class OutgoingDetailEndpoints
 
         // A new account name adds the account, or a pot in one (BUD-89). Saved with the change, or not at all.
         var accounts = await AccountDirectory.LoadAsync(db, householdId);
+
+        // Moving the renewal date on is recorded as renewing it (BUD-139).
+        DateOnly? renewed = null;
         return await ChangeAsync(db, householdId, outgoingId, request.Version, errors, time, errorKey: nameof(request.RenewalDate), outgoing =>
+        {
+            renewed = request.RenewalDate is { } next && outgoing.RenewalDate is { } previous && next > previous ? next : null;
             outgoing.UpdateDetails(new OutgoingDetails
             {
                 Name = request.Name,
@@ -84,10 +91,11 @@ internal static class OutgoingDetailEndpoints
                 Website = request.Website,
                 ContactPhone = request.ContactPhone,
                 Notes = request.Notes,
-            }));
+            });
+        }, outgoing => renewed is { } next ? ActivityMessages.OutgoingRenewed(householdId, outgoing, next) : ActivityMessages.OutgoingUpdated(householdId, outgoing));
     }
 
-    private static async Task<IResult> DeleteAsync(Guid outgoingId, BudgetDbContext db)
+    private static async Task<IResult> DeleteAsync(Guid householdId, Guid outgoingId, BudgetDbContext db)
     {
         var outgoing = await db.Outgoings.SingleOrDefaultAsync(o => o.Id == outgoingId);
         if (outgoing is null)
@@ -96,6 +104,7 @@ internal static class OutgoingDetailEndpoints
         }
 
         db.Outgoings.Remove(outgoing);
+        db.ActivityEntries.Add(ActivityMessages.OutgoingDeleted(householdId, outgoing));
         await db.SaveChangesAsync();
         return Results.NoContent();
     }
@@ -106,19 +115,22 @@ internal static class OutgoingDetailEndpoints
         Guid householdId, Guid outgoingId, SaveOutgoingAmountRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, outgoingId, request.Version, Errors(OutgoingValidator.Validate(request, isCorrection: false)), time,
             errorKey: nameof(request.EffectiveFrom),
-            outgoing => outgoing.ChangeAmount(request.EffectiveFrom!.Value, request.Amount!.Value, Schedule(request), request.Comment));
+            outgoing => outgoing.ChangeAmount(request.EffectiveFrom!.Value, request.Amount!.Value, Schedule(request), request.Comment),
+            outgoing => ActivityMessages.OutgoingAmountChanged(householdId, outgoing, request.Amount!.Value, Schedule(request), request.EffectiveFrom!.Value));
 
     private static Task<IResult> CorrectAmountChangeAsync(
         Guid householdId, Guid outgoingId, Guid entryId, SaveOutgoingAmountRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, outgoingId, request.Version, Errors(OutgoingValidator.Validate(request, isCorrection: true)), time,
             errorKey: nameof(request.EffectiveFrom),
-            outgoing => outgoing.CorrectAmountChange(entryId, request.EffectiveFrom!.Value, request.Amount!.Value, Schedule(request), request.Comment, request.CorrectionReason!));
+            outgoing => outgoing.CorrectAmountChange(entryId, request.EffectiveFrom!.Value, request.Amount!.Value, Schedule(request), request.Comment, request.CorrectionReason!),
+            outgoing => ActivityMessages.OutgoingCorrected(householdId, outgoing, "an amount", request.CorrectionReason!));
 
     private static Task<IResult> DeleteAmountChangeAsync(
         Guid householdId, Guid outgoingId, Guid entryId, [FromBody] DeleteOutgoingEntryRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, outgoingId, request.Version, Errors(OutgoingValidator.Validate(request)), time,
             errorKey: nameof(request.Reason),
-            outgoing => outgoing.DeleteAmountChange(entryId, request.Reason));
+            outgoing => outgoing.DeleteAmountChange(entryId, request.Reason),
+            outgoing => ActivityMessages.OutgoingEntryDeleted(householdId, outgoing, "an amount", request.Reason));
 
     // ---- Pauses and ending ----
 
@@ -137,7 +149,10 @@ internal static class OutgoingDetailEndpoints
                 {
                     outgoing.Pause(start, ResumesOn(outgoing, request), request.Comment);
                 }
-            });
+            },
+            outgoing => request.Reason == OutgoingStatusReasonDto.Ended
+                ? ActivityMessages.OutgoingEnded(householdId, outgoing, request.StartDate!.Value)
+                : ActivityMessages.OutgoingPaused(householdId, outgoing, request.StartDate!.Value, ResumesAfterPause(outgoing, request.StartDate!.Value)));
 
     private static Task<IResult> CorrectStatusPeriodAsync(
         Guid householdId, Guid outgoingId, Guid entryId, SaveOutgoingStatusRequest request, BudgetDbContext db, TimeProvider time) =>
@@ -149,17 +164,23 @@ internal static class OutgoingDetailEndpoints
                 request.StartDate!.Value,
                 request.Reason == OutgoingStatusReasonDto.Ended ? null : ResumesOn(outgoing, request),
                 request.Comment,
-                request.CorrectionReason!));
+                request.CorrectionReason!),
+            outgoing => ActivityMessages.OutgoingCorrected(householdId, outgoing, request.Reason == OutgoingStatusReasonDto.Ended ? "its end" : "a pause", request.CorrectionReason!));
 
     private static Task<IResult> DeleteStatusPeriodAsync(
         Guid householdId, Guid outgoingId, Guid entryId, [FromBody] DeleteOutgoingEntryRequest request, BudgetDbContext db, TimeProvider time) =>
         ChangeAsync(db, householdId, outgoingId, request.Version, Errors(OutgoingValidator.Validate(request)), time,
             errorKey: nameof(request.Reason),
-            outgoing => outgoing.DeleteStatusPeriod(entryId, request.Reason));
+            outgoing => outgoing.DeleteStatusPeriod(entryId, request.Reason),
+            outgoing => ActivityMessages.OutgoingEntryDeleted(householdId, outgoing, "a pause or end", request.Reason));
 
     // ---- Helpers ----
 
     private static PaymentSchedule Schedule(SaveOutgoingAmountRequest request) => new(request.Every, (PaymentUnit)request.Unit);
+
+    /// <summary>When the pause starting on <paramref name="start"/> ends, if it does.</summary>
+    private static DateOnly? ResumesAfterPause(Outgoing outgoing, DateOnly start) =>
+        outgoing.StatusPeriods.FirstOrDefault(p => p.Reason == OutgoingStatusReason.Paused && p.StartDate == start)?.ResumesOn;
 
     private static DateOnly? ResumesOn(Outgoing outgoing, SaveOutgoingStatusRequest request)
     {
@@ -192,7 +213,8 @@ internal static class OutgoingDetailEndpoints
         Dictionary<string, string[]> errors,
         TimeProvider time,
         string errorKey,
-        Action<Outgoing> change)
+        Action<Outgoing> change,
+        Func<Outgoing, ActivityEntry> activity)
     {
         var outgoing = await Load(db).SingleOrDefaultAsync(o => o.Id == outgoingId);
         if (outgoing is null)
@@ -227,6 +249,9 @@ internal static class OutgoingDetailEndpoints
         {
             return Results.ValidationProblem(new Dictionary<string, string[]> { [errorKey] = [ex.Message] });
         }
+
+        // Recent activity (BUD-139), saved with the change.
+        db.ActivityEntries.Add(activity(outgoing));
 
         // Saving the outgoing itself (even when only its history changed) checks and bumps its version.
         var entry = db.Entry(outgoing);

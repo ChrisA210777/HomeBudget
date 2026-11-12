@@ -1,6 +1,7 @@
 using Budget.Client;
 using Budget.Client.Account;
 using Budget.Client.Accounts;
+using Budget.Client.Activity;
 using Budget.Client.Budgeting;
 using Budget.Client.CashFlow;
 using Budget.Client.Households;
@@ -40,6 +41,7 @@ builder.Services.AddScoped<ICashFlowApi, CashFlowApi>();
 builder.Services.AddScoped<IInvitationApi, InvitationApi>();
 builder.Services.AddScoped<ISharing, Sharing>();
 builder.Services.AddScoped<IRenewalApi, RenewalApi>();
+builder.Services.AddScoped<IActivityApi, ActivityApi>();
 builder.Services.AddScoped<IBudgetApi, BudgetApi>();
 builder.Services.AddScoped<Budget.Client.DataExport.IImportApi, Budget.Client.DataExport.ImportApi>();
 builder.Services.AddSingleton(TimeProvider.System);

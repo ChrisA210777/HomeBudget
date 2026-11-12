@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
         services.AddScoped<AuditingInterceptor>();
+        services.AddScoped<ActivityInterceptor>();
         services.AddScoped<CurrentHousehold>();
         services.AddScoped<ICurrentHousehold>(sp => sp.GetRequiredService<CurrentHousehold>());
 
@@ -40,7 +41,9 @@ public static class DependencyInjection
             }
 
             options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure());
-            options.AddInterceptors(serviceProvider.GetRequiredService<AuditingInterceptor>());
+            options.AddInterceptors(
+                serviceProvider.GetRequiredService<AuditingInterceptor>(),
+                serviceProvider.GetRequiredService<ActivityInterceptor>());
         });
 
         services.AddIdentityCore<ApplicationUser>()

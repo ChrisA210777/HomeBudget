@@ -1,8 +1,10 @@
 @page "/"
 @attribute [Authorize]
+@using Budget.Client.Activity
 @using Budget.Client.Budgeting
 @using Budget.Client.Households
 @using Budget.Client.Outgoings
+@using Budget.Shared.Activity
 @using Budget.Shared.Budgeting
 @using Budget.Shared.Households
 @using Budget.Shared.Income
@@ -11,6 +13,8 @@
 @inject IHouseholdApi HouseholdApi
 @inject IBudgetApi BudgetApi
 @inject IRenewalApi RenewalApi
+@inject IActivityApi ActivityApi
+@inject TimeProvider Time
 @inject IJSRuntime JS
 
 <PageTitle>Home Budget</PageTitle>
@@ -171,6 +175,37 @@
                     </MudCard>
                 </MudItem>
             }
+            @* What's been changed lately, and by whom (BUD-139). *@
+            <MudItem xs="12">
+                <MudCard Outlined="true" data-testid="activity-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" Class="mr-1" aria-hidden="true" />Recent activity</MudText>
+                        @if (_activity is { Items.Count: 0 })
+                        {
+                            <MudText Typo="Typo.body2" data-testid="no-activity">No recent activity</MudText>
+                        }
+                        else if (_activity is not null)
+                        {
+                            <ul class="plain-list" aria-label="Recent activity">
+                                @foreach (var item in _activity.Items)
+                                {
+                                    <li class="py-2 activity-row" data-testid="activity">
+                                        @if (ActivityFormat.Link(item) is { } link)
+                                        {
+                                            <MudLink Href="@BackLink.To(link, "/")" Typo="Typo.body1" Class="activity-text" data-testid="activity-text">@ActivityFormat.Sentence(item, _activity.CurrencyCode)</MudLink>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.body1" Class="activity-text" data-testid="activity-text">@ActivityFormat.Sentence(item, _activity.CurrencyCode)</MudText>
+                                        }
+                                        <MudText Typo="Typo.caption" Class="activity-when text-nowrap" data-testid="activity-when">@ActivityFormat.When(item.At, Time.GetUtcNow())</MudText>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
         </MudGrid>
     }
 </MudContainer>
@@ -205,6 +240,7 @@
     private bool _peopleStepDismissed;
     private BudgetMonthResponse? _budget;
     private IReadOnlyList<RenewalComingUp>? _renewals;
+    private ActivityResponse? _activity;
 
     protected override async Task OnInitializedAsync()
     {
@@ -213,10 +249,12 @@
         {
             var budget = BudgetApi.GetMonthAsync(_household.HouseholdId);
             var renewals = RenewalApi.ComingUpAsync(_household.HouseholdId);
+            var activity = ActivityApi.GetAsync(_household.HouseholdId, take: 5, days: 7);
             var setup = _household.Role == "Viewer" ? null : HouseholdApi.GetSetupAsync(_household.HouseholdId);
             _peopleStepDismissed = await IsPeopleStepDismissedAsync();
             _budget = await budget;
             _renewals = await renewals;
+            _activity = await activity;
             _setup = setup is null ? null : await setup;
         }
 

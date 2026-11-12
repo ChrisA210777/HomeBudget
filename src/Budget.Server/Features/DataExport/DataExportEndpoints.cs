@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Budget.Domain.Households;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Shared.DataExport;
 using Budget.Shared.Households;
@@ -174,6 +175,7 @@ public static class DataExportEndpoints
         db.Accounts.AddRange(plan.Accounts);
         db.Outgoings.AddRange(plan.Outgoings);
         db.Transfers.AddRange(plan.Transfers);
+        db.ActivityEntries.Add(ActivityMessages.Imported(household.Id, replaced: false));
         user.LastActiveHouseholdId = household.Id;
 
         // One save, so it's all or nothing.
@@ -217,6 +219,7 @@ public static class DataExportEndpoints
         }
 
         // Two saves in one transaction: the old data goes first, so the new can reuse its names.
+        var imported = ActivityMessages.Imported(householdId, replaced: true);
         var strategy = db.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
@@ -249,6 +252,7 @@ public static class DataExportEndpoints
             db.Accounts.AddRange(plan.Accounts);
             db.Outgoings.AddRange(plan.Outgoings);
             db.Transfers.AddRange(plan.Transfers);
+            db.ActivityEntries.Add(imported);
             await db.SaveChangesAsync();
 
             await transaction.CommitAsync();

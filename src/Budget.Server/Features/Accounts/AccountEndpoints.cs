@@ -1,5 +1,6 @@
 using Budget.Domain.Accounts;
 using Budget.Infrastructure.Persistence;
+using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
 using Budget.Shared.Accounts;
 using Budget.Shared.Households;
@@ -98,6 +99,8 @@ public static class AccountEndpoints
             ? Account.Create(householdId, request.Name, request.OwnerPersonId, request.Provider)
             : Account.CreatePot(parent, request.Name);
         db.Accounts.Add(account);
+        db.ActivityEntries.Add(ActivityMessages.AccountAdded(
+            householdId, account.Id, parent is null ? account.Name : $"{parent.Name} › {account.Name}", isPot: parent is not null));
         await db.SaveChangesAsync();
         return Results.Created(HouseholdAccountRoutes.Account(householdId, account.Id), (await SummariesAsync(householdId, db)).Single(a => a.Id == account.Id));
     }
@@ -121,6 +124,7 @@ public static class AccountEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        var monthStartChanged = !account.IsPot && account.MonthStartsWithId != request.MonthStartsWithId;
         if (!account.IsPot)
         {
             account.StartMonthWith(request.MonthStartsWithId);
@@ -134,6 +138,10 @@ public static class AccountEndpoints
             pot.FollowOwner(owner);
         }
 
+        var shownAs = directory.Find(account.ParentAccountId) is { } potOf ? $"{potOf.Name} › {account.Name}" : account.Name;
+        db.ActivityEntries.Add(monthStartChanged
+            ? ActivityMessages.AccountMonthStart(householdId, account.Id, shownAs, await PaymentNameAsync(request.MonthStartsWithId, directory, db))
+            : ActivityMessages.AccountUpdated(householdId, account.Id, shownAs));
         await db.SaveChangesAsync();
         return Results.Ok((await SummariesAsync(householdId, db)).Single(a => a.Id == account.Id));
     }
@@ -155,8 +163,22 @@ public static class AccountEndpoints
         }
 
         account.StartMonthWith(request.MonthStartsWithId);
+        db.ActivityEntries.Add(ActivityMessages.AccountMonthStart(
+            householdId, account.Id, account.Name, await PaymentNameAsync(request.MonthStartsWithId, directory, db)));
         await db.SaveChangesAsync();
         return Results.Ok((await SummariesAsync(householdId, db)).Single(a => a.Id == account.Id));
+    }
+
+    /// <summary>The name of the income or transfer an account's month starts with, for recent activity.</summary>
+    private static async Task<string?> PaymentNameAsync(Guid? paymentId, AccountDirectory directory, BudgetDbContext db)
+    {
+        if (paymentId is not { } id)
+        {
+            return null;
+        }
+
+        var income = await db.IncomeStreams.Where(i => i.Id == id).Select(i => i.Name).FirstOrDefaultAsync();
+        return income ?? (await db.Transfers.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id) is { } transfer ? MonthStarts.Name(transfer, directory) : null);
     }
 
     private static async Task<bool> IsMonthStartOptionAsync(Account account, Guid paymentId, AccountDirectory directory, BudgetDbContext db)
@@ -183,6 +205,7 @@ public static class AccountEndpoints
             account.Restore();
         }
 
+        db.ActivityEntries.Add(ActivityMessages.AccountArchived(householdId, account.Id, directory.DisplayName(account.Id)!, archived));
         await db.SaveChangesAsync();
         return Results.Ok(await SummariesAsync(householdId, db));
     }
@@ -237,6 +260,7 @@ public static class AccountEndpoints
             });
         }
 
+        db.ActivityEntries.Add(ActivityMessages.AccountMerged(householdId, target.Id, directory.DisplayName(source.Id)!, directory.DisplayName(target.Id)!));
         source.Archive();
         if (target.IsArchived)
         {
