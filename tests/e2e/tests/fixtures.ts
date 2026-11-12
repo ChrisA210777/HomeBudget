@@ -1,16 +1,21 @@
-import { test as base } from '@playwright/test';
+import { expect as baseExpect, test as base } from '@playwright/test';
 
 export { expect } from '@playwright/test';
 
 /**
  * The standard test, plus: when a test fails, print what the browser reported (console errors,
- * uncaught exceptions, failed requests) so the CI log explains the failure on its own.
+ * uncaught exceptions, failed requests) so the CI log explains the failure on its own. Every test also fails if the
+ * browser blocked anything under the Content Security Policy (BUD-143), so the whole suite checks the policy.
  */
 export const test = base.extend<{ browserDiagnostics: void }>({
   browserDiagnostics: [
     async ({ page }, use, testInfo) => {
       const lines: string[] = [];
+      const blocked: string[] = [];
       page.on('console', message => {
+        if (message.text().includes('Content Security Policy')) {
+          blocked.push(message.text());
+        }
         if (message.type() === 'error' || message.type() === 'warning') {
           lines.push(`console.${message.type()}: ${message.text()}`);
         }
@@ -28,6 +33,8 @@ export const test = base.extend<{ browserDiagnostics: void }>({
       if (testInfo.status !== testInfo.expectedStatus) {
         console.log(`\n--- Browser diagnostics for "${testInfo.title}" [${testInfo.project.name}] ---\n${lines.slice(0, 40).join('\n') || '(none)'}\nURL: ${page.url()}\nBody: ${(await page.locator('body').innerText().catch(() => '')).slice(0, 500)}\n---`);
       }
+
+      baseExpect(blocked, 'The Content Security Policy blocked something').toEqual([]);
     },
     { auto: true },
   ],

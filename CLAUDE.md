@@ -43,6 +43,9 @@ than replacing the whole page, so nothing is lost.
 - Each change goes on its own branch with a pull request. CI (build, tests, end-to-end) runs on the PR; the owner
   merges.
 - Secrets never go in the repo: user secrets locally, GitHub secrets for Azure.
+- The Content Security Policy (`Hosting/SecurityHeaders.cs`) allows only the app's own files: no inline scripts or
+  event handlers, and no scripts, fonts, images or API calls from other sites. Put scripts in `wwwroot/js`; if something
+  truly needs another origin, change the policy deliberately and say why. Every e2e test fails on a policy violation.
 - Server code is organised by feature; see `src/Budget.Server/Features/README.md`.
 - Styles for one page or component go in its own scoped `.razor.css` file (use `::deep` for MudBlazor's elements).
   `wwwroot/css/app.css` is only for app-wide rules, so features don't all add to the end of one file.

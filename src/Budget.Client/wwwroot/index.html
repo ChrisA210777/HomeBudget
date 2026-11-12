@@ -16,7 +16,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Budget" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+    <link href="css/fonts.css" rel="stylesheet" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
     <link href="Budget.Client.styles.css" rel="stylesheet" />
@@ -35,13 +35,7 @@
 
     <script src="_framework/blazor.webassembly.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
-    <script>
-        // Caches the app shell so it opens offline and can be installed (BUD-37, BUD-38).
-        // The page listens for updates once the app has started (js/pwa.js).
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });
-        }
-    </script>
+    <script src="js/register-service-worker.js"></script>
 </body>
 
 </html>
