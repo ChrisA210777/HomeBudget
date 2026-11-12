@@ -14,6 +14,17 @@ test('shows the household in the app bar and navigation that suits the screen', 
   }
 });
 
+test('the first item in the side menu has space above it, like the other groups', async ({ page }, testInfo) => {
+  test.skip(isPhone(testInfo), 'Phones use the bottom bar.');
+  await signIn(page);
+
+  const appBar = await page.locator('.mud-appbar').boundingBox();
+  const home = await page.getByTestId('side-nav').getByRole('link', { name: 'Home' }).boundingBox();
+
+  // BUD-158: at least the 8px the dividers leave between the other groups.
+  expect(home!.y - (appBar!.y + appBar!.height)).toBeGreaterThanOrEqual(8);
+});
+
 test('moves between sections with the navigation', async ({ page }, testInfo) => {
   await signIn(page);
   const nav = page.getByTestId(isPhone(testInfo) ? 'bottom-nav' : 'side-nav');
