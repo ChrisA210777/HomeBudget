@@ -40,7 +40,7 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         if: steps.existing.outputs.exists != 'true'
         with:
           global-json-file: global.json
