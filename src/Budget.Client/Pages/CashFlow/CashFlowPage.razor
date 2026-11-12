@@ -126,6 +126,13 @@
             else
             {
                 <MudPaper Outlined="true" Class="pa-3 mb-3">
+                    @if (_month && (account.From != _days.From || account.To != _days.To) && account.From != default)
+                    {
+                        @* The title stays the calendar month; the account's own month can differ (BUD-138). *@
+                        <MudText Typo="Typo.body2" Class="mb-1" data-testid="account-month">
+                            This account's month: <strong class="text-nowrap">@PeriodNames.Days(account.From, account.To)</strong>@(account.MonthStartsWith is { } startsWith ? $", from when {startsWith} arrives" : null)
+                        </MudText>
+                    }
                     <div class="d-flex align-center flex-wrap gap-2">
                         <MudText Typo="Typo.body2" Class="flex-grow-1" data-testid="day-totals">
                             In @Format(account.TotalIn, _days.CurrencyCode) · Out @Format(account.TotalOut, _days.CurrencyCode)
@@ -143,9 +150,14 @@
                     {
                         @* Short only until regular money arrives: offer to start the account's month with it (BUD-136). *@
                         <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" data-testid="month-start-tip">
-                            <div>@suggestion.Name arrives on @suggestion.Date.ToString("d MMM", Display). If that's when this account gets its money for the month, start its month then, so it isn't shown short before it arrives.</div>
+                            <div><strong>@suggestion.Name may be this account's money for the month ahead</strong></div>
+                            <div>
+                                This account looks short from @account.Days.First(d => d.IsShort).Date.ToString("d MMM", Display) because its bills go out
+                                before @suggestion.Name arrives on @suggestion.Date.ToString("d MMM", Display). If @suggestion.Name pays for the month after it
+                                arrives, count this account's month from then instead of the 1st.
+                            </div>
                             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Class="mt-1"
-                                       OnClick="() => StartMonthWithAsync(accountId, suggestion.PaymentId)" data-testid="use-month-start">Start its month with @suggestion.Name</MudButton>
+                                       OnClick="() => StartMonthWithAsync(accountId, suggestion.PaymentId)" data-testid="use-month-start">Count from when @suggestion.Name arrives</MudButton>
                         </MudAlert>
                     }
                 </MudPaper>
@@ -244,7 +256,8 @@
 
         if (_daily)
         {
-            _days = await CashFlowApi.GetDaysAsync(household.HouseholdId, _from, _to);
+            // A month shows each account's own month for it, e.g. 21 Oct – 20 Nov for pay on the 21st (BUD-138).
+            _days = await CashFlowApi.GetDaysAsync(household.HouseholdId, _from, _to, accountMonths: _month);
             if (_days.Accounts.All(a => a.AccountId != _account))
             {
                 _account = _days.Accounts.FirstOrDefault()?.AccountId;

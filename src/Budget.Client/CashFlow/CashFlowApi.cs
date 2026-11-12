@@ -9,7 +9,8 @@ public interface ICashFlowApi
 {
     Task<CashFlowMonthResponse> GetMonthAsync(Guid householdId, int year, int month);
 
-    Task<CashFlowDaysResponse> GetDaysAsync(Guid householdId, DateOnly from, DateOnly to);
+    /// <param name="accountMonths">From and to are a calendar month, and each account shows its own month for it (BUD-138).</param>
+    Task<CashFlowDaysResponse> GetDaysAsync(Guid householdId, DateOnly from, DateOnly to, bool accountMonths);
 
     /// <summary>Starts an account's month when a payment arrives, from Cash flow's suggestion (BUD-136). False if refused.</summary>
     Task<bool> SetMonthStartAsync(Guid householdId, Guid accountId, Guid? paymentId);
@@ -20,8 +21,8 @@ public sealed class CashFlowApi(HttpClient http) : ICashFlowApi
     public async Task<CashFlowMonthResponse> GetMonthAsync(Guid householdId, int year, int month) =>
         (await http.GetFromJsonAsync<CashFlowMonthResponse>(new Uri(CashFlowRoutes.Month(householdId, year, month), UriKind.Relative)))!;
 
-    public async Task<CashFlowDaysResponse> GetDaysAsync(Guid householdId, DateOnly from, DateOnly to) =>
-        (await http.GetFromJsonAsync<CashFlowDaysResponse>(new Uri(CashFlowRoutes.Days(householdId, from, to), UriKind.Relative)))!;
+    public async Task<CashFlowDaysResponse> GetDaysAsync(Guid householdId, DateOnly from, DateOnly to, bool accountMonths) =>
+        (await http.GetFromJsonAsync<CashFlowDaysResponse>(new Uri(CashFlowRoutes.Days(householdId, from, to, accountMonths), UriKind.Relative)))!;
 
     public async Task<bool> SetMonthStartAsync(Guid householdId, Guid accountId, Guid? paymentId)
     {

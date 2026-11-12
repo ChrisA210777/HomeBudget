@@ -113,11 +113,16 @@ public static class CashFlowEndpoints
         return Results.Ok(new CashFlowMonthResponse(year, monthNumber, data.Currency, accounts));
     }
 
-    private static async Task<IResult> DaysAsync(Guid householdId, DateOnly? from, DateOnly? to, BudgetDbContext db)
+    private static async Task<IResult> DaysAsync(Guid householdId, DateOnly? from, DateOnly? to, bool? accountMonths, BudgetDbContext db)
     {
         if (from is not { } start || to is not { } end || end < start || end.DayNumber - start.DayNumber >= MaxDays)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["from"] = [$"Choose a period of up to {MaxDays} days."] });
+        }
+
+        if (accountMonths == true && (start.Day != 1 || end != start.AddMonths(1).AddDays(-1)))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["from"] = ["Accounts' own months need a calendar month."] });
         }
 
         var data = await LoadAsync(db, householdId);
@@ -126,8 +131,13 @@ public static class CashFlowEndpoints
         var lookFrom = start.AddDays(-LookBackDays);
         var entries = Entries(data, lookFrom, end);
 
-        var accounts = Ordered(entries.Where(e => e.Date >= start).Select(e => e.Account), data)
-            .Select(g => DaysFor(g.Id, g.Name, entries.Where(e => e.Account == g.Id).ToList(), data, start, end, lookFrom))
+        var accounts = Ordered(entries.Select(e => e.Account), data)
+            .Select(g =>
+            {
+                var (accountFrom, accountTo) = accountMonths == true ? AccountMonth(data.Accounts.Find(g.Id), data, start, end, lookFrom) : (start, end);
+                return DaysFor(g.Id, g.Name, entries.Where(e => e.Account == g.Id).ToList(), data, accountFrom, accountTo, lookFrom);
+            })
+            .Where(a => a.Days.Count > 0)
             .ToList();
 
         return Results.Ok(new CashFlowDaysResponse(start, end, data.Currency, accounts));
@@ -185,6 +195,7 @@ public static class CashFlowEndpoints
         DateOnly lookFrom)
     {
         var account = data.Accounts.Find(accountId);
+        entries = entries.Where(e => e.Date <= end).ToList();
         var (startsWith, starts) = MonthStartsFor(account, data, lookFrom, end, start);
         var opening = starts.Where(d => d <= start).Max();
 
@@ -212,11 +223,28 @@ public static class CashFlowEndpoints
 
         return new CashFlowDaysAccount(accountId, name, days, days.Sum(d => d.In), days.Sum(d => d.Out))
         {
+            From = start,
+            To = end,
             BroughtForward = opening < start ? Values.RoundForDisplay(broughtForward) : 0m,
             BroughtForwardSince = opening < start ? opening : null,
             MonthStartsWith = startsWith,
             Suggestion = startsWith is null ? Suggest(account, days, entries, data) : null,
         };
+    }
+
+    /// <summary>
+    /// An account's own month that pays for a calendar month (BUD-138): from its last month start on or before the 1st
+    /// to the day before its last month start on or before the next month's 1st. Months follow on with no gaps or
+    /// overlaps; if the payment it starts with doesn't arrive in time, the account's month runs to the calendar month's
+    /// end.
+    /// </summary>
+    private static (DateOnly From, DateOnly To) AccountMonth(Account? account, Data data, DateOnly monthStart, DateOnly monthEnd, DateOnly lookFrom)
+    {
+        var nextMonth = monthEnd.AddDays(1);
+        var (_, starts) = MonthStartsFor(account, data, lookFrom, nextMonth, monthStart);
+        var from = starts.Where(d => d <= monthStart).Max();
+        var next = starts.Where(d => d <= nextMonth).Max();
+        return (from, next > from ? next.AddDays(-1) : monthEnd);
     }
 
     /// <summary>

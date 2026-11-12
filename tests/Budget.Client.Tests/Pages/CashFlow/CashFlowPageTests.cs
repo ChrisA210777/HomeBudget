@@ -113,6 +113,34 @@ public sealed class CashFlowPageTests : IDisposable
     }
 
     [Fact]
+    public void A_month_shows_each_accounts_own_month_and_says_which_days()
+    {
+        UseTransfers(true);
+        _api.DaysResponse = (from, to) => new CashFlowDaysResponse(from, to, "GBP",
+        [
+            new(JointId, "Joint",
+            [
+                new(new DateOnly(2026, 10, 21), [new(CashFlowKindDto.Income, Guid.NewGuid(), "Salary", null, 3000m)], 3000m, 0m, 3000m, false)
+                {
+                    MonthStarted = new DateOnly(2026, 10, 21),
+                },
+            ], 3000m, 0m)
+            {
+                From = new DateOnly(2026, 10, 21),
+                To = new DateOnly(2026, 11, 20),
+                MonthStartsWith = "Salary",
+            },
+        ]);
+        var cut = _context.RenderComponent<CashFlowPage>();
+        cut.Find("[data-testid=show-daily]").Click();
+
+        // BUD-138: the month view asks for each account's own month, and says which days that is.
+        cut.WaitForAssertion(() => Assert.Equal(new[] { true }, _api.AccountMonths));
+        Assert.Equal("This account's month: 21 Oct – 20 Nov 26, from when Salary arrives", Text(cut, "account-month"));
+        Assert.Equal("November 2026", Text(cut, "period-name"));
+    }
+
+    [Fact]
     public void Offers_to_start_an_accounts_month_when_its_money_arrives()
     {
         UseTransfers(true);
@@ -131,7 +159,7 @@ public sealed class CashFlowPageTests : IDisposable
         var cut = _context.RenderComponent<CashFlowPage>();
         cut.Find("[data-testid=show-daily]").Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("Bills top-up arrives on 25 Nov", Text(cut, "month-start-tip"), StringComparison.Ordinal));
+        cut.WaitForAssertion(() => Assert.Contains("looks short from 1 Nov because its bills go out before Bills top-up arrives on 25 Nov", Text(cut, "month-start-tip"), StringComparison.Ordinal));
         cut.Find("[data-testid=use-month-start]").Click();
 
         cut.WaitForAssertion(() => Assert.Equal(new[] { (JointId, (Guid?)topUp) }, _api.MonthStarts));
@@ -166,6 +194,8 @@ public sealed class CashFlowPageTests : IDisposable
 
         public List<(DateOnly From, DateOnly To)> Days { get; } = [];
 
+        public List<bool> AccountMonths { get; } = [];
+
         public List<(Guid AccountId, Guid? PaymentId)> MonthStarts { get; } = [];
 
         /// <summary>A day-by-day response for a test to use instead of the usual one.</summary>
@@ -192,9 +222,10 @@ public sealed class CashFlowPageTests : IDisposable
             ]));
         }
 
-        public Task<CashFlowDaysResponse> GetDaysAsync(Guid householdId, DateOnly from, DateOnly to)
+        public Task<CashFlowDaysResponse> GetDaysAsync(Guid householdId, DateOnly from, DateOnly to, bool accountMonths)
         {
             Days.Add((from, to));
+            AccountMonths.Add(accountMonths);
             if (DaysResponse is not null)
             {
                 return Task.FromResult(DaysResponse(from, to));
