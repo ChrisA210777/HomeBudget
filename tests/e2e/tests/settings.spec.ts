@@ -37,3 +37,22 @@ test('outgoings open in the view chosen last time', async ({ page }) => {
   await expect(page.getByTestId('group-by')).toHaveText('Group: Paid from');
   await expect(page.getByTestId('month-name')).toContainText('–');
 });
+
+test('deleting your account signs you out and says it has gone', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/settings');
+  await settled(page);
+
+  await page.getByTestId('delete-account').click();
+  await expect(page.getByTestId('households-to-delete')).toContainText('My Household');
+  await expect(page.getByTestId('delete-account-yes')).toBeDisabled();
+  await page.getByTestId('delete-account-confirm').fill('DELETE');
+  await page.getByTestId('delete-account-yes').click();
+
+  await expect(page).toHaveURL(/\/login\?accountDeleted=true$/);
+  await expect(page.getByTestId('account-deleted')).toHaveText('Your account has been deleted.');
+
+  // Nothing is left signed in.
+  await page.goto('/settings');
+  await expect(page).toHaveURL(/\/login/);
+});

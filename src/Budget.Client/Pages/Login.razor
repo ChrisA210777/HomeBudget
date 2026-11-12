@@ -11,6 +11,11 @@
         <h1 class="mud-typography mud-typography-h5 mb-2">Sign in</h1>
         <MudText Typo="Typo.body2" Class="mb-4">Sign in to see and manage your household budget.</MudText>
 
+        @if (_accountDeleted)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="account-deleted">Your account has been deleted.</MudAlert>
+        }
+
         @if (_signedOut)
         {
             <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="signed-out">You've signed out.</MudAlert>
@@ -52,6 +57,7 @@
     private IReadOnlyList<AuthProvider>? _providers;
     private string? _errorMessage;
     private bool _signedOut;
+    private bool _accountDeleted;
     private string _returnUrl = "/";
 
     protected override async Task OnInitializedAsync()
@@ -65,6 +71,7 @@
         }
 
         _signedOut = string.Equals(query["signedOut"], "true", StringComparison.OrdinalIgnoreCase);
+        _accountDeleted = string.Equals(query["accountDeleted"], "true", StringComparison.OrdinalIgnoreCase);
 
         _errorMessage = query["error"] switch
         {
