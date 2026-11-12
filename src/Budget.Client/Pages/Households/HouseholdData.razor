@@ -237,9 +237,9 @@
             _me = _preview.People.FirstOrDefault(p => p.IsYou)?.Id;
             _importErrors = null;
         }
-        catch (TooManyRequestsException e)
+        catch (TooManyRequestsException tooMany)
         {
-            _preview = Refused(e.Message);
+            _preview = Refused(tooMany.Message);
         }
         catch (HttpRequestException)
         {
@@ -267,9 +267,9 @@
             // It's now the active household: reload so every part of the app uses it.
             Navigation.NavigateTo("/?imported=true", forceLoad: true);
         }
-        catch (TooManyRequestsException e)
+        catch (TooManyRequestsException tooMany)
         {
-            _importErrors = [new ImportProblem(string.Empty, e.Message)];
+            _importErrors = [new ImportProblem(string.Empty, tooMany.Message)];
         }
         catch (HttpRequestException)
         {
@@ -301,9 +301,9 @@
 
             Navigation.NavigateTo("/?replaced=true", forceLoad: true);
         }
-        catch (TooManyRequestsException e)
+        catch (TooManyRequestsException tooMany)
         {
-            _importErrors = [new ImportProblem(string.Empty, e.Message)];
+            _importErrors = [new ImportProblem(string.Empty, tooMany.Message)];
         }
         catch (HttpRequestException)
         {
