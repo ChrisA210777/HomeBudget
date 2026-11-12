@@ -111,6 +111,8 @@ short labels, a Filter panel) are for phones only (below 600px); larger screens 
 **Accessibility**
 - Every icon-only button has an aria-label and a tooltip; never nest interactive controls; touch targets are at
   least 44px on phones; pages pass the axe scan in light and dark themes.
+- Links within a sentence are underlined (`Underline="Underline.Always"`), so they don't rely on colour (axe
+  `link-in-text-block`).
 - Headings focused after navigation show no focus outline (App.razor), but controls always do.
 
 **Process**
