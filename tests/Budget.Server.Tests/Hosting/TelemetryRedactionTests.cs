@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Budget.Server.Hosting;
 
 namespace Budget.Server.Tests.Hosting;
@@ -64,7 +63,7 @@ public class TelemetryRedactionTests
     [Fact]
     public void The_trace_processor_redacts_request_addresses()
     {
-        using var activity = new Activity("GET /invite/abc");
+        using var activity = new System.Diagnostics.Activity("GET /invite/abc");
         activity.SetTag("url.path", "/api/invitations/CfDJ8secret/accept");
         activity.SetTag("url.query", "?returnUrl=%2Finvite%2FCfDJ8secret");
         activity.SetTag("url.full", "https://budget.example/invite/CfDJ8secret");
