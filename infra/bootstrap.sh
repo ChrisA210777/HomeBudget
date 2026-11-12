@@ -20,7 +20,7 @@ TENANT_ID=$(az account show --query tenantId -o tsv)
 echo "Subscription: $(az account show --query name -o tsv) ($SUBSCRIPTION_ID)"
 
 echo "== Registering the Azure services the app uses (first time only; can take a few minutes)"
-for ns in Microsoft.Web Microsoft.Sql Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Consumption; do
+for ns in Microsoft.Web Microsoft.Sql Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Consumption Microsoft.KeyVault; do
   az provider register --namespace "$ns" --wait --output none
 done
 
@@ -66,6 +66,26 @@ if ! az role assignment list --assignee "$SP_OBJECT_ID" --scope "$SCOPE" --role 
   done
 fi
 
+echo "== Letting it give the app read access to Key Vault secrets (BUD-147), and no other role"
+# Bicep grants the app's identity "Key Vault Secrets User" on the vault. Contributor can't assign roles, so the deployer
+# also gets "Role Based Access Control Administrator", with a condition that it can only assign or remove that one role,
+# and never to itself.
+RBAC_ADMIN_ROLE="f58310d9-a9f6-439a-9e8d-f62e7b41a168"
+SECRETS_USER_ROLE="4633458b-17de-408a-b874-0445c86b69e6"
+CONDITION="((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$SECRETS_USER_ROLE} AND @Request[Microsoft.Authorization/roleAssignments:PrincipalId] ForAnyOfAnyValues:GuidNotEquals {$SP_OBJECT_ID})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$SECRETS_USER_ROLE}))"
+if ! az role assignment list --assignee "$SP_OBJECT_ID" --scope "$SCOPE" --role "$RBAC_ADMIN_ROLE" --query "[0]" -o tsv | grep -q .; then
+  az role assignment create --assignee-object-id "$SP_OBJECT_ID" --assignee-principal-type ServicePrincipal \
+    --role "$RBAC_ADMIN_ROLE" --scope "$SCOPE" --condition "$CONDITION" --condition-version "2.0" --output none
+fi
+
+echo "== Letting you set the sign-in secrets in Key Vault"
+# You (the person running this) can add and change secrets in the resource group's vaults. The deployer can't read them.
+ME=$(az ad signed-in-user show --query id -o tsv)
+if ! az role assignment list --assignee "$ME" --scope "$SCOPE" --role "Key Vault Secrets Officer" --query "[0]" -o tsv | grep -q .; then
+  az role assignment create --assignee-object-id "$ME" --assignee-principal-type User \
+    --role "Key Vault Secrets Officer" --scope "$SCOPE" --output none
+fi
+
 cat <<DONE
 
 Done. In GitHub, go to $REPO -> Settings -> Secrets and variables -> Actions -> Variables
@@ -79,5 +99,5 @@ and add these repository variables:
   BUDGET_EMAIL              <the email address for cost alerts>
   MICROSOFT_CLIENT_ID       <the Application (client) ID of your "Sign in with Microsoft" app registration>
 
-Then see infra/README.md for the secret and the environment.
+Then see infra/README.md for the environment and for putting the sign-in secrets in Key Vault.
 DONE

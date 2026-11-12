@@ -22,19 +22,11 @@ param sqlAdminObjectId string
 @description('Display name of that identity.')
 param sqlAdminName string
 
-@description('Client id of the Entra app registration used for "Sign in with Microsoft".')
+@description('Client id of the Entra app registration used for "Sign in with Microsoft". Its secret is in Key Vault (BUD-147).')
 param microsoftClientId string = ''
 
-@secure()
-@description('Client secret for that app registration.')
-param microsoftClientSecret string = ''
-
-@description('Google OAuth client ID for "Sign in with Google" (ADR-015). Empty turns Google sign-in off.')
+@description('Google OAuth client ID for "Sign in with Google" (ADR-015). Empty turns Google sign-in off. Its secret is in Key Vault (BUD-147).')
 param googleClientId string = ''
-
-@secure()
-@description('Google OAuth client secret.')
-param googleClientSecret string = ''
 
 @description('Monthly budget for this resource group, in the billing currency. Alerts go out as soon as anything is spent.')
 param budgetAmount int = 1
@@ -138,6 +130,43 @@ resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   }
 }
 
+// ---- Secrets (BUD-147) ----------------------------------------------------------
+// The sign-in client secrets live only here. They're set once by hand (infra/README.md), never by the deploy, and the
+// app reads them with its managed identity through Key Vault references. Access is by Azure RBAC.
+
+var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
+var microsoftSecretName = 'microsoft-client-secret'
+var googleSecretName = 'google-client-secret'
+
+resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: 'kv-${name}-${suffix}'
+  location: location
+  properties: {
+    tenantId: subscription().tenantId
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    enableRbacAuthorization: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 7
+    // The free web app can't use a private network, so the vault is reachable publicly; every request still needs an
+    // Entra identity with a role on it.
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+// The app can read secrets, and nothing else. The deployer may only grant this one role (see bootstrap.sh).
+resource appReadsSecrets 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(vault.id, appIdentity.id, keyVaultSecretsUserRoleId)
+  scope: vault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalId: appIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // ---- Web app -------------------------------------------------------------------
 
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
@@ -159,7 +188,7 @@ var microsoftSettings = empty(microsoftClientId) ? [] : [
   }
   {
     name: 'Authentication__Microsoft__ClientSecret'
-    value: microsoftClientSecret
+    value: '@Microsoft.KeyVault(VaultName=${vault.name};SecretName=${microsoftSecretName})'
   }
 ]
 
@@ -170,7 +199,7 @@ var googleSettings = empty(googleClientId) ? [] : [
   }
   {
     name: 'Authentication__Google__ClientSecret'
-    value: googleClientSecret
+    value: '@Microsoft.KeyVault(VaultName=${vault.name};SecretName=${googleSecretName})'
   }
 ]
 
@@ -184,8 +213,14 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
       '${appIdentity.id}': {}
     }
   }
+  dependsOn: [
+    // So the app can read its secrets as soon as it starts.
+    appReadsSecrets
+  ]
   properties: {
     serverFarmId: plan.id
+    // Key Vault references are read with this identity rather than a system-assigned one.
+    keyVaultReferenceIdentity: appIdentity.id
     httpsOnly: true
     clientAffinityEnabled: false
     siteConfig: {
@@ -294,3 +329,4 @@ output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
 output databaseName string = databaseName
 output appIdentityName string = appIdentity.name
 output appIdentityClientId string = appIdentity.properties.clientId
+output keyVaultName string = vault.name

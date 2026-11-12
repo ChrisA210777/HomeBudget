@@ -82,8 +82,8 @@ Restart the app and the Google button appears.
 **3. In Azure**
 
 1. In GitHub, go to **Settings → Secrets and variables → Actions → Variables** and add `GOOGLE_CLIENT_ID` (it isn't secret).
-2. Go to **Settings → Environments → dev** and add the environment secret `GOOGLE_CLIENT_SECRET`, next to `MICROSOFT_CLIENT_SECRET`.
-3. Run **Actions → Deploy → Run workflow**, or merge to `main`. The deploy sets `Authentication__Google__ClientId` and `Authentication__Google__ClientSecret` on the web app. See [infra/README.md](infra/README.md).
+2. Run **Actions → Deploy → Run workflow**, or merge to `main`. The deploy sets `Authentication__Google__ClientId`, and points `Authentication__Google__ClientSecret` at Key Vault.
+3. Put the secret in Key Vault as `google-client-secret` and restart the app (BUD-147). See step 5 in [infra/README.md](infra/README.md).
 
 **Good to know**
 
