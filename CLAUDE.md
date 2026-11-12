@@ -105,6 +105,8 @@ short labels, a Filter panel) are for phones only (below 600px); larger screens 
   "Surplus **£400.00**". Status is shown by an icon and words, never colour alone.
 - Long names wrap beside their icon (a grid, not centred), or stop at two lines with `two-lines`; chips are
   left-aligned.
+- A form that records details about someone else (e.g. adding a person) has a short note saying to let them know and
+  to keep to what's needed (BUD-154).
 
 **Accessibility**
 - Every icon-only button has an aria-label and a tooltip; never nest interactive controls; touch targets are at
