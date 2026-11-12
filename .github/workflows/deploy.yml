@@ -69,9 +69,7 @@ jobs:
           AZURE_DEPLOYER_OBJECT_ID: ${{ vars.AZURE_DEPLOYER_OBJECT_ID }}
           BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
           MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}
-          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           for v in RESOURCE_GROUP AZURE_DEPLOYER_OBJECT_ID BUDGET_EMAIL; do
             if [ -z "${!v}" ]; then echo "::error::The $v variable isn't set. See infra/README.md."; exit 1; fi
@@ -89,6 +87,7 @@ jobs:
             echo "database=$(jq -r .databaseName.value <<<"$outputs")"
             echo "identityName=$(jq -r .appIdentityName.value <<<"$outputs")"
             echo "identityClientId=$(jq -r .appIdentityClientId.value <<<"$outputs")"
+            echo "keyVault=$(jq -r .keyVaultName.value <<<"$outputs")"
           } >> "$GITHUB_OUTPUT"
 
       - name: Let this runner reach the database
