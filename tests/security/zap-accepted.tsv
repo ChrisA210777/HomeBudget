@@ -2,3 +2,4 @@
 # The scan fails on any other medium or high alert. One line per rule: the ZAP rule id, its name, and why it's accepted.
 # Keep the reason specific, and remove the line when the cause is fixed.
 # rule id	name	reason
+10055	CSP: style-src unsafe-inline	MudBlazor sets inline style attributes and its theme provider adds a <style> element whose content changes with the theme, so styles must allow inline. Scripts stay strictly self-only with nothing inline, and Blazor escapes everything it renders, so injecting CSS would first need an HTML injection the app does not allow.

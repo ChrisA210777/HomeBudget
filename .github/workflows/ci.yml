@@ -221,6 +221,8 @@ jobs:
           TestSignIn__Enabled: "true"
           Database__MigrateOnStartup: "true"
           ConnectionStrings__Budget: "Server=localhost,1433;Database=HomeBudgetZap;User Id=sa;Password=E2e_Only_Pa55!;TrustServerCertificate=True;Encrypt=False"
+          # Log each request, so the job can check the scan reached the API and not only the app's files.
+          Logging__LogLevel__Microsoft.AspNetCore.Hosting.Diagnostics: Information
         run: |
           nohup dotnet Budget.Server.dll --urls "$APP_URL" > ../server.log 2>&1 &
           for i in $(seq 1 60); do
@@ -255,7 +257,19 @@ jobs:
                 -config replacer.full_list(0).replacement=__Host-budget=$SESSION_COOKIE \
                 -config ajaxSpider.maxDuration=3"
 
+      - name: Check the scan reached the API signed in
+        run: |
+          # Ids are replaced, so the list shows which endpoints were scanned rather than every household.
+          grep -oE "Request starting HTTP/[0-9.]+ [A-Z]+ https://localhost:7180/(api|bff)/[^ ]*" artifacts/server.log \
+            | sed -E 's#https://localhost:7180##; s#[0-9a-f]{8}-[0-9a-f-]{27}#{id}#g; s#\?.*##' | sort | uniq -c | sort -rn > zap/api-requests.txt || true
+          echo "API endpoints the scan requested:"; cat zap/api-requests.txt
+          if ! grep -q "/api/households/" zap/api-requests.txt; then
+            echo "::error::The scan didn't reach the household API, so it probably wasn't signed in."
+            exit 1
+          fi
+
       - name: Check the alerts
+        if: success() || failure()
         run: python3 tests/security/check-zap-report.py zap/report.json tests/security/zap-accepted.tsv
 
       - name: Show the app's log
@@ -270,3 +284,4 @@ jobs:
           path: |
             zap/report.html
             zap/report.json
+            zap/api-requests.txt
