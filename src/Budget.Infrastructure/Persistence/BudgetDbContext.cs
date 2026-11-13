@@ -61,6 +61,9 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
     /// <summary>Recent activity (BUD-139). Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
     public DbSet<ActivityEntry> ActivityEntries => Set<ActivityEntry>();
 
+    /// <summary>Who downloaded the data (BUD-141). Filtered to the current household (see <see cref="ICurrentHousehold"/>).</summary>
+    public DbSet<DataDownload> DataDownloads => Set<DataDownload>();
+
     /// <summary>Read by the household query filters each time a query runs.</summary>
     private Guid? CurrentHouseholdId => _currentHousehold.HouseholdId;
 

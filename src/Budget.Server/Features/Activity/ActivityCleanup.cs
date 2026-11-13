@@ -1,10 +1,14 @@
 using Budget.Domain.Activity;
+using Budget.Domain.Households;
 using Budget.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Budget.Server.Features.Activity;
 
-/// <summary>Removes recent activity older than three months (BUD-139), when the app starts and then once a day.</summary>
+/// <summary>
+/// Removes recent activity older than three months (BUD-139) and data download log entries older than twelve months
+/// (BUD-141), when the app starts and then once a day.
+/// </summary>
 public sealed partial class ActivityCleanup(IServiceScopeFactory scopes, TimeProvider time, ILogger<ActivityCleanup> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -22,6 +26,13 @@ public sealed partial class ActivityCleanup(IServiceScopeFactory scopes, TimePro
                 {
                     LogRemoved(removed, cutoff);
                 }
+
+                var downloadsCutoff = time.GetUtcNow() - DataDownload.KeptFor;
+                var downloads = await db.DataDownloads.IgnoreQueryFilters().Where(d => d.At < downloadsCutoff).ExecuteDeleteAsync(stoppingToken);
+                if (downloads > 0)
+                {
+                    LogDownloadsRemoved(downloads, downloadsCutoff);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -35,6 +46,9 @@ public sealed partial class ActivityCleanup(IServiceScopeFactory scopes, TimePro
     [LoggerMessage(Level = LogLevel.Information, Message = "Removed {Count} recent activity entries older than {Cutoff}")]
     private partial void LogRemoved(int count, DateTimeOffset cutoff);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't remove old recent activity")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Removed {Count} data download log entries older than {Cutoff}")]
+    private partial void LogDownloadsRemoved(int count, DateTimeOffset cutoff);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't remove old recent activity or download log entries")]
     private partial void LogFailed(Exception exception);
 }

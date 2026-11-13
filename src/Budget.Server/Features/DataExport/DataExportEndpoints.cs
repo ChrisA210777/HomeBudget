@@ -1,10 +1,11 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Budget.Domain.Households;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
+using Budget.Server.Features.SignIn;
 using Budget.Server.Hosting;
 using Budget.Shared.DataExport;
 using Budget.Shared.Households;
@@ -27,6 +28,9 @@ public static class DataExportEndpoints
         // Admins only: the file holds everyone's personal and financial details (ADR-012).
         household.MapGet("/export", ExportAsync).RequireAuthorization(HouseholdPolicies.Admin).RequireRateLimiting(RateLimits.Data);
         household.MapGet("/export/csv", ExportCsvAsync).RequireAuthorization(HouseholdPolicies.Admin).RequireRateLimiting(RateLimits.Data);
+
+        // Who downloaded the data (BUD-141): Admins only, like the downloads themselves.
+        household.MapGet("/export/downloads", DownloadsAsync).RequireAuthorization(HouseholdPolicies.Admin);
         household.MapPost("/import/preview", PreviewAsync).RequireAuthorization(HouseholdPolicies.Admin)
             .RequireRateLimiting(RateLimits.Data).WithMaxRequestSize(MaxUploadBytes);
 
@@ -40,9 +44,11 @@ public static class DataExportEndpoints
     }
 
     /// <summary>Downloads the household's data as a JSON file (BUD-65).</summary>
-    private static async Task<IResult> ExportAsync(Guid householdId, bool? history, bool? audit, ExportBuilder builder, TimeProvider time)
+    private static async Task<IResult> ExportAsync(
+        Guid householdId, bool? history, bool? audit, ExportBuilder builder, ClaimsPrincipal principal, BudgetDbContext db, TimeProvider time)
     {
         var export = await builder.BuildAsync(householdId, new ExportOptions { IncludeHistory = history == true, IncludeAudit = audit == true });
+        await RecordDownloadAsync(db, householdId, principal, time, DataDownloadFormat.Json, export.Options);
         var json = JsonSerializer.SerializeToUtf8Bytes(export, ExportFormat.JsonOptions);
         var fileName = $"home-budget-{FileNamePart(export.Household.Name)}-{time.GetUtcNow():yyyy-MM-dd}.json";
 
@@ -50,12 +56,49 @@ public static class DataExportEndpoints
     }
 
     /// <summary>Downloads the household's data as a zip of CSV files for Excel (BUD-66), with the same options as JSON.</summary>
-    private static async Task<IResult> ExportCsvAsync(Guid householdId, bool? history, bool? audit, ExportBuilder builder, TimeProvider time)
+    private static async Task<IResult> ExportCsvAsync(
+        Guid householdId, bool? history, bool? audit, ExportBuilder builder, ClaimsPrincipal principal, BudgetDbContext db, TimeProvider time)
     {
         var export = await builder.BuildAsync(householdId, new ExportOptions { IncludeHistory = history == true, IncludeAudit = audit == true });
+        await RecordDownloadAsync(db, householdId, principal, time, DataDownloadFormat.Csv, export.Options);
         var fileName = $"home-budget-{FileNamePart(export.Household.Name)}-{time.GetUtcNow():yyyy-MM-dd}-csv.zip";
         return Results.File(CsvExporter.Write(export), "application/zip", fileName);
     }
+
+    /// <summary>Logs a download before the file is sent (BUD-141), so a download is never missed from the log.</summary>
+    private static async Task RecordDownloadAsync(
+        BudgetDbContext db, Guid householdId, ClaimsPrincipal principal, TimeProvider time, DataDownloadFormat format, ExportOptions options)
+    {
+        db.DataDownloads.Add(DataDownload.Record(householdId, UserId(principal), time.GetUtcNow(), format, options.IncludeHistory, options.IncludeAudit));
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>The data download log (BUD-141): the last twelve months, newest first, with each person's name now.</summary>
+    private static async Task<IReadOnlyList<DataDownloadSummary>> DownloadsAsync(Guid householdId, ClaimsPrincipal principal, BudgetDbContext db, TimeProvider time)
+    {
+        var me = UserId(principal);
+        var since = time.GetUtcNow() - DataDownload.KeptFor;
+        var rows = await (
+                from download in db.DataDownloads
+                where download.HouseholdId == householdId && download.At >= since
+                join user in db.Users on download.UserId equals (Guid?)user.Id into users
+                from user in users.DefaultIfEmpty()
+                orderby download.At descending
+                select new { download.At, download.UserId, Name = user == null ? null : user.DisplayName, download.Format, download.IncludesHistory, download.IncludesAudit })
+            .ToListAsync();
+
+        return rows
+            .Select(r => new DataDownloadSummary(
+                r.At,
+                r.Name ?? AccountDeletionEndpoints.FormerMember,
+                r.UserId == me,
+                r.Format.ToString(),
+                r.IncludesHistory,
+                r.IncludesAudit))
+            .ToList();
+    }
+
+    private static Guid UserId(ClaimsPrincipal principal) => Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     /// <summary>
     /// Checks an uploaded file and says what's in it (BUD-67). Nothing is saved, and the file isn't kept: it's read

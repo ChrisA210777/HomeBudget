@@ -126,6 +126,38 @@ namespace Budget.Infrastructure.Persistence.Migrations
                     b.ToTable("ActivityEntries", (string)null);
                 });
 
+            modelBuilder.Entity("Budget.Domain.Households.DataDownload", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IncludesAudit")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IncludesHistory")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HouseholdId", "At");
+
+                    b.ToTable("DataDownloads", (string)null);
+                });
+
             modelBuilder.Entity("Budget.Domain.Households.Household", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1322,6 +1354,15 @@ namespace Budget.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Budget.Domain.Activity.ActivityEntry", b =>
+                {
+                    b.HasOne("Budget.Domain.Households.Household", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Budget.Domain.Households.DataDownload", b =>
                 {
                     b.HasOne("Budget.Domain.Households.Household", null)
                         .WithMany()

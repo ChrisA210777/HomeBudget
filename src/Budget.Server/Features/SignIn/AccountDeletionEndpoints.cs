@@ -147,6 +147,11 @@ public static class AccountDeletionEndpoints
                     .SetProperty(x => x.ActorName, FormerMember)
                     .SetProperty(x => x.UserId, (Guid?)null));
 
+            // So does the data download log (BUD-141): it then shows "A former member".
+            await db.DataDownloads.IgnoreQueryFilters()
+                .Where(d => d.UserId == userId)
+                .ExecuteUpdateAsync(d => d.SetProperty(x => x.UserId, (Guid?)null));
+
             // Your user record, with its sign-in links and settings.
             var result = await users.DeleteAsync(user);
             if (!result.Succeeded)

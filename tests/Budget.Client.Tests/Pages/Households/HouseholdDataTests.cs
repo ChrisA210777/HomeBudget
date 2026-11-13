@@ -1,4 +1,4 @@
-using Budget.Client.Account;
+﻿using Budget.Client.Account;
 using Budget.Client.DataExport;
 using Budget.Client.Pages.Households;
 using Budget.Shared.DataExport;
@@ -63,6 +63,45 @@ public sealed class HouseholdDataTests : IDisposable
 
         Assert.NotNull(cut.Find("[data-testid=admins-only]"));
         Assert.Empty(cut.FindAll("[data-testid=export-section]"));
+    }
+
+    [Fact]
+    public void Admins_see_who_has_downloaded_the_data()
+    {
+        UseRole("Admin");
+        _importApi.Downloads.Add(new DataDownloadSummary(new DateTimeOffset(2026, 11, 13, 9, 30, 0, TimeSpan.Zero), "Chris Austin", true, "Csv", true, true));
+        _importApi.Downloads.Add(new DataDownloadSummary(new DateTimeOffset(2026, 11, 2, 18, 5, 0, TimeSpan.Zero), "A former member", false, "Json", false, false));
+
+        var cut = _context.RenderComponent<HouseholdData>();
+
+        var entries = cut.FindAll("[data-testid=download]").ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.Equal("You", entries[0].QuerySelector("[data-testid=download-who]")!.TextContent);
+        Assert.Contains("CSV for Excel, with full history and who recorded what", entries[0].TextContent, StringComparison.Ordinal);
+        Assert.Equal("A former member", entries[1].QuerySelector("[data-testid=download-who]")!.TextContent);
+        Assert.Contains("JSON, current items", entries[1].TextContent, StringComparison.Ordinal);
+        Assert.Contains("2026", entries[1].QuerySelector("[data-testid=download-when]")!.TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Admins_are_told_when_no_one_has_downloaded_the_data()
+    {
+        UseRole("Admin");
+
+        var cut = _context.RenderComponent<HouseholdData>();
+
+        Assert.Contains("No one has downloaded the data in the last 12 months", cut.Find("[data-testid=downloads-none]").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Members_who_arent_admins_dont_see_or_load_the_log()
+    {
+        UseRole("User", isOwner: false);
+
+        var cut = _context.RenderComponent<HouseholdData>();
+
+        Assert.Empty(cut.FindAll("[data-testid=downloads-section]"));
+        Assert.Equal(0, _importApi.DownloadsRead);
     }
 
     [Fact]
@@ -211,6 +250,16 @@ public sealed class HouseholdDataTests : IDisposable
         {
             Replaced.Add((householdId, useFileName));
             return Task.FromResult(Result);
+        }
+
+        public List<DataDownloadSummary> Downloads { get; } = [];
+
+        public int DownloadsRead { get; private set; }
+
+        public Task<IReadOnlyList<DataDownloadSummary>> DownloadsAsync(Guid householdId)
+        {
+            DownloadsRead++;
+            return Task.FromResult<IReadOnlyList<DataDownloadSummary>>(Downloads);
         }
     }
 

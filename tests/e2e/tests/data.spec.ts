@@ -20,6 +20,13 @@ test('an admin can download the household as a JSON file', async ({ page }, test
   expect(file.schemaVersion).toBe(5);
   expect(file.household.name).toBe('My Household');
   expect(file.outgoings.map((o: { name: string }) => o.name)).toEqual(['Council tax']);
+
+  // The download is logged for Admins to see (BUD-141).
+  await expect(page.getByTestId('downloads-none')).toHaveCount(0);
+  const logged = page.getByTestId('download');
+  await expect(logged).toHaveCount(1);
+  await expect(logged.getByTestId('download-who')).toHaveText('You');
+  await expect(logged).toContainText('JSON, current items');
 });
 
 test('a downloaded file can be checked before importing', async ({ page }) => {
