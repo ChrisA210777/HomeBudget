@@ -23,7 +23,7 @@ The deploy identity can't read the secrets itself. It can deploy code that runs 
 
 ## Deploying
 
-`.github/workflows/deploy.yml` runs after CI passes on `main`, or by hand from **Actions → Deploy → Run workflow**. It:
+`.github/workflows/deploy.yml` runs after CI passes on `main`, or by hand from **Actions → Deploy → Run workflow** on `main`. It:
 
 1. deploys the Bicep (safe to repeat)
 2. opens the database firewall to the runner, applies EF Core migrations, makes sure the app's identity has a database user, and closes the firewall again
@@ -42,7 +42,10 @@ The deploy identity can't read the secrets itself. It can deploy code that runs 
 
 2. **GitHub variables.** Go to **Settings → Secrets and variables → Actions → Variables** and add the repository variables the script prints (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_DEPLOYER_OBJECT_ID`, `BUDGET_EMAIL`, `MICROSOFT_CLIENT_ID`).
 
-3. **GitHub environment.** Go to **Settings → Environments → New environment**, name it `dev`. For Google sign-in, also add the repository variable `GOOGLE_CLIENT_ID` (step 2); without it, Google sign-in is simply off. Creating the Google OAuth client is described in the main README's *Google sign-in* section.
+3. **GitHub environment.** Go to **Settings → Environments → New environment**, name it `dev`. Under **Deployment
+   branches and tags**, choose **Selected branches and tags** and add `main` (BUD-164): Azure trusts any workflow run in
+   the `dev` environment, and the deploy identity is the database's admin, so only reviewed code on `main` may use it.
+   For Google sign-in, also add the repository variable `GOOGLE_CLIENT_ID` (step 2); without it, Google sign-in is simply off. Creating the Google OAuth client is described in the main README's *Google sign-in* section.
 
 4. **First deploy.** Run **Actions → Deploy → Run workflow**. The summary shows the app's address, e.g. `https://app-homebudget-dev-abc123.azurewebsites.net`, and the Key Vault's name, e.g. `kv-homebudget-dev-abc123`.
 
