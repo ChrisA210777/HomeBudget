@@ -191,7 +191,6 @@ public static class AccountEndpoints
                 from member in db.HouseholdMembers
                 join household in db.Households on member.HouseholdId equals household.Id
                 where member.UserId == user.Id
-                orderby household.Name
 
                 // Across all the user's households, so the per-household filter doesn't apply here.
                 let person = db.People.IgnoreQueryFilters()
@@ -201,6 +200,9 @@ public static class AccountEndpoints
                 select new HouseholdMembershipSummary(
                     household.Id, household.Name, member.Role.ToString(), member.IsOwner, person == null ? null : person.Id, person == null ? null : person.DisplayName, household.TransfersEnabled))
             .ToListAsync();
+
+        // Household names are encrypted, so they're sorted here (BUD-166).
+        households = [.. households.OrderBy(h => h.Name, StringComparer.CurrentCultureIgnoreCase)];
 
         // Fall back to another household if the last active one is gone or no longer theirs.
         var activeHouseholdId = households.Any(h => h.HouseholdId == user.LastActiveHouseholdId)

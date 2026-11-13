@@ -39,8 +39,8 @@ public static class ExistingDataEncryptor
         }
 
         var table = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
-        var key = entityType.FindPrimaryKey()!.Properties.Single();
-        var keyColumn = key.GetColumnName(table)!;
+        // Some tables have a key of more than one column (e.g. a household and a user).
+        var keyColumns = entityType.FindPrimaryKey()!.Properties.Select(p => p.GetColumnName(table)!).ToList();
         var columns = encrypted.Select(p => p.GetColumnName(table)!).ToList();
         var nameColumn = nameSource?.GetColumnName(table);
         var nameKeyColumn = nameSource is null ? null : EncryptionModelExtensions.NameKeyColumn;
@@ -51,7 +51,7 @@ public static class ExistingDataEncryptor
             conditions.Add($"{Quote(nameKeyColumn)} IS NULL");
         }
 
-        var selected = new List<string> { keyColumn };
+        var selected = new List<string>(keyColumns);
         selected.AddRange(columns);
         if (nameColumn is not null && !columns.Contains(nameColumn))
         {
@@ -110,8 +110,14 @@ public static class ExistingDataEncryptor
                     i++;
                 }
 
-                AddParameter(update, "@id", row[keyColumn]);
-                update.CommandText = $"UPDATE {tableName} SET {string.Join(", ", assignments)} WHERE {Quote(keyColumn)} = @id";
+                var matches = new List<string>();
+                for (var k = 0; k < keyColumns.Count; k++)
+                {
+                    matches.Add($"{Quote(keyColumns[k])} = @k{k}");
+                    AddParameter(update, $"@k{k}", row[keyColumns[k]]);
+                }
+
+                update.CommandText = $"UPDATE {tableName} SET {string.Join(", ", assignments)} WHERE {string.Join(" AND ", matches)}";
                 await update.ExecuteNonQueryAsync(cancellationToken);
             }
         }
