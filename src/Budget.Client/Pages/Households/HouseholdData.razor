@@ -1,4 +1,4 @@
-@page "/household/data"
+﻿@page "/household/data"
 @attribute [Authorize]
 @using Budget.Client.DataExport
 @using Budget.Shared.DataExport
@@ -40,12 +40,49 @@
 
             @* A plain link, so the browser downloads the file with the name the server gives it. *@
             <MudButton Href="@ExportUrl" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download"
-                       Disabled="!Online" download data-testid="download-json">Download (JSON)</MudButton>
+                       Disabled="!Online" download OnClick="RefreshDownloadsSoonAsync" data-testid="download-json">Download (JSON)</MudButton>
             <MudButton Href="@CsvUrl" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TableChart"
-                       Disabled="!Online" download Class="ml-sm-2 mt-2 mt-sm-0" data-testid="download-csv">Download for Excel (CSV)</MudButton>
+                       Disabled="!Online" download OnClick="RefreshDownloadsSoonAsync" Class="ml-sm-2 mt-2 mt-sm-0" data-testid="download-csv">Download for Excel (CSV)</MudButton>
             <MudText Typo="Typo.caption" Class="d-block mt-2" Color="Color.Secondary">
                 The JSON file can be imported again. The CSV files are for opening in Excel, and can't be imported.
             </MudText>
+        </MudPaper>
+
+        <MudPaper Class="pa-4 mt-4" Elevation="1" data-testid="downloads-section">
+            <MudText Typo="Typo.h6" Class="mb-1">Who has downloaded the data</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Every download of @_household.Name's data in the last @DataDownloadRoutes.KeptForMonths months, so you can spot one you don't expect.
+                Only Admins can see this.
+            </MudText>
+
+            @if (_downloads is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_downloadsFailed)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" data-testid="downloads-failed">The list couldn't be loaded. Check your connection and try again.</MudAlert>
+            }
+            else if (_downloads.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" data-testid="downloads-none">No one has downloaded the data in the last @DataDownloadRoutes.KeptForMonths months.</MudText>
+            }
+            else
+            {
+                <ul class="download-list" data-testid="downloads">
+                    @foreach (var download in _downloads)
+                    {
+                        <li data-testid="download">
+                            <MudIcon Icon="@(download.Format == "Csv" ? Icons.Material.Filled.TableChart : Icons.Material.Filled.Download)" Size="Size.Small"
+                                     Color="Color.Secondary" aria-hidden="true" />
+                            <div>
+                                <MudText Typo="Typo.body2"><strong data-testid="download-who">@(download.IsYou ? "You" : download.Who)</strong> · @Describe(download)</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="download-when">@download.At.ToLocalTime().ToString("d MMM yyyy, HH:mm")</MudText>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
         </MudPaper>
 
         <MudPaper Class="pa-4 mt-4" Elevation="1" data-testid="import-section">
@@ -169,7 +206,7 @@
                                 a person in the file with the same name becomes them. It can't be undone.
                             </MudText>
                             <MudButton Href="@BackupUrl" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" download
-                                       Class="mb-2" data-testid="replace-backup">Download a backup first</MudButton>
+                                       OnClick="RefreshDownloadsSoonAsync" Class="mb-2" data-testid="replace-backup">Download a backup first</MudButton>
                             <MudCheckBox T="bool" @bind-Value="_useFileName" Label="@($"Rename the household to “{_preview.HouseholdName}”")" Color="Color.Primary"
                                          data-testid="replace-use-file-name" />
                             <MudTextField @bind-Value="_replaceConfirm" Label="@($"Type {_household.Name} to confirm")" Variant="Variant.Outlined" Immediate="true"
@@ -325,6 +362,55 @@
 
     private static string Count(int count, string one, string many) => $"{count} {(count == 1 ? one : many)}";
 
-    protected override async Task OnInitializedAsync() =>
+    private IReadOnlyList<DataDownloadSummary>? _downloads;
+    private bool _downloadsFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
         _household = await Session.GetActiveHouseholdAsync() ?? new HouseholdMembershipSummary(Guid.Empty, string.Empty, "Viewer", false);
+        if (_household.Role == "Admin")
+        {
+            await LoadDownloadsAsync();
+        }
+    }
+
+    /// <summary>The data download log (BUD-141).</summary>
+    private async Task LoadDownloadsAsync()
+    {
+        try
+        {
+            _downloads = await ImportApi.DownloadsAsync(_household!.HouseholdId);
+            _downloadsFailed = false;
+        }
+        catch (HttpRequestException)
+        {
+            _downloads ??= [];
+            _downloadsFailed = true;
+        }
+    }
+
+    /// <summary>The download is a plain link, so the list is read again once the server has had time to log it.</summary>
+    private async Task RefreshDownloadsSoonAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2));
+        await LoadDownloadsAsync();
+    }
+
+    /// <summary>"JSON, with full history and who recorded what".</summary>
+    private static string Describe(DataDownloadSummary download)
+    {
+        var format = download.Format == "Csv" ? "CSV for Excel" : "JSON";
+        var extras = new List<string>();
+        if (download.IncludesHistory)
+        {
+            extras.Add("full history");
+        }
+
+        if (download.IncludesAudit)
+        {
+            extras.Add("who recorded what");
+        }
+
+        return extras.Count == 0 ? $"{format}, current items" : $"{format}, with {string.Join(" and ", extras)}";
+    }
 }

@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Budget.Shared.DataExport;
 
@@ -15,6 +15,9 @@ public interface IImportApi
 
     /// <summary>Replaces this household's data with the file's (BUD-62). Members and their people stay.</summary>
     Task<ImportResultResponse> ReplaceAsync(Guid householdId, byte[] file, bool useFileName);
+
+    /// <summary>Who downloaded the household's data in the last twelve months, newest first (BUD-141). Admins only.</summary>
+    Task<IReadOnlyList<DataDownloadSummary>> DownloadsAsync(Guid householdId);
 }
 
 public sealed class ImportApi(HttpClient http) : IImportApi
@@ -27,6 +30,9 @@ public sealed class ImportApi(HttpClient http) : IImportApi
 
     public Task<ImportResultResponse> ReplaceAsync(Guid householdId, byte[] file, bool useFileName) =>
         PostFileAsync<ImportResultResponse>(ReplaceRoutes.Replace(householdId, useFileName), file);
+
+    public async Task<IReadOnlyList<DataDownloadSummary>> DownloadsAsync(Guid householdId) =>
+        await http.GetFromJsonAsync<List<DataDownloadSummary>>(new Uri(DataDownloadRoutes.List(householdId), UriKind.Relative)) ?? [];
 
     private async Task<T> PostFileAsync<T>(string url, byte[] file)
     {

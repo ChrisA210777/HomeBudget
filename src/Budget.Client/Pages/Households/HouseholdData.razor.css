@@ -1,0 +1,23 @@
+/* The data download log (BUD-141): an icon beside each entry, with long names wrapping beside it. */
+.download-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.download-list li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 8px 0;
+}
+
+.download-list li + li {
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+.download-list li > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
