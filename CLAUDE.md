@@ -2,6 +2,14 @@
 
 Notes for anyone (person or AI assistant) making changes in this repo.
 
+## Cost comes first
+
+**Cost is the number one priority** (agreed 13 Nov 2026, BUD-167). Choose the free or cheapest option that does the
+job: free tiers, built-in features, and no new paid services, licences or higher plans. Override this only with a
+strong justification, usually security or legal compliance (e.g. UK GDPR), and then write down why, what it costs a
+month, and the cheaper options that were rejected (in the story, and in the ADR or Confluence page it affects). When
+proposing anything with a running cost, say the expected monthly cost up front.
+
 ## Keep the documentation current
 
 Documentation lives in two places, and both are part of "done":
