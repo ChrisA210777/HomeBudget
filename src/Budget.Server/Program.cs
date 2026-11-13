@@ -1,5 +1,6 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Budget.Infrastructure;
+using Budget.Infrastructure.Encryption;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.SignIn;
@@ -25,6 +26,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services.AddScoped<ExportBuilder>();
 builder.Services.AddHostedService<ActivityCleanup>();
+builder.Services.AddHostedService<EncryptExistingData>();
 builder.Services.AddInfrastructure();
 builder.Services.AddBudgetAuthentication(builder.Configuration);
 builder.Services.AddHouseholdAuthorization();
@@ -55,6 +57,15 @@ var app = builder.Build();
 app.UseForwardedHeadersIfEnabled();
 app.UseCorrelationIdHeader();
 app.UseSecurityHeaders(app.Environment);
+
+// Names and free text are stored encrypted (BUD-166). Deployed environments must set Encryption:Key (a Key Vault
+// reference in Azure); Development and the Testing environment fall back to a fixed, non-secret key. Done before
+// anything touches the database, and it stops the app starting if the key is missing or unreadable.
+FieldEncryption.Configure(
+    app.Configuration[$"{FieldEncryption.ConfigSection}:Key"] is { Length: > 0 } encryptionKey ? encryptionKey
+        : app.Environment.IsDevelopment() || app.Environment.IsEnvironment(TestSignInEndpoint.EnvironmentName) ? FieldEncryption.DevelopmentKey
+        : throw new InvalidOperationException($"Set {FieldEncryption.ConfigSection}:Key (see infra/README.md)."),
+    app.Configuration.GetSection($"{FieldEncryption.ConfigSection}:PreviousKeys").Get<string[]>());
 
 // In Development (and the end-to-end Testing environment) the database is created and migrated on startup. Deployed environments
 // apply migrations from the pipeline using the migration bundle instead (see ADR-003).

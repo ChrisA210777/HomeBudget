@@ -1,4 +1,5 @@
 using Budget.Domain.Households;
+using Budget.Infrastructure.Encryption;
 using Budget.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -12,7 +13,7 @@ public sealed class HouseholdConfiguration : IEntityTypeConfiguration<Household>
         builder.ToTable("Households");
         builder.HasKey(h => h.Id);
         builder.Property(h => h.Id).ValueGeneratedNever();
-        builder.Property(h => h.Name).HasMaxLength(Household.NameMaxLength).IsRequired();
+        builder.Property(h => h.Name).HasMaxLength(Household.NameMaxLength).IsRequired().IsEncrypted();
         builder.Property(h => h.CurrencyCode).HasMaxLength(3).IsFixedLength().IsUnicode(false).IsRequired();
 
         builder.HasMany(h => h.Members)

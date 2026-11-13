@@ -45,8 +45,8 @@ public class PersonRemovalApiTests(BudgetApiFactory factory) : IntegrationTestBa
         await ExecuteDbContextAsync(async db =>
         {
             Assert.False(await db.People.IgnoreQueryFilters().AnyAsync(p => p.Id == sam));
-            Assert.Equal(chris, (await db.IncomeStreams.IgnoreQueryFilters().SingleAsync(s => s.HouseholdId == householdId && s.Name == "Paper round")).PersonId);
-            Assert.False(await db.Outgoings.IgnoreQueryFilters().AnyAsync(o => o.HouseholdId == householdId && (o.Name == "Phone" || o.Name == "Gym")));
+            Assert.Equal(chris, (await db.IncomeStreams.IgnoreQueryFilters().Where(s => s.HouseholdId == householdId).ToListAsync()).Single(s => s.Name == "Paper round").PersonId);
+            Assert.DoesNotContain(await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId).ToListAsync(), o => o.Name is "Phone" or "Gym");
             var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(a => a.Id == accountId);
             Assert.Equal((null, true), (account.OwnerPersonId, account.IsArchived));
             Assert.False(await db.Invitations.AnyAsync(i => i.HouseholdId == householdId && i.AcceptedAt == null && i.RevokedAt == null));
@@ -90,8 +90,8 @@ public class PersonRemovalApiTests(BudgetApiFactory factory) : IntegrationTestBa
         Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
         await ExecuteDbContextAsync(async db =>
         {
-            Assert.False(await db.IncomeStreams.IgnoreQueryFilters().AnyAsync(s => s.HouseholdId == householdId && s.Name == "Paper round"));
-            var outgoings = await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId && (o.Name == "Phone" || o.Name == "Gym")).ToListAsync();
+            Assert.DoesNotContain(await db.IncomeStreams.IgnoreQueryFilters().Where(s => s.HouseholdId == householdId).ToListAsync(), s => s.Name == "Paper round");
+            var outgoings = (await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId).ToListAsync()).Where(o => o.Name is "Phone" or "Gym").ToList();
             Assert.Equal(2, outgoings.Count);
             Assert.All(outgoings, o => Assert.Null(o.PersonId));
             var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(a => a.Id == accountId);

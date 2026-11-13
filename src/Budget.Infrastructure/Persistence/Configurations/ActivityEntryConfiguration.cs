@@ -1,5 +1,6 @@
 using Budget.Domain.Activity;
 using Budget.Domain.Households;
+using Budget.Infrastructure.Encryption;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -13,9 +14,9 @@ public sealed class ActivityEntryConfiguration : IEntityTypeConfiguration<Activi
         builder.ToTable("ActivityEntries");
         builder.HasKey(a => a.Id);
         builder.Property(a => a.Id).ValueGeneratedNever();
-        builder.Property(a => a.ActorName).HasMaxLength(ActivityEntry.ActorNameMaxLength).IsRequired();
+        builder.Property(a => a.ActorName).HasMaxLength(ActivityEntry.ActorNameMaxLength).IsRequired().IsEncrypted();
         builder.Property(a => a.Area).HasConversion<string>().HasMaxLength(20);
-        builder.Property(a => a.Summary).HasMaxLength(ActivityEntry.SummaryMaxLength).IsRequired();
+        builder.Property(a => a.Summary).HasMaxLength(ActivityEntry.SummaryMaxLength).IsRequired().IsEncrypted();
         builder.Property(a => a.MergeKey).HasMaxLength(ActivityEntry.MergeKeyMaxLength);
 
         // Read newest first for a household.

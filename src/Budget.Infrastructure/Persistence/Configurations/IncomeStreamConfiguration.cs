@@ -2,6 +2,7 @@ using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Income;
 using Budget.Domain.People;
+using Budget.Infrastructure.Encryption;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -21,7 +22,7 @@ public sealed class IncomeStreamConfiguration : IEntityTypeConfiguration<IncomeS
         builder.ToTable("IncomeStreams");
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id).ValueGeneratedNever();
-        builder.Property(s => s.Name).HasMaxLength(IncomeStream.NameMaxLength).IsRequired();
+        builder.Property(s => s.Name).HasMaxLength(IncomeStream.NameMaxLength).IsRequired().IsEncrypted();
         builder.Property<byte[]>(RowVersion).IsRowVersion();
         builder.HasIndex(s => s.HouseholdId);
         builder.Ignore(s => s.StartsOn);
@@ -61,7 +62,7 @@ public sealed class IncomeAmountChangeConfiguration : IEntityTypeConfiguration<I
         builder.ToTable("IncomeAmountChanges");
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).ValueGeneratedNever();
-        builder.Property(c => c.Comment).HasMaxLength(IncomeStream.CommentMaxLength).IsRequired();
+        builder.Property(c => c.Comment).HasMaxLength(IncomeStream.CommentMaxLength).IsRequired().IsEncrypted();
         builder.Property(c => c.Unit).HasConversion<string>().HasMaxLength(10);
         builder.Ignore(c => c.Schedule);
         builder.Ignore(c => c.MonthlyEquivalent);
@@ -79,7 +80,7 @@ public sealed class IncomeStatusPeriodConfiguration : IEntityTypeConfiguration<I
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
         builder.Property(p => p.Reason).HasConversion<string>().HasMaxLength(30);
-        builder.Property(p => p.Comment).HasMaxLength(IncomeStream.CommentMaxLength).IsRequired();
+        builder.Property(p => p.Comment).HasMaxLength(IncomeStream.CommentMaxLength).IsRequired().IsEncrypted();
         builder.HasIndex(p => p.IncomeStreamId);
     }
 }
@@ -93,9 +94,9 @@ public sealed class IncomeCorrectionConfiguration : IEntityTypeConfiguration<Inc
         builder.Property(c => c.Id).ValueGeneratedNever();
         builder.Property(c => c.EntryType).HasConversion<string>().HasMaxLength(30);
         builder.Property(c => c.Action).HasConversion<string>().HasMaxLength(20);
-        builder.Property(c => c.Before).HasMaxLength(IncomeCorrection.DescriptionMaxLength).IsRequired();
-        builder.Property(c => c.After).HasMaxLength(IncomeCorrection.DescriptionMaxLength);
-        builder.Property(c => c.Reason).HasMaxLength(IncomeStream.CommentMaxLength).IsRequired();
+        builder.Property(c => c.Before).HasMaxLength(IncomeCorrection.DescriptionMaxLength).IsRequired().IsEncrypted();
+        builder.Property(c => c.After).HasMaxLength(IncomeCorrection.DescriptionMaxLength).IsEncrypted();
+        builder.Property(c => c.Reason).HasMaxLength(IncomeStream.CommentMaxLength).IsRequired().IsEncrypted();
         builder.HasIndex(c => c.IncomeStreamId);
     }
 }

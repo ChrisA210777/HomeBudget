@@ -45,7 +45,9 @@ public static class AccountDeletionEndpoints
     private static async Task<AccountDeletionCheck> WhatDeletingDoesAsync(Guid userId, BudgetDbContext db)
     {
         var ownedIds = await db.HouseholdMembers.Where(m => m.UserId == userId && m.IsOwner).Select(m => m.HouseholdId).ToListAsync();
-        var owned = await db.Households.Include(h => h.Members).Where(h => ownedIds.Contains(h.Id)).OrderBy(h => h.Name).ToListAsync();
+        // Household names are encrypted, so they're sorted here (BUD-166).
+        var owned = (await db.Households.Include(h => h.Members).Where(h => ownedIds.Contains(h.Id)).ToListAsync())
+            .OrderBy(h => h.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         var toDelete = new List<OwnedHousehold>();
         var toPassOn = new List<PassedOnHousehold>();
         foreach (var household in owned)

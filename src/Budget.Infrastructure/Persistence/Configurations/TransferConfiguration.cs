@@ -2,6 +2,7 @@ using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Outgoings;
 using Budget.Domain.Transfers;
+using Budget.Infrastructure.Encryption;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -26,8 +27,8 @@ public sealed class TransferConfiguration : IEntityTypeConfiguration<Transfer>
         builder.Ignore(t => t.StartsOn);
         builder.Ignore(t => t.EndsOn);
 
-        builder.Property(t => t.Name).HasMaxLength(Transfer.NameMaxLength);
-        builder.Property(t => t.Notes).HasMaxLength(Transfer.NotesMaxLength);
+        builder.Property(t => t.Name).HasMaxLength(Transfer.NameMaxLength).IsEncrypted();
+        builder.Property(t => t.Notes).HasMaxLength(Transfer.NotesMaxLength).IsEncrypted();
 
         builder.HasOne<Household>()
             .WithMany()
@@ -62,7 +63,7 @@ public sealed class TransferAmountChangeConfiguration : IEntityTypeConfiguration
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).ValueGeneratedNever();
         builder.Property(c => c.Unit).HasConversion<string>().HasMaxLength(10);
-        builder.Property(c => c.Comment).HasMaxLength(Transfer.CommentMaxLength).IsRequired();
+        builder.Property(c => c.Comment).HasMaxLength(Transfer.CommentMaxLength).IsRequired().IsEncrypted();
         builder.Ignore(c => c.Schedule);
         builder.Ignore(c => c.MonthlyEquivalent);
 
@@ -79,7 +80,7 @@ public sealed class TransferStatusPeriodConfiguration : IEntityTypeConfiguration
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
         builder.Property(p => p.Reason).HasConversion<string>().HasMaxLength(20);
-        builder.Property(p => p.Comment).HasMaxLength(Transfer.CommentMaxLength).IsRequired();
+        builder.Property(p => p.Comment).HasMaxLength(Transfer.CommentMaxLength).IsRequired().IsEncrypted();
         builder.HasIndex(p => p.TransferId);
     }
 }
@@ -93,9 +94,9 @@ public sealed class TransferCorrectionConfiguration : IEntityTypeConfiguration<T
         builder.Property(c => c.Id).ValueGeneratedNever();
         builder.Property(c => c.EntryType).HasConversion<string>().HasMaxLength(30);
         builder.Property(c => c.Action).HasConversion<string>().HasMaxLength(20);
-        builder.Property(c => c.Before).HasMaxLength(TransferCorrection.DescriptionMaxLength).IsRequired();
-        builder.Property(c => c.After).HasMaxLength(TransferCorrection.DescriptionMaxLength);
-        builder.Property(c => c.Reason).HasMaxLength(Transfer.CommentMaxLength).IsRequired();
+        builder.Property(c => c.Before).HasMaxLength(TransferCorrection.DescriptionMaxLength).IsRequired().IsEncrypted();
+        builder.Property(c => c.After).HasMaxLength(TransferCorrection.DescriptionMaxLength).IsEncrypted();
+        builder.Property(c => c.Reason).HasMaxLength(Transfer.CommentMaxLength).IsRequired().IsEncrypted();
         builder.HasIndex(c => c.TransferId);
     }
 }

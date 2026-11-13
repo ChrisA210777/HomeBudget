@@ -248,6 +248,10 @@ var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var microsoftSecretName = 'microsoft-client-secret'
 var googleSecretName = 'google-client-secret'
 
+// The key that encrypts names and free text in the database (BUD-166, ADR-017). Set once by hand (infra/README.md), never
+// by the deploy; losing it loses that data, so a copy is kept offline too.
+var dataEncryptionKeySecretName = 'data-encryption-key'
+
 resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: 'kv-${name}-${suffix}'
   location: location
@@ -260,6 +264,9 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
+    // A deleted vault or secret can't be purged until the 7 days are up, so the encryption key can't be destroyed in one
+    // step (BUD-166). This can never be turned off again for this vault.
+    enablePurgeProtection: true
     // The free web app can't use a private network, so the vault is reachable publicly; every request still needs an
     // Entra identity with a role on it.
     publicNetworkAccess: 'Enabled'
@@ -368,6 +375,11 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'ForwardedHeaders__ForwardHost'
           value: 'false'
+        }
+        {
+          // Names and free text are encrypted with this (BUD-166). The app won't start until the secret is set.
+          name: 'Encryption__Key'
+          value: '@Microsoft.KeyVault(VaultName=${vault.name};SecretName=${dataEncryptionKeySecretName})'
         }
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'

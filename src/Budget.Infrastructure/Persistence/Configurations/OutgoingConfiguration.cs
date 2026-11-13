@@ -2,6 +2,7 @@ using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.Outgoings;
 using Budget.Domain.People;
+using Budget.Infrastructure.Encryption;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,12 +15,13 @@ public sealed class OutgoingCategoryConfiguration : IEntityTypeConfiguration<Out
         builder.ToTable("OutgoingCategories");
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).ValueGeneratedNever();
-        builder.Property(c => c.Name).HasMaxLength(OutgoingCategory.NameMaxLength).IsRequired();
+        builder.Property(c => c.Name).HasMaxLength(OutgoingCategory.NameMaxLength).IsRequired().IsEncrypted();
         builder.Property(c => c.Icon).HasMaxLength(OutgoingCategory.IconMaxLength).IsUnicode(false).IsRequired()
             .HasDefaultValue(OutgoingCategory.DefaultIcon);
 
-        // Unique within a household; the collation is case-insensitive.
-        builder.HasIndex(c => new { c.HouseholdId, c.Name }).IsUnique();
+        // Unique within a household, ignoring case: on the name's keyed hash, as names are encrypted (BUD-166).
+        builder.HasNameKey(c => c.Name);
+        builder.HasIndex(nameof(OutgoingCategory.HouseholdId), EncryptionModelExtensions.NameKeyColumn).IsUnique().HasFilter("[NameKey] IS NOT NULL");
 
         builder.HasOne<Household>()
             .WithMany()
@@ -47,17 +49,17 @@ public sealed class OutgoingConfiguration : IEntityTypeConfiguration<Outgoing>
         builder.Ignore(o => o.StartsOn);
         builder.Ignore(o => o.EndsOn);
 
-        builder.Property(o => o.Name).HasMaxLength(Outgoing.NameMaxLength).IsRequired();
+        builder.Property(o => o.Name).HasMaxLength(Outgoing.NameMaxLength).IsRequired().IsEncrypted();
         builder.Property(o => o.Kind).HasConversion<string>().HasMaxLength(20);
         builder.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20);
         builder.Property(o => o.AlertPeriod).HasConversion<string>().HasMaxLength(20);
         builder.Property(o => o.PaymentMethod).HasConversion<string>().HasMaxLength(20);
-        builder.Property(o => o.Recipient).HasMaxLength(Outgoing.RecipientMaxLength);
-        builder.Property(o => o.ReferenceLabel).HasMaxLength(Outgoing.ReferenceLabelMaxLength);
-        builder.Property(o => o.ReferenceValue).HasMaxLength(Outgoing.ReferenceValueMaxLength);
-        builder.Property(o => o.Website).HasMaxLength(Outgoing.WebsiteMaxLength);
-        builder.Property(o => o.ContactPhone).HasMaxLength(Outgoing.ContactPhoneMaxLength);
-        builder.Property(o => o.Notes).HasMaxLength(Outgoing.NotesMaxLength);
+        builder.Property(o => o.Recipient).HasMaxLength(Outgoing.RecipientMaxLength).IsEncrypted();
+        builder.Property(o => o.ReferenceLabel).HasMaxLength(Outgoing.ReferenceLabelMaxLength).IsEncrypted();
+        builder.Property(o => o.ReferenceValue).HasMaxLength(Outgoing.ReferenceValueMaxLength).IsEncrypted();
+        builder.Property(o => o.Website).HasMaxLength(Outgoing.WebsiteMaxLength).IsEncrypted();
+        builder.Property(o => o.ContactPhone).HasMaxLength(Outgoing.ContactPhoneMaxLength).IsEncrypted();
+        builder.Property(o => o.Notes).HasMaxLength(Outgoing.NotesMaxLength).IsEncrypted();
 
         builder.HasOne<Household>()
             .WithMany()
@@ -105,7 +107,7 @@ public sealed class OutgoingAmountChangeConfiguration : IEntityTypeConfiguration
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).ValueGeneratedNever();
         builder.Property(c => c.Unit).HasConversion<string>().HasMaxLength(10);
-        builder.Property(c => c.Comment).HasMaxLength(Outgoing.CommentMaxLength).IsRequired();
+        builder.Property(c => c.Comment).HasMaxLength(Outgoing.CommentMaxLength).IsRequired().IsEncrypted();
         builder.Ignore(c => c.Schedule);
         builder.Ignore(c => c.MonthlyEquivalent);
 
@@ -122,7 +124,7 @@ public sealed class OutgoingStatusPeriodConfiguration : IEntityTypeConfiguration
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
         builder.Property(p => p.Reason).HasConversion<string>().HasMaxLength(20);
-        builder.Property(p => p.Comment).HasMaxLength(Outgoing.CommentMaxLength).IsRequired();
+        builder.Property(p => p.Comment).HasMaxLength(Outgoing.CommentMaxLength).IsRequired().IsEncrypted();
         builder.HasIndex(p => p.OutgoingId);
     }
 }
@@ -136,9 +138,9 @@ public sealed class OutgoingCorrectionConfiguration : IEntityTypeConfiguration<O
         builder.Property(c => c.Id).ValueGeneratedNever();
         builder.Property(c => c.EntryType).HasConversion<string>().HasMaxLength(30);
         builder.Property(c => c.Action).HasConversion<string>().HasMaxLength(20);
-        builder.Property(c => c.Before).HasMaxLength(OutgoingCorrection.DescriptionMaxLength).IsRequired();
-        builder.Property(c => c.After).HasMaxLength(OutgoingCorrection.DescriptionMaxLength);
-        builder.Property(c => c.Reason).HasMaxLength(Outgoing.CommentMaxLength).IsRequired();
+        builder.Property(c => c.Before).HasMaxLength(OutgoingCorrection.DescriptionMaxLength).IsRequired().IsEncrypted();
+        builder.Property(c => c.After).HasMaxLength(OutgoingCorrection.DescriptionMaxLength).IsEncrypted();
+        builder.Property(c => c.Reason).HasMaxLength(Outgoing.CommentMaxLength).IsRequired().IsEncrypted();
         builder.HasIndex(c => c.OutgoingId);
     }
 }

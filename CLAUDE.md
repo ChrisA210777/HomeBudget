@@ -58,6 +58,11 @@ than replacing the whole page, so nothing is lost.
 - Each change goes on its own branch with a pull request. CI (build, tests, end-to-end) runs on the PR; the owner
   merges.
 - Secrets never go in the repo: user secrets locally, GitHub secrets for Azure.
+- Names and free text in household data are stored encrypted (BUD-166, ADR-017): mark a new text field about people or
+  their money with `.IsEncrypted()` in its EF configuration. The database can't compare, sort or search encrypted
+  columns, so load the rows and do it in memory (`StringComparer.CurrentCultureIgnoreCase`), or compare name keys
+  (`HasNameKey`, `FieldEncryption.NameKey`) for uniqueness. `EncryptedQueryGuard` throws if a query tries, so tests
+  catch it. Amounts, dates, ids and the sign-in account table stay readable.
 - The Content Security Policy (`Hosting/SecurityHeaders.cs`) allows only the app's own files: no inline scripts or
   event handlers, and no scripts, fonts, images or API calls from other sites. Put scripts in `wwwroot/js`; if something
   truly needs another origin, change the policy deliberately and say why. Every e2e test fails on a policy violation.

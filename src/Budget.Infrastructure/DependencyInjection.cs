@@ -1,3 +1,4 @@
+using Budget.Infrastructure.Encryption;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -26,6 +27,8 @@ public static class DependencyInjection
         services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
         services.AddScoped<AuditingInterceptor>();
         services.AddScoped<ActivityInterceptor>();
+        services.AddSingleton<NameKeyInterceptor>();
+        services.AddSingleton<EncryptedQueryGuard>();
         services.AddScoped<CurrentHousehold>();
         services.AddScoped<ICurrentHousehold>(sp => sp.GetRequiredService<CurrentHousehold>());
 
@@ -43,7 +46,9 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure());
             options.AddInterceptors(
                 serviceProvider.GetRequiredService<AuditingInterceptor>(),
-                serviceProvider.GetRequiredService<ActivityInterceptor>());
+                serviceProvider.GetRequiredService<ActivityInterceptor>(),
+                serviceProvider.GetRequiredService<NameKeyInterceptor>(),
+                serviceProvider.GetRequiredService<EncryptedQueryGuard>());
         });
 
         services.AddIdentityCore<ApplicationUser>()

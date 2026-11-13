@@ -133,8 +133,9 @@ public class ExportApiTests(BudgetApiFactory factory) : IntegrationTestBase(fact
     private Task AddDataAsync(Guid householdId) =>
         ExecuteDbContextAsync(async db =>
         {
-            var housing = await db.OutgoingCategories.IgnoreQueryFilters().SingleAsync(c => c.HouseholdId == householdId && c.Name == "Housing");
-            var leisure = await db.OutgoingCategories.IgnoreQueryFilters().SingleAsync(c => c.HouseholdId == householdId && c.Name == "Leisure & memberships");
+            var categories = await db.OutgoingCategories.IgnoreQueryFilters().Where(c => c.HouseholdId == householdId).ToListAsync();
+            var housing = categories.Single(c => c.Name == "Housing");
+            var leisure = categories.Single(c => c.Name == "Leisure & memberships");
             var person = await db.People.IgnoreQueryFilters().SingleAsync(p => p.HouseholdId == householdId);
 
             var salary = IncomeStream.Create(householdId, person.Id, "Salary", 2500m, Today.AddYears(-1), "Starting amount");

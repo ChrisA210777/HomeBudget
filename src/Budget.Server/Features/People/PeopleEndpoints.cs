@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Budget.Domain.People;
+using Budget.Infrastructure.Encryption;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
@@ -110,9 +111,9 @@ public static class PeopleEndpoints
             return errors;
         }
 
-        // The database comparison is case-insensitive, matching the unique index.
-        var name = request.DisplayName.Trim();
-        if (await db.People.AnyAsync(p => p.DisplayName == name && p.Id != exceptPersonId))
+        // Names are encrypted, so they're compared by their keyed hash, which ignores case (BUD-166).
+        var nameKey = FieldEncryption.NameKey(request.DisplayName);
+        if (await db.People.AnyAsync(p => EF.Property<string>(p, EncryptionModelExtensions.NameKeyColumn) == nameKey && p.Id != exceptPersonId))
         {
             errors[nameof(SavePersonRequest.DisplayName)] = [DuplicateName];
         }

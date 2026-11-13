@@ -227,12 +227,14 @@ public static class HouseholdEndpoints
         var user = await db.Users.SingleAsync(u => u.Id == userId);
         if (user.LastActiveHouseholdId == householdId)
         {
-            user.LastActiveHouseholdId = await db.HouseholdMembers
-                .Where(m => m.UserId == userId && m.HouseholdId != householdId)
-                .Join(db.Households, m => m.HouseholdId, h => h.Id, (_, h) => h)
-                .OrderBy(h => h.Name)
+            // Household names are encrypted, so they're sorted here (BUD-166).
+            user.LastActiveHouseholdId = (await db.HouseholdMembers
+                    .Where(m => m.UserId == userId && m.HouseholdId != householdId)
+                    .Join(db.Households, m => m.HouseholdId, h => h.Id, (_, h) => new { h.Id, h.Name })
+                    .ToListAsync())
+                .OrderBy(h => h.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(h => (Guid?)h.Id)
-                .FirstOrDefaultAsync();
+                .FirstOrDefault();
         }
 
         await db.SaveChangesAsync();

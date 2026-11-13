@@ -46,17 +46,20 @@ public sealed class ExportBuilder(BudgetDbContext db, TimeProvider time)
             .AsNoTracking()
             .ToListAsync();
 
-        var people = await db.People.AsNoTracking().OrderBy(p => p.DisplayName).ToListAsync();
-        var accounts = await db.Accounts.AsNoTracking().OrderBy(a => a.Name).ToListAsync();
+        // Names are encrypted, so lists are sorted here rather than by the database (BUD-166).
+        var people = (await db.People.AsNoTracking().ToListAsync()).OrderBy(p => p.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+        var accounts = (await db.Accounts.AsNoTracking().ToListAsync()).OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         string? AccountName(Guid? id) =>
             accounts.Find(a => a.Id == id) is { } account ? account.DisplayName(accounts.Find(a => a.Id == account.ParentAccountId)) : null;
-        var categories = await db.OutgoingCategories.AsNoTracking().OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync();
+        var categories = (await db.OutgoingCategories.AsNoTracking().ToListAsync()).OrderBy(c => c.SortOrder).ThenBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         var incomes = await db.IncomeStreams.AsNoTracking()
             .Include(i => i.AmountChanges).Include(i => i.StatusPeriods).Include(i => i.Corrections)
-            .AsSplitQuery().OrderBy(i => i.Name).ToListAsync();
+            .AsSplitQuery().ToListAsync();
+        incomes = [.. incomes.OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase)];
         var outgoings = await db.Outgoings.AsNoTracking()
             .Include(o => o.AmountChanges).Include(o => o.StatusPeriods).Include(o => o.Corrections)
-            .AsSplitQuery().OrderBy(o => o.Name).ToListAsync();
+            .AsSplitQuery().ToListAsync();
+        outgoings = [.. outgoings.OrderBy(o => o.Name, StringComparer.CurrentCultureIgnoreCase)];
         var transfers = await db.Transfers.AsNoTracking()
             .Include(t => t.AmountChanges).Include(t => t.StatusPeriods).Include(t => t.Corrections)
             .AsSplitQuery().OrderBy(t => t.FirstPaymentDate).ToListAsync();

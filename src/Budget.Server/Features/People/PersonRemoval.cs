@@ -143,14 +143,20 @@ public static class PersonRemoval
                 .Where(i => i.PersonId == personId)
                 .ExecuteUpdateAsync(i => i.SetProperty(x => x.PersonId, (Guid?)null));
 
-            // Earlier activity about them keeps what happened, without their name (BUD-154).
-            await db.ActivityEntries.IgnoreQueryFilters()
+            // Earlier activity about them keeps what happened, without their name (BUD-154). Summaries are encrypted, so
+            // which wording each gets is decided here rather than by the database (BUD-166).
+            var earlier = await db.ActivityEntries.IgnoreQueryFilters()
                 .Where(a => a.SubjectId == personId)
-                .ExecuteUpdateAsync(a => a
-                    .SetProperty(x => x.Summary, x => x.Summary.StartsWith("added ")
-                        ? ActivityMessages.RemovedPersonAdded
-                        : ActivityMessages.RemovedPersonRenamed)
-                    .SetProperty(x => x.SubjectId, (Guid?)null));
+                .Select(a => new { a.Id, a.Summary })
+                .ToListAsync();
+            var added = earlier.Where(a => a.Summary.StartsWith("added ", StringComparison.Ordinal)).Select(a => a.Id).ToList();
+            var renamed = earlier.Select(a => a.Id).Except(added).ToList();
+            await db.ActivityEntries.IgnoreQueryFilters()
+                .Where(a => added.Contains(a.Id))
+                .ExecuteUpdateAsync(a => a.SetProperty(x => x.Summary, ActivityMessages.RemovedPersonAdded).SetProperty(x => x.SubjectId, (Guid?)null));
+            await db.ActivityEntries.IgnoreQueryFilters()
+                .Where(a => renamed.Contains(a.Id))
+                .ExecuteUpdateAsync(a => a.SetProperty(x => x.Summary, ActivityMessages.RemovedPersonRenamed).SetProperty(x => x.SubjectId, (Guid?)null));
 
             db.People.Remove(person);
             db.ActivityEntries.Add(ActivityMessages.PersonRemoved(householdId));
