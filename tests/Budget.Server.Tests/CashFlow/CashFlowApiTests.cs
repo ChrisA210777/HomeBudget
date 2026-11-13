@@ -86,10 +86,10 @@ public class CashFlowApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var (jointId, billsId, topUpId, gymId) = (Guid.Empty, Guid.Empty, Guid.Empty, Guid.Empty);
         await ExecuteDbContextAsync(async db =>
         {
-            jointId = await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.Name == "Joint").Select(a => a.Id).SingleAsync();
-            billsId = await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId && a.Name == "Bills").Select(a => a.Id).SingleAsync();
-            topUpId = await db.Transfers.IgnoreQueryFilters().Where(t => t.HouseholdId == householdId && t.Name == "Bills top-up").Select(t => t.Id).SingleAsync();
-            gymId = await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId && o.Name == "Gym").Select(o => o.Id).SingleAsync();
+            jointId = (await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ToListAsync()).Single(a => a.Name == "Joint").Id;
+            billsId = (await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ToListAsync()).Single(a => a.Name == "Bills").Id;
+            topUpId = (await db.Transfers.IgnoreQueryFilters().Where(t => t.HouseholdId == householdId).ToListAsync()).Single(t => t.Name == "Bills top-up").Id;
+            gymId = (await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId).ToListAsync()).Single(o => o.Name == "Gym").Id;
         });
 
         // The choices are the money into the account: the top-up into its Bills pot, not the move into its own Holiday pot.
@@ -131,8 +131,8 @@ public class CashFlowApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         var (client, householdId) = await HouseholdAsync();
         await ExecuteDbContextAsync(async db =>
         {
-            var joint = await db.Accounts.IgnoreQueryFilters().SingleAsync(a => a.HouseholdId == householdId && a.Name == "Joint");
-            var topUp = await db.Transfers.IgnoreQueryFilters().SingleAsync(t => t.HouseholdId == householdId && t.Name == "Bills top-up");
+            var joint = (await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ToListAsync()).Single(a => a.Name == "Joint");
+            var topUp = (await db.Transfers.IgnoreQueryFilters().Where(t => t.HouseholdId == householdId).ToListAsync()).Single(t => t.Name == "Bills top-up");
             joint.StartMonthWith(topUp.Id);
             await db.SaveChangesAsync();
         });
@@ -164,7 +164,7 @@ public class CashFlowApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
         await ExecuteDbContextAsync(async db =>
         {
             var person = await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == householdId).Select(p => p.Id).FirstAsync();
-            var current = await db.Accounts.IgnoreQueryFilters().SingleAsync(a => a.HouseholdId == householdId && a.Name == "Current");
+            var current = (await db.Accounts.IgnoreQueryFilters().Where(a => a.HouseholdId == householdId).ToListAsync()).Single(a => a.Name == "Current");
             currentId = current.Id;
             var pension = IncomeStream.Create(householdId, person, "State pension", 900m, new DateOnly(2026, 10, 12), "Start", new PaymentSchedule(4, PaymentUnit.Week));
             pension.PayInto(current.Id);

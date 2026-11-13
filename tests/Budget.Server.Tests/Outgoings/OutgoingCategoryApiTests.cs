@@ -145,8 +145,8 @@ public class OutgoingCategoryApiTests(BudgetApiFactory factory) : IntegrationTes
     {
         var (_, householdId) = await CreateHouseholdOwnerAsync();
         Guid categoryId = default;
-        await ExecuteDbContextAsync(async db => categoryId = await db.OutgoingCategories.IgnoreQueryFilters()
-            .Where(c => c.HouseholdId == householdId && c.Name == "Housing").Select(c => c.Id).SingleAsync());
+        await ExecuteDbContextAsync(async db => categoryId = (await db.OutgoingCategories.IgnoreQueryFilters()
+            .Where(c => c.HouseholdId == householdId).ToListAsync()).Single(c => c.Name == "Housing").Id);
 
         var account = Account.Create(householdId, "Joint account");
         var outgoing = Outgoing.Create(householdId, new OutgoingDetails

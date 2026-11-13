@@ -37,6 +37,10 @@ Then open https://localhost:7180. The health check is at https://localhost:7180/
 
 In Development the app creates the `HomeBudget` database and applies any pending migrations on startup, so SQL Server must be running first.
 
+Names and free text are stored encrypted (BUD-166). Locally and in tests the app uses a fixed development key, so there's
+nothing to set up; to look at a value in the database, decrypt it with `FieldEncryption.Decrypt`. Deployed environments
+use their own key from Key Vault (`infra/README.md`).
+
 If the HTTPS development certificate isn't trusted yet, run `dotnet dev-certs https --trust`.
 
 ### Microsoft sign-in

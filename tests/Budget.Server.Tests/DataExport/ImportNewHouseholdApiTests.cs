@@ -153,7 +153,7 @@ public class ImportNewHouseholdApiTests(BudgetApiFactory factory) : IntegrationT
 
         Assert.False(result.Succeeded);
         Assert.Equal("outgoings[0].statusPeriods[0]", Assert.Single(result.Errors).Path);
-        await ExecuteDbContextAsync(async db => Assert.False(await db.Households.AnyAsync(h => h.Name == name)));
+        await ExecuteDbContextAsync(async db => Assert.DoesNotContain(await db.Households.ToListAsync(), h => h.Name == name));
     }
 
     [Fact]

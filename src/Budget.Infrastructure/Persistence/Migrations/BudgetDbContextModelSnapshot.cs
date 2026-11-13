@@ -50,15 +50,19 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
+
+                    b.Property<string>("NameKey")
+                        .HasMaxLength(44)
+                        .HasColumnType("nvarchar(44)");
 
                     b.Property<DateTimeOffset?>("OriginallyRecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<Guid?>("OwnerPersonId")
                         .HasColumnType("uniqueidentifier");
@@ -67,8 +71,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Provider")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
 
                     b.HasKey("Id");
 
@@ -76,9 +80,9 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ParentAccountId");
 
-                    b.HasIndex("HouseholdId", "ParentAccountId", "Name")
+                    b.HasIndex("HouseholdId", "ParentAccountId", "NameKey")
                         .IsUnique()
-                        .HasFilter("[ParentAccountId] IS NOT NULL");
+                        .HasFilter("[ParentAccountId] IS NOT NULL AND [NameKey] IS NOT NULL");
 
                     b.ToTable("Accounts", (string)null);
                 });
@@ -90,8 +94,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("ActorName")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<string>("Area")
                         .IsRequired()
@@ -113,8 +117,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Summary")
                         .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
+                        .HasMaxLength(1254)
+                        .HasColumnType("nvarchar(1254)");
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -184,15 +188,15 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
 
                     b.Property<DateTimeOffset?>("OriginallyRecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<bool>("TransfersEnabled")
                         .HasColumnType("bit");
@@ -232,8 +236,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -292,8 +296,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<Guid?>("PersonId")
                         .HasColumnType("uniqueidentifier");
@@ -345,8 +349,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Comment")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -373,8 +377,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -400,13 +404,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("After")
-                        .HasMaxLength(600)
-                        .HasColumnType("nvarchar(600)");
+                        .HasMaxLength(2454)
+                        .HasColumnType("nvarchar(2454)");
 
                     b.Property<string>("Before")
                         .IsRequired()
-                        .HasMaxLength(600)
-                        .HasColumnType("nvarchar(600)");
+                        .HasMaxLength(2454)
+                        .HasColumnType("nvarchar(2454)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -435,13 +439,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<string>("Reason")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.HasKey("Id");
 
@@ -457,8 +461,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Comment")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -482,8 +486,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<string>("Reason")
                         .IsRequired()
@@ -529,15 +533,15 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
 
                     b.Property<DateTimeOffset?>("OriginallyRecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<Guid>("PersonId")
                         .HasColumnType("uniqueidentifier");
@@ -578,8 +582,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("ContactPhone")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(174)
+                        .HasColumnType("nvarchar(174)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -606,19 +610,18 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTimeOffset?>("OriginallyRecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<string>("PaymentMethod")
                         .HasMaxLength(20)
@@ -633,16 +636,16 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Recipient")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
 
                     b.Property<string>("ReferenceLabel")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
 
                     b.Property<string>("ReferenceValue")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
 
                     b.Property<DateOnly?>("RenewalDate")
                         .HasColumnType("date");
@@ -659,8 +662,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Website")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
+                        .HasMaxLength(1254)
+                        .HasColumnType("nvarchar(1254)");
 
                     b.HasKey("Id");
 
@@ -688,8 +691,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Comment")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -713,8 +716,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<Guid>("OutgoingId")
                         .HasColumnType("uniqueidentifier");
@@ -765,23 +768,28 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("NameKey")
+                        .HasMaxLength(44)
+                        .HasColumnType("nvarchar(44)");
 
                     b.Property<DateTimeOffset?>("OriginallyRecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("HouseholdId", "Name")
-                        .IsUnique();
+                    b.HasIndex("HouseholdId", "NameKey")
+                        .IsUnique()
+                        .HasFilter("[NameKey] IS NOT NULL");
 
                     b.ToTable("OutgoingCategories", (string)null);
                 });
@@ -797,13 +805,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("After")
-                        .HasMaxLength(600)
-                        .HasColumnType("nvarchar(600)");
+                        .HasMaxLength(2454)
+                        .HasColumnType("nvarchar(2454)");
 
                     b.Property<string>("Before")
                         .IsRequired()
-                        .HasMaxLength(600)
-                        .HasColumnType("nvarchar(600)");
+                        .HasMaxLength(2454)
+                        .HasColumnType("nvarchar(2454)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -829,16 +837,16 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<Guid>("OutgoingId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Reason")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.HasKey("Id");
 
@@ -854,8 +862,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Comment")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -873,8 +881,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<Guid>("OutgoingId")
                         .HasColumnType("uniqueidentifier");
@@ -910,14 +918,18 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
 
                     b.Property<Guid>("HouseholdId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("LinkedUserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("NameKey")
+                        .HasMaxLength(44)
+                        .HasColumnType("nvarchar(44)");
 
                     b.Property<DateTimeOffset>("ModifiedAt")
                         .HasColumnType("datetimeoffset");
@@ -929,15 +941,16 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("LinkedUserId");
 
-                    b.HasIndex("HouseholdId", "DisplayName")
-                        .IsUnique();
+                    b.HasIndex("HouseholdId", "NameKey")
+                        .IsUnique()
+                        .HasFilter("[NameKey] IS NOT NULL");
 
                     b.HasIndex("HouseholdId", "LinkedUserId")
                         .IsUnique()
@@ -973,19 +986,18 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Name")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(454)
+                        .HasColumnType("nvarchar(454)");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTimeOffset?>("OriginallyRecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -1017,8 +1029,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Comment")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -1042,8 +1054,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<Guid>("TransferId")
                         .HasColumnType("uniqueidentifier");
@@ -1072,13 +1084,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("After")
-                        .HasMaxLength(600)
-                        .HasColumnType("nvarchar(600)");
+                        .HasMaxLength(2454)
+                        .HasColumnType("nvarchar(2454)");
 
                     b.Property<string>("Before")
                         .IsRequired()
-                        .HasMaxLength(600)
-                        .HasColumnType("nvarchar(600)");
+                        .HasMaxLength(2454)
+                        .HasColumnType("nvarchar(2454)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -1104,13 +1116,13 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<string>("Reason")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<Guid>("TransferId")
                         .HasColumnType("uniqueidentifier");
@@ -1129,8 +1141,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Comment")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -1148,8 +1160,8 @@ namespace Budget.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("OriginallyRecordedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(854)
+                        .HasColumnType("nvarchar(854)");
 
                     b.Property<string>("Reason")
                         .IsRequired()

@@ -51,7 +51,7 @@ public class ReplaceHouseholdDataApiTests(BudgetApiFactory factory) : Integratio
             Assert.DoesNotContain("Old gym", outgoings);
             Assert.Equal(3, outgoings.Count);
 
-            var salary = await db.IncomeStreams.IgnoreQueryFilters().SingleAsync(i => i.HouseholdId == householdId && i.Name == "Salary");
+            var salary = (await db.IncomeStreams.IgnoreQueryFilters().Where(i => i.HouseholdId == householdId).ToListAsync()).Single(i => i.Name == "Salary");
             Assert.Equal(people.Single(p => p.DisplayName == "Chris").Id, salary.PersonId);
         });
     }
@@ -81,7 +81,7 @@ public class ReplaceHouseholdDataApiTests(BudgetApiFactory factory) : Integratio
         Assert.False(result.Succeeded);
         await ExecuteDbContextAsync(async db =>
         {
-            Assert.True(await db.Outgoings.IgnoreQueryFilters().AnyAsync(o => o.HouseholdId == householdId && o.Name == "Old gym"));
+            Assert.Contains(await db.Outgoings.IgnoreQueryFilters().Where(o => o.HouseholdId == householdId).ToListAsync(), o => o.Name == "Old gym");
             Assert.Equal(16, await db.OutgoingCategories.IgnoreQueryFilters().CountAsync(c => c.HouseholdId == householdId));
             Assert.Equal("My Household", (await db.Households.SingleAsync(h => h.Id == householdId)).Name);
         });
@@ -117,7 +117,7 @@ public class ReplaceHouseholdDataApiTests(BudgetApiFactory factory) : Integratio
                 db.People.Add(Person.Create(householdId, "JANE", userId));
             }
 
-            var housing = await db.OutgoingCategories.IgnoreQueryFilters().SingleAsync(c => c.HouseholdId == householdId && c.Name == "Housing");
+            var housing = (await db.OutgoingCategories.IgnoreQueryFilters().Where(c => c.HouseholdId == householdId).ToListAsync()).Single(c => c.Name == "Housing");
             db.Outgoings.Add(Outgoing.Create(householdId, new OutgoingDetails { Name = "Old gym", CategoryId = housing.Id, FirstPaymentDate = new DateOnly(2026, 1, 1) }, 30m, PaymentSchedule.Monthly, "Starting amount"));
             await db.SaveChangesAsync();
         });

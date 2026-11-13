@@ -1,6 +1,7 @@
 using Budget.Domain.Accounts;
 using Budget.Domain.Households;
 using Budget.Domain.People;
+using Budget.Infrastructure.Encryption;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -15,8 +16,8 @@ public sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.Property(a => a.Id).ValueGeneratedNever();
         builder.Ignore(a => a.IsPot);
 
-        builder.Property(a => a.Name).HasMaxLength(Account.NameMaxLength).IsRequired();
-        builder.Property(a => a.Provider).HasMaxLength(Account.ProviderMaxLength);
+        builder.Property(a => a.Name).HasMaxLength(Account.NameMaxLength).IsRequired().IsEncrypted();
+        builder.Property(a => a.Provider).HasMaxLength(Account.ProviderMaxLength).IsEncrypted();
 
         // The owner is a person in the household; people are never deleted while they own anything.
         builder.HasOne<Person>()
@@ -24,9 +25,12 @@ public sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasForeignKey(a => a.OwnerPersonId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Names are unique among a household's accounts and among an account's pots. The collation ignores case,
-        // and a null parent counts as a value in a SQL Server unique index, so accounts are covered too.
-        builder.HasIndex(a => new { a.HouseholdId, a.ParentAccountId, a.Name }).IsUnique();
+        // Pots' names are unique within their account, ignoring case; accounts' names are checked by the app (as before,
+        // the index leaves out rows without a parent). Names are encrypted, so the index is on their keyed hash (BUD-166).
+        // Rows saved before BUD-166 get their key on start-up.
+        builder.HasNameKey(a => a.Name);
+        builder.HasIndex(nameof(Account.HouseholdId), nameof(Account.ParentAccountId), EncryptionModelExtensions.NameKeyColumn)
+            .IsUnique().HasFilter("[ParentAccountId] IS NOT NULL AND [NameKey] IS NOT NULL");
 
         builder.HasOne<Household>()
             .WithMany()

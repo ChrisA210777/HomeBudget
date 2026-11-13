@@ -1,5 +1,6 @@
 using Budget.Domain.Households;
 using Budget.Domain.People;
+using Budget.Infrastructure.Encryption;
 using Budget.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -13,11 +14,12 @@ public sealed class PersonConfiguration : IEntityTypeConfiguration<Person>
         builder.ToTable("People");
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
-        builder.Property(p => p.DisplayName).HasMaxLength(Person.DisplayNameMaxLength).IsRequired();
+        builder.Property(p => p.DisplayName).HasMaxLength(Person.DisplayNameMaxLength).IsRequired().IsEncrypted();
 
-        // Names are unique within a household. The database collation is case-insensitive,
-        // so "jane" and "Jane" count as the same name.
-        builder.HasIndex(p => new { p.HouseholdId, p.DisplayName }).IsUnique();
+        // Names are unique within a household, ignoring case ("jane" and "Jane" are the same). Names are encrypted, so
+        // the index is on their keyed hash (BUD-166).
+        builder.HasNameKey(p => p.DisplayName);
+        builder.HasIndex(nameof(Person.HouseholdId), EncryptionModelExtensions.NameKeyColumn).IsUnique().HasFilter("[NameKey] IS NOT NULL");
 
         // A login is linked to at most one person per household.
         builder.HasIndex(p => new { p.HouseholdId, p.LinkedUserId })

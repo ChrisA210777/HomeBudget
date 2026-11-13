@@ -41,7 +41,9 @@ public static class BudgetEndpoints
 
         var streams = await db.IncomeStreams.Include(s => s.AmountChanges).Include(s => s.StatusPeriods).AsSplitQuery().AsNoTracking().ToListAsync();
         var outgoings = await db.Outgoings.Include(o => o.AmountChanges).Include(o => o.StatusPeriods).AsSplitQuery().AsNoTracking().ToListAsync();
-        var categories = await db.OutgoingCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).Select(c => new { c.Id, c.Name, c.Icon }).ToListAsync();
+        // Names are encrypted, so they're sorted here (BUD-166).
+        var categories = (await db.OutgoingCategories.Select(c => new { c.Id, c.Name, c.Icon, c.SortOrder }).ToListAsync())
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         var currency = await db.Households.Where(h => h.Id == householdId).Select(h => h.CurrencyCode).SingleAsync();
 
         var budget = TotalsFor(streams, outgoings, year, monthNumber);

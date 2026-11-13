@@ -574,8 +574,8 @@ public class OutgoingApiTests(BudgetApiFactory factory) : IntegrationTestBase(fa
     private async Task<Guid> CategoryIdAsync(Guid householdId, string name)
     {
         Guid id = default;
-        await ExecuteDbContextAsync(async db => id = await db.OutgoingCategories.IgnoreQueryFilters()
-            .Where(c => c.HouseholdId == householdId && c.Name == name).Select(c => c.Id).SingleAsync());
+        await ExecuteDbContextAsync(async db => id = (await db.OutgoingCategories.IgnoreQueryFilters()
+            .Where(c => c.HouseholdId == householdId).ToListAsync()).Single(c => c.Name == name).Id);
         return id;
     }
 

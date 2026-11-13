@@ -1,4 +1,5 @@
 using Budget.Domain.Outgoings;
+using Budget.Infrastructure.Encryption;
 using Budget.Infrastructure.Persistence;
 using Budget.Server.Features.Activity;
 using Budget.Server.Features.Households;
@@ -28,12 +29,15 @@ public static class OutgoingCategoryEndpoints
         return app;
     }
 
+    // Names are encrypted, so they're sorted here rather than by the database (BUD-166).
     private static async Task<IReadOnlyList<OutgoingCategorySummary>> ListAsync(BudgetDbContext db) =>
-        await db.OutgoingCategories
-            .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
-            .Select(c => new OutgoingCategorySummary(c.Id, c.Name, c.IsHidden, db.Outgoings.Count(o => o.CategoryId == c.Id), c.Icon))
+        (await db.OutgoingCategories
+            .Select(c => new { c.SortOrder, Summary = new OutgoingCategorySummary(c.Id, c.Name, c.IsHidden, db.Outgoings.Count(o => o.CategoryId == c.Id), c.Icon) })
             .AsNoTracking()
-            .ToListAsync();
+            .ToListAsync())
+        .OrderBy(c => c.SortOrder).ThenBy(c => c.Summary.Name, StringComparer.CurrentCultureIgnoreCase)
+        .Select(c => c.Summary)
+        .ToList();
 
     private static async Task<IResult> AddAsync(Guid householdId, AddCategoryRequest request, BudgetDbContext db)
     {
@@ -125,9 +129,9 @@ public static class OutgoingCategoryEndpoints
             return errors;
         }
 
-        // The database comparison is case-insensitive, matching the unique index.
-        var trimmed = name!.Trim();
-        if (await db.OutgoingCategories.AnyAsync(c => c.Name == trimmed && c.Id != exceptId))
+        // Names are encrypted, so they're compared by their keyed hash, which ignores case (BUD-166).
+        var nameKey = FieldEncryption.NameKey(name!);
+        if (await db.OutgoingCategories.AnyAsync(c => EF.Property<string>(c, EncryptionModelExtensions.NameKeyColumn) == nameKey && c.Id != exceptId))
         {
             errors["Name"] = [DuplicateName];
         }

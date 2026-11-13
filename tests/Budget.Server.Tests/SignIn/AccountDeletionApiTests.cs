@@ -53,7 +53,7 @@ public class AccountDeletionApiTests(BudgetApiFactory factory) : IntegrationTest
             // The shared household keeps her person and what she added, without the link to her.
             var person = await db.People.IgnoreQueryFilters().SingleAsync(p => p.Id == personId);
             Assert.Null(person.LinkedUserId);
-            Assert.True(await db.People.IgnoreQueryFilters().AnyAsync(p => p.HouseholdId == sharedId && p.DisplayName == "Sam"));
+            Assert.Contains(await db.People.IgnoreQueryFilters().Where(p => p.HouseholdId == sharedId).ToListAsync(), p => p.DisplayName == "Sam");
             Assert.False(await db.ActivityEntries.IgnoreQueryFilters().AnyAsync(a => a.UserId == janeId));
         });
 

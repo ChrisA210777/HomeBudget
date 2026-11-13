@@ -111,9 +111,12 @@ public class MigrationTests(SqlServerFixture sqlServer)
         await migrator.MigrateAsync();
 
         var accounts = await db.Accounts.IgnoreQueryFilters().AsNoTracking().ToListAsync();
+
+        // Names are encrypted once the app runs (BUD-166), so they're matched in memory.
+        var outgoings = await db.Outgoings.IgnoreQueryFilters().AsNoTracking().ToListAsync();
         string? PaidFrom(string outgoing)
         {
-            var accountId = db.Outgoings.IgnoreQueryFilters().AsNoTracking().Single(o => o.Name == outgoing).AccountId;
+            var accountId = outgoings.Single(o => o.Name == outgoing).AccountId;
             var account = accounts.SingleOrDefault(a => a.Id == accountId);
             return account?.DisplayName(accounts.SingleOrDefault(a => a.Id == account.ParentAccountId));
         }
@@ -131,7 +134,7 @@ public class MigrationTests(SqlServerFixture sqlServer)
         Assert.Null(PaidFrom("Gym"));
 
         // Each household gets its own accounts.
-        var rent = await db.Outgoings.IgnoreQueryFilters().AsNoTracking().SingleAsync(o => o.Name == "Rent");
+        var rent = outgoings.Single(o => o.Name == "Rent");
         Assert.Equal(otherHouseholdId, accounts.Single(a => a.Id == rent.AccountId).HouseholdId);
     }
 }

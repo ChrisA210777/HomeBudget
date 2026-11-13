@@ -6,6 +6,7 @@ using Budget.Domain.Income;
 using Budget.Domain.Outgoings;
 using Budget.Domain.People;
 using Budget.Domain.Transfers;
+using Budget.Infrastructure.Encryption;
 using Budget.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -79,10 +80,14 @@ public class BudgetDbContext : IdentityUserContext<ApplicationUser, Guid>
         // Original audit details kept from an import (BUD-63), on every auditable table.
         foreach (var entity in builder.Model.GetEntityTypes().Where(e => typeof(AuditableEntity).IsAssignableFrom(e.ClrType)))
         {
-            builder.Entity(entity.ClrType).Property(nameof(AuditableEntity.OriginallyRecordedBy)).HasMaxLength(AuditableEntity.OriginallyRecordedByMaxLength);
+            builder.Entity(entity.ClrType).Property(nameof(AuditableEntity.OriginallyRecordedBy)).HasMaxLength(AuditableEntity.OriginallyRecordedByMaxLength)
+                .IsEncrypted();
             builder.Entity(entity.ClrType).Ignore(nameof(AuditableEntity.RecordedByName));
             builder.Entity(entity.ClrType).Ignore(nameof(AuditableEntity.RecordedAt));
         }
+
+        // Names and free text are stored encrypted (BUD-166): this widens their columns and adds the converter.
+        builder.ApplyEncryption();
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

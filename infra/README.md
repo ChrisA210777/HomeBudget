@@ -8,7 +8,7 @@
 | Azure SQL database | Free offer (serverless), pauses for the rest of the month if the free allowance runs out | £0 |
 | Log Analytics + Application Insights | Pay as you go, capped at 0.1 GB a day | £0 (within the free allowance) |
 | User-assigned managed identity | | £0 |
-| Key Vault (BUD-147) | Standard: no monthly fee, $0.03 per 10,000 operations; the app reads two secrets about once a day | £0 (well under 1p a month) |
+| Key Vault (BUD-147) | Standard: no monthly fee, $0.03 per 10,000 operations; the app reads three secrets about once a day. Purge protection on (BUD-166) | £0 (well under 1p a month) |
 | Budget | £1 a month, emails on any spend | £0 |
 | SQL auditing (BUD-165) | Server audit to the Log Analytics workspace above; the app's own queries are left out | £0 (a few MB a month, within the cap and free allowance) |
 | Action group + activity log alert (BUD-165) | Emails the budget contacts when the database's admin changes | £0 (activity log alerts and the first 1,000 emails a month are free) |
@@ -62,6 +62,19 @@ The deploy identity can't read the secrets itself. It can deploy code that runs 
 
    Until they're set, signing in fails. To change a secret later (e.g. when it expires), set it again and restart the app.
 
+   **The data encryption key** (BUD-166). Names and free text are stored encrypted with a key that only exists here and
+   in your password manager. Create it once (the app won't start without it):
+
+   ```bash
+   KEY=$(openssl rand -base64 32)
+   az keyvault secret set --vault-name "$VAULT" --name data-encryption-key --value "$KEY" --output none
+   echo "$KEY"   # copy it into your password manager now, then run: clear
+   ```
+
+   **Never change or delete this secret.** If it's lost, everyone's names, notes and history can't be read again, and the
+   database backups can't help, because they're encrypted with it too. The vault keeps deleted secrets for 7 days and
+   purge protection stops them being destroyed sooner, but the copy in your password manager is the real backup.
+
 6. **Sign-in redirect.** In the Entra app registration, go to **Authentication** and add `https://<that address>/signin-microsoft` as a Web redirect URI. For Google, add `https://<that address>/signin-google` to the OAuth client's redirect URIs.
 
 ## Moving an existing environment's secrets to Key Vault (BUD-147, once)
@@ -79,7 +92,14 @@ If Dev was set up before Key Vault:
 - **The database's free allowance** is 100,000 vCore-seconds a month. If it runs out, the database pauses until the 1st (by design, so it can't cost anything); the app shows an error until then. Usage is under the database's **Free amount remaining** metric in the portal.
 - **Upgrading** is a parameter change: set `appServiceSku` to `B1` (Always On, no sleeping) or `S1` (deployment slots).
 - **Key Vault references** are read when the app starts and about once a day after. After changing a secret, restart the app. If a reference can't be read, the app gets the reference text instead of the secret and signing in fails: check the app's **Environment variables** page, where each Key Vault reference shows whether it resolved.
-- **Deleted secrets** are kept for 7 days (soft delete) and can be recovered in that time.
+- **Deleted secrets** are kept for 7 days (soft delete) and can be recovered in that time. Purge protection (BUD-166) means
+  they can't be destroyed sooner, and can't be turned off.
+- **Encrypted data (BUD-166).** Names, notes, references, history and recent activity are encrypted by the app before
+  they reach the database, with the `data-encryption-key` secret. Rows saved before that are encrypted when the app
+  starts. If the app won't start after a deploy, check the web app's **Environment variables** page: `Encryption__Key`
+  must show its Key Vault reference as resolved. To restore the key from your password manager, set the secret again with
+  the same value and restart the app. Changing to a new key needs the old one listed in `Encryption__PreviousKeys__0` and
+  isn't automated yet.
 - **Looking at the data:** the database's Entra admin is the GitHub identity. To query it yourself in the portal's Query editor, temporarily set yourself as admin under the SQL server's **Microsoft Entra ID** page. That sends an alert email (BUD-165), and everything you run is recorded in the SQL audit; the next deploy sets
   the admin back. Only do it when you need to, e.g. to look into a reported problem (ADR-017).
 - **SQL audit:** sign-ins and statements from anyone but the app's identity are kept for 30 days in Log Analytics. Query

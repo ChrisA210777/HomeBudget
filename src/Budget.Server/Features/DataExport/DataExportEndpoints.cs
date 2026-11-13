@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Budget.Domain.Households;
@@ -159,7 +159,8 @@ public static class DataExportEndpoints
                 Incomes = await db.IncomeStreams.CountAsync(i => i.HouseholdId == householdId),
                 Outgoings = await db.Outgoings.CountAsync(o => o.HouseholdId == householdId),
             },
-            PeopleKept = await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId != null).OrderBy(p => p.DisplayName).Select(p => p.DisplayName).ToListAsync(),
+            PeopleKept = (await db.People.Where(p => p.HouseholdId == householdId && p.LinkedUserId != null).Select(p => p.DisplayName).ToListAsync())
+                .Order(StringComparer.CurrentCultureIgnoreCase).ToList(),
         };
 
         static ImportProblem Problem(ExportProblem p) => new(p.Path, p.Message);
