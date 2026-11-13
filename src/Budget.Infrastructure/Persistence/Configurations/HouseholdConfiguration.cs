@@ -44,6 +44,7 @@ public sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Appl
     public void Configure(EntityTypeBuilder<ApplicationUser> builder)
     {
         builder.Property(u => u.DisplayName).HasMaxLength(ApplicationUser.DisplayNameMaxLength);
+        builder.Property(u => u.TermsAcceptedVersion).HasMaxLength(ApplicationUser.TermsVersionMaxLength);
 
         // No cascade in the database: clearing this when a household is deleted is done in code,
         // which avoids SQL Server's "multiple cascade paths" restriction.

@@ -76,4 +76,16 @@ public sealed class UserSession(IAccountApi accountApi)
         _currentUser = Task.FromResult<CurrentUserResponse?>(user with { Households = households });
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Records in the cached user that they've accepted the current terms (BUD-152), so the app stops asking.</summary>
+    public async Task SetTermsAcceptedAsync()
+    {
+        if (await GetCurrentUserAsync() is not { } user)
+        {
+            return;
+        }
+
+        _currentUser = Task.FromResult<CurrentUserResponse?>(user with { MustAcceptTerms = false });
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 }

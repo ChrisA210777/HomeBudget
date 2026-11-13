@@ -6,12 +6,14 @@ namespace Budget.Shared.Account;
 public sealed record AuthProvider(string Name, string DisplayName);
 
 /// <summary>The signed-in user and the households they belong to.</summary>
+/// <param name="MustAcceptTerms">They haven't accepted the current terms of use (BUD-152), so the app asks them to first.</param>
 public sealed record CurrentUserResponse(
     Guid Id,
     string DisplayName,
     string? Email,
     IReadOnlyList<HouseholdMembershipSummary> Households,
-    Guid? LastActiveHouseholdId);
+    Guid? LastActiveHouseholdId,
+    bool MustAcceptTerms = false);
 
 /// <summary>A household the user belongs to and their role in it.</summary>
 /// <param name="PersonId">The person in that household linked to the user's login, if any.</param>

@@ -1,0 +1,18 @@
+@* The heading of the privacy notice and terms (BUD-152): its version, and a note while the wording is a draft. *@
+
+<h1 class="mud-typography mud-typography-h4 mb-1">@Title</h1>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3" data-testid="legal-version">Version @Version</MudText>
+@if (LegalDocuments.IsDraft)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4" data-testid="legal-draft">
+        This is a draft that's still being reviewed. Details in [square brackets] haven't been decided yet.
+    </MudAlert>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Version { get; set; } = string.Empty;
+}

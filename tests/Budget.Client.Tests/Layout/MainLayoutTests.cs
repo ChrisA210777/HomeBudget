@@ -179,6 +179,44 @@ public sealed class MainLayoutTests : IDisposable
 #pragma warning restore MUD0012
     }
 
+    [Fact]
+    public void Someone_who_hasnt_accepted_the_terms_is_asked_to_first_then_brought_back()
+    {
+        _context.Services.AddSingleton<IAccountApi>(new FakeAccountApi(mustAcceptTerms: true));
+        var navigation = _context.Services.GetRequiredService<FakeNavigationManager>();
+        navigation.NavigateTo("/outgoings?view=year");
+
+        var cut = Render();
+
+        cut.WaitForAssertion(() => Assert.Equal("http://localhost/terms/accept?returnUrl=%2Foutgoings%3Fview%3Dyear", navigation.Uri));
+    }
+
+    [Theory]
+    [InlineData("/terms")]
+    [InlineData("/privacy")]
+    [InlineData("/settings")]
+    public void The_terms_privacy_notice_and_settings_open_without_accepting(string page)
+    {
+        _context.Services.AddSingleton<IAccountApi>(new FakeAccountApi(mustAcceptTerms: true));
+        var navigation = _context.Services.GetRequiredService<FakeNavigationManager>();
+        navigation.NavigateTo(page);
+
+        Render();
+
+        Assert.Equal("http://localhost" + page, navigation.Uri);
+    }
+
+    [Fact]
+    public void Someone_who_has_accepted_isnt_asked()
+    {
+        var navigation = _context.Services.GetRequiredService<FakeNavigationManager>();
+        navigation.NavigateTo("/outgoings");
+
+        Render();
+
+        Assert.Equal("http://localhost/outgoings", navigation.Uri);
+    }
+
     public void Dispose() => _context.Dispose();
 
     private static void OnlineProbe(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)

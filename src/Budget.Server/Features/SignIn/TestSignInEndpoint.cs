@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Budget.Domain.Households;
 using Budget.Infrastructure.Identity;
 using Budget.Infrastructure.Persistence;
+using Budget.Shared.Account;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,13 +32,15 @@ public static class TestSignInEndpoint
     /// Finds or creates the person (with their own household, as on a real first sign-in) and signs them in.
     /// With <paramref name="joinHouseholdOf"/>, they're also added to the household owned by that test person, with
     /// <paramref name="joinAs"/> (default User), and it becomes their active household. Until invitations exist
-    /// (BUD-23), this is how the tests get a household with several members.
+    /// (BUD-23), this is how the tests get a household with several members. They've accepted the terms of use unless
+    /// <paramref name="acceptTerms"/> is false.
     /// </summary>
     private static async Task<IResult> SignInAsync(
         string name,
         string? returnUrl,
         string? joinHouseholdOf,
         string? joinAs,
+        bool? acceptTerms,
         SignInManager<ApplicationUser> signInManager,
         ExternalUserProvisioner provisioner,
         BudgetDbContext db,
@@ -81,6 +84,15 @@ public static class TestSignInEndpoint
 
             var tracked = await db.Users.SingleAsync(u => u.Id == user.Id);
             tracked.LastActiveHouseholdId = household.Id;
+            await db.SaveChangesAsync();
+        }
+
+        // Test people have accepted the terms (BUD-152), unless a test is checking what happens when they haven't.
+        if (acceptTerms != false && user.TermsAcceptedVersion != LegalDocuments.TermsVersion)
+        {
+            var accepting = await db.Users.SingleAsync(u => u.Id == user.Id);
+            accepting.TermsAcceptedVersion = LegalDocuments.TermsVersion;
+            accepting.TermsAcceptedAt = clock.GetUtcNow();
             await db.SaveChangesAsync();
         }
 

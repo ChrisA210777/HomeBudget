@@ -1,0 +1,34 @@
+/* The privacy notice and terms (BUD-152): readable prose, with headings spaced like sections. */
+.legal ::deep h2 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin: 1.5rem 0 0.5rem;
+}
+
+.legal ::deep p,
+.legal ::deep li {
+    line-height: 1.6;
+}
+
+.legal ::deep ul {
+    padding-left: 1.25rem;
+    margin: 0 0 0.75rem;
+}
+
+.legal ::deep p {
+    margin: 0 0 0.75rem;
+}
+
+.legal ::deep table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 0.75rem;
+}
+
+.legal ::deep th,
+.legal ::deep td {
+    text-align: left;
+    vertical-align: top;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}

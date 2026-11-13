@@ -99,7 +99,7 @@
                 <li>shows "A former member" instead of your name in recent activity</li>
             </ul>
             <MudText Typo="Typo.body2" Class="mb-3">
-                This can't be undone. To keep a copy, download each household's data first from <MudLink Href="/household/data">Household data</MudLink>.
+                This can't be undone. To keep a copy, download each household's data first from <MudLink Underline="Underline.Always" Href="/household/data">Household data</MudLink>.
             </MudText>
             <MudTextField T="string" @bind-Value="_typed" Immediate="true" Label="@($"Type {DeleteAccountRequest.Expected} to confirm")" Variant="Variant.Outlined"
                           Margin="Margin.Dense" Class="mb-3" autocomplete="off" data-testid="delete-account-confirm" />

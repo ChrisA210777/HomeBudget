@@ -1,0 +1,11 @@
+@page "/terms"
+@attribute [AllowAnonymous]
+
+@* BUD-152. The wording is the draft on Confluence (Data Protection (UK GDPR) › Terms of Use), awaiting review. Change it there
+   first, then here, and bump LegalDocuments.TermsVersion: everyone is then asked to accept the new version. *@
+
+<PageTitle>Terms · Home Budget</PageTitle>
+
+<LegalPage Title="Terms of use" Version="@LegalDocuments.TermsVersion" Other="privacy notice" OtherHref="@LegalDocuments.PrivacyPath">
+    <TermsText />
+</LegalPage>

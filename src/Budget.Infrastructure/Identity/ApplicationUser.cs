@@ -31,6 +31,16 @@ public class ApplicationUser : IdentityUser<Guid>
 
     /// <summary>Whether Income shows a month or 12 months (BUD-80).</summary>
     public ListPeriod IncomePeriod { get; set; } = ListPeriod.Month;
+
+    // ---- Terms of use (BUD-152) ----
+
+    public const int TermsVersionMaxLength = 20;
+
+    /// <summary>The version of the terms of use the user last accepted; <c>null</c> until they've accepted any.</summary>
+    public string? TermsAcceptedVersion { get; set; }
+
+    /// <summary>When they accepted it.</summary>
+    public DateTimeOffset? TermsAcceptedAt { get; set; }
 }
 
 /// <summary>A month or 12 months.</summary>
