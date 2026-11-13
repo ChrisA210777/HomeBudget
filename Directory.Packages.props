@@ -24,7 +24,7 @@
     <!-- Redacting values marked as personal or secret in logs (BUD-146). -->
     <PackageVersion Include="Microsoft.Extensions.Compliance.Redaction" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Telemetry" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Telemetry.Abstractions" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Telemetry.Abstractions" Version="11.0.0" />
     <!-- Azure.Monitor.OpenTelemetry.AspNetCore 1.3.0 pulls in OpenTelemetry 1.12.0, which is affected by
          GHSA-g94r-2vxg-569j (CVE-2026-40894). Pin the core OpenTelemetry packages to the fixed release. -->
     <PackageVersion Include="OpenTelemetry" Version="1.15.3" />
