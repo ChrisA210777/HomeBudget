@@ -74,7 +74,7 @@ public sealed class HouseholdDataTests : IDisposable
 
         var cut = _context.RenderComponent<HouseholdData>();
 
-        var entries = cut.FindAll("[data-testid=download]");
+        var entries = cut.FindAll("[data-testid=download]").ToList();
         Assert.Equal(2, entries.Count);
         Assert.Equal("You", entries[0].QuerySelector("[data-testid=download-who]")!.TextContent);
         Assert.Contains("CSV for Excel, with full history and who recorded what", entries[0].TextContent, StringComparison.Ordinal);
