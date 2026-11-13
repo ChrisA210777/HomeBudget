@@ -130,6 +130,116 @@ resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   }
 }
 
+// ---- Database auditing (BUD-165, ADR-017) ------------------------------------------
+// Records who signs in to the database and what they run, except the app's own identity, so that any other access
+// (a person who made themselves admin, the deploy's migrations) is visible. Written to the Log Analytics workspace
+// above: free within its allowance and capped, and the volume is small because the app's routine queries are left out.
+
+// The extended settings are the ones that accept a filter (predicateExpression).
+resource sqlAudit 'Microsoft.Sql/servers/extendedAuditingSettings@2023-08-01-preview' = {
+  parent: sqlServer
+  name: 'default'
+  properties: {
+    state: 'Enabled'
+    isAzureMonitorTargetEnabled: true
+    auditActionsAndGroups: [
+      'BATCH_COMPLETED_GROUP'
+      'SUCCESSFUL_DATABASE_AUTHENTICATION_GROUP'
+      'FAILED_DATABASE_AUTHENTICATION_GROUP'
+      'DATABASE_PRINCIPAL_CHANGE_GROUP'
+      'DATABASE_ROLE_MEMBER_CHANGE_GROUP'
+      'DATABASE_PERMISSION_CHANGE_GROUP'
+    ]
+    // The app's database user is named after its identity (see the deploy's "Give the app access" step).
+    predicateExpression: 'database_principal_name <> \'${appIdentity.name}\''
+  }
+}
+
+// Server-level audit records are sent from the master database.
+resource masterDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' existing = {
+  parent: sqlServer
+  name: 'master'
+}
+
+resource sqlAuditToLogs 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  scope: masterDatabase
+  name: 'sql-audit'
+  properties: {
+    workspaceId: logs.id
+    logs: [
+      {
+        category: 'SQLSecurityAuditEvents'
+        enabled: true
+      }
+    ]
+  }
+  dependsOn: [
+    sqlAudit
+  ]
+}
+
+// ---- Alerts (BUD-165) --------------------------------------------------------------
+// Emails go to the budget contacts. Action group emails and activity log alerts are free.
+
+resource alertEmails 'Microsoft.Insights/actionGroups@2023-01-01' = {
+  name: 'ag-${name}'
+  location: 'global'
+  properties: {
+    groupShortName: 'homebudget'
+    enabled: true
+    emailReceivers: [for (email, i) in budgetContactEmails: {
+      name: 'email-${i}'
+      emailAddress: email
+      useCommonAlertSchema: true
+    }]
+  }
+}
+
+// Someone changed who is the database's admin, or turned off Entra-only sign-in, e.g. to look at the data. The deploy
+// sets the admin back through the server itself, which doesn't trigger this.
+resource sqlAdminChanged 'Microsoft.Insights/activityLogAlerts@2020-10-01' = {
+  name: 'alert-${name}-sql-admin-changed'
+  location: 'global'
+  properties: {
+    enabled: true
+    description: 'The SQL server\'s Entra admin or Entra-only setting was changed (ADR-017). Check who did it in the activity log, and what they ran in the SQL audit (Monitoring page).'
+    scopes: [
+      resourceGroup().id
+    ]
+    condition: {
+      allOf: [
+        {
+          field: 'category'
+          equals: 'Administrative'
+        }
+        {
+          anyOf: [
+            {
+              field: 'operationName'
+              equals: 'Microsoft.Sql/servers/administrators/write'
+            }
+            {
+              field: 'operationName'
+              equals: 'Microsoft.Sql/servers/administrators/delete'
+            }
+            {
+              field: 'operationName'
+              equals: 'Microsoft.Sql/servers/azureADOnlyAuthentications/write'
+            }
+          ]
+        }
+      ]
+    }
+    actions: {
+      actionGroups: [
+        {
+          actionGroupId: alertEmails.id
+        }
+      ]
+    }
+  }
+}
+
 // ---- Secrets (BUD-147) ----------------------------------------------------------
 // The sign-in client secrets live only here. They're set once by hand (infra/README.md), never by the deploy, and the
 // app reads them with its managed identity through Key Vault references. Access is by Azure RBAC.

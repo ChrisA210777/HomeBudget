@@ -10,6 +10,8 @@
 | User-assigned managed identity | | £0 |
 | Key Vault (BUD-147) | Standard: no monthly fee, $0.03 per 10,000 operations; the app reads two secrets about once a day | £0 (well under 1p a month) |
 | Budget | £1 a month, emails on any spend | £0 |
+| SQL auditing (BUD-165) | Server audit to the Log Analytics workspace above; the app's own queries are left out | £0 (a few MB a month, within the cap and free allowance) |
+| Action group + activity log alert (BUD-165) | Emails the budget contacts when the database's admin changes | £0 (activity log alerts and the first 1,000 emails a month are free) |
 
 The app reaches the database with its managed identity; there are no database passwords. The sign-in client secrets (Microsoft and Google) live only in Key Vault (BUD-147). You set them there once; the app reads them with its managed identity through Key Vault references, and the deploy never sees them. Access is by Azure roles:
 
@@ -78,4 +80,7 @@ If Dev was set up before Key Vault:
 - **Upgrading** is a parameter change: set `appServiceSku` to `B1` (Always On, no sleeping) or `S1` (deployment slots).
 - **Key Vault references** are read when the app starts and about once a day after. After changing a secret, restart the app. If a reference can't be read, the app gets the reference text instead of the secret and signing in fails: check the app's **Environment variables** page, where each Key Vault reference shows whether it resolved.
 - **Deleted secrets** are kept for 7 days (soft delete) and can be recovered in that time.
-- **Looking at the data:** the database's Entra admin is the GitHub identity. To query it yourself in the portal's Query editor, temporarily set yourself as admin under the SQL server's **Microsoft Entra ID** page.
+- **Looking at the data:** the database's Entra admin is the GitHub identity. To query it yourself in the portal's Query editor, temporarily set yourself as admin under the SQL server's **Microsoft Entra ID** page. That sends an alert email (BUD-165), and everything you run is recorded in the SQL audit; the next deploy sets
+  the admin back. Only do it when you need to, e.g. to look into a reported problem (ADR-017).
+- **SQL audit:** sign-ins and statements from anyone but the app's identity are kept for 30 days in Log Analytics. Query
+  `AzureDiagnostics | where Category == "SQLSecurityAuditEvents"` (see the Monitoring page in Confluence).
