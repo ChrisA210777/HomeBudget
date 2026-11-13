@@ -103,22 +103,36 @@ jobs:
           ./artifacts/efbundle --connection "Server=tcp:${{ steps.infra.outputs.sqlFqdn }},1433;Database=${{ steps.infra.outputs.database }};Authentication=Active Directory Default;Encrypt=True;Connect Timeout=180"
 
       - name: Give the app access to the database
+        env:
+          # Developer sign-ins only (the Azure CLI login above). Without this, sqlcmd first tries the runner's managed identity
+          # endpoint, which sometimes answers 401 and stops it trying anything else (BUD-168).
+          AZURE_TOKEN_CREDENTIALS: dev
+          # Pinned, not "latest" (BUD-160, BUD-168).
+          SQLCMD_VERSION: v1.10.0
         run: |
-          # From Microsoft's apt repository, or straight from the go-sqlcmd release if apt doesn't have it.
+          # From Microsoft's apt repository, or straight from the pinned go-sqlcmd release if apt doesn't have it.
           command -v sqlcmd >/dev/null \
             || { sudo apt-get update -q && sudo apt-get install -y -q sqlcmd; } \
-            || curl -fsSL https://github.com/microsoft/go-sqlcmd/releases/latest/download/sqlcmd-linux-amd64.tar.bz2 \
+            || curl -fsSL "https://github.com/microsoft/go-sqlcmd/releases/download/$SQLCMD_VERSION/sqlcmd-linux-amd64.tar.bz2" \
                  | sudo tar -xj -C /usr/local/bin sqlcmd
           sqlcmd --version
           # The user is created from the identity's client id, so the server doesn't need directory access.
           sid=$(python3 -c "import uuid,sys; print('0x' + uuid.UUID(sys.argv[1]).bytes_le.hex().upper())" "${{ steps.infra.outputs.identityClientId }}")
           name="${{ steps.infra.outputs.identityName }}"
-          sqlcmd -S "tcp:${{ steps.infra.outputs.sqlFqdn }},1433" -d "${{ steps.infra.outputs.database }}" \
-            --authentication-method ActiveDirectoryDefault -l 180 -b -Q "
-              IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'$name')
-                CREATE USER [$name] WITH SID = $sid, TYPE = E;
-              ALTER ROLE db_datareader ADD MEMBER [$name];
-              ALTER ROLE db_datawriter ADD MEMBER [$name];"
+          # Tried a few times: signing in or reaching the waking free database can fail once.
+          for attempt in 1 2 3; do
+            if sqlcmd -S "tcp:${{ steps.infra.outputs.sqlFqdn }},1433" -d "${{ steps.infra.outputs.database }}" \
+              --authentication-method ActiveDirectoryDefault -l 180 -b -Q "
+                IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'$name')
+                  CREATE USER [$name] WITH SID = $sid, TYPE = E;
+                ALTER ROLE db_datareader ADD MEMBER [$name];
+                ALTER ROLE db_datawriter ADD MEMBER [$name];"; then
+              exit 0
+            fi
+            echo "Attempt $attempt failed"
+            sleep 20
+          done
+          exit 1
 
       - name: Close the database firewall again
         if: always() && steps.infra.outputs.sqlServer != ''
