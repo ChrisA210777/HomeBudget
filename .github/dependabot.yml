@@ -33,3 +33,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  # The end-to-end test tools (BUD-160). Versions are locked in tests/e2e/package-lock.json.
+  - package-ecosystem: npm
+    directory: /tests/e2e
+    schedule:
+      interval: weekly
+    groups:
+      e2e:
+        patterns:
+          - "*"

@@ -25,9 +25,12 @@ ASPNETCORE_ENVIRONMENT=Testing TestSignIn__Enabled=true Database__MigrateOnStart
 
 # in another terminal
 cd tests/e2e
-npm install
+npm ci                      # installs exactly what package-lock.json says
 npx playwright install chromium
 npx playwright test
 ```
 
 CI runs the same steps in the `e2e` job.
+
+The versions are locked in `package-lock.json` (BUD-160), and Dependabot proposes updates weekly. To change a version,
+edit `package.json` and run `npm install` to update the lockfile, then commit both.
