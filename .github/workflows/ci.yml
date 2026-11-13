@@ -23,9 +23,9 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results
           path: TestResults
@@ -69,7 +69,7 @@ jobs:
             --output artifacts/efbundle --force
 
       - name: Upload migration bundle
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: efbundle
           path: artifacts/efbundle
@@ -96,9 +96,9 @@ jobs:
     env:
       E2E_BASE_URL: https://localhost:7180
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -132,14 +132,15 @@ jobs:
           curl -sk -o /dev/null -w "/account/test-sign-in -> %{http_code}\n" "$E2E_BASE_URL/account/test-sign-in?name=Probe"
           curl -sk "$E2E_BASE_URL/" | head -c 3000
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
 
       - name: Install Playwright
         working-directory: tests/e2e
         run: |
-          npm install --no-audit --no-fund
+          # Exactly the versions in package-lock.json (BUD-160).
+          npm ci --no-audit --no-fund
           npx playwright install chromium
           # The system packages come from Ubuntu's mirrors, which are sometimes unreachable from GitHub's runners, and
           # apt can spend many minutes failing. Try twice, a few minutes each; if they still can't be fetched, carry on:
@@ -163,7 +164,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-report
           path: |
@@ -173,7 +174,7 @@ jobs:
 
       - name: Upload screenshots
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-screens
           path: tests/e2e/screens
@@ -202,9 +203,9 @@ jobs:
     env:
       APP_URL: https://localhost:7180
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -282,7 +283,7 @@ jobs:
 
       - name: Upload the ZAP report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: zap-report
           path: |
