@@ -20,11 +20,12 @@ concurrency:
 
 jobs:
   dev:
-    # After a successful CI run for a push to main, or when started by hand; skipped until Azure
-    # is set up (infra/README.md).
+    # After a successful CI run for a push to main, or when started by hand from main; skipped until
+    # Azure is set up (infra/README.md). The `dev` environment also only allows main (BUD-164), which is
+    # what actually stops another branch's copy of this file from using the deploy identity.
     if: >-
       vars.AZURE_CLIENT_ID != '' && (
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
     # Pinned: Microsoft's apt repository doesn't have sqlcmd for Ubuntu 26.04 yet.
     runs-on: ubuntu-24.04
