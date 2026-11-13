@@ -135,7 +135,8 @@ resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
 // (a person who made themselves admin, the deploy's migrations) is visible. Written to the Log Analytics workspace
 // above: free within its allowance and capped, and the volume is small because the app's routine queries are left out.
 
-resource sqlAudit 'Microsoft.Sql/servers/auditingSettings@2023-08-01-preview' = {
+// The extended settings are the ones that accept a filter (predicateExpression).
+resource sqlAudit 'Microsoft.Sql/servers/extendedAuditingSettings@2023-08-01-preview' = {
   parent: sqlServer
   name: 'default'
   properties: {
