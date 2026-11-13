@@ -139,7 +139,8 @@ jobs:
       - name: Install Playwright
         working-directory: tests/e2e
         run: |
-          npm install --no-audit --no-fund
+          # Exactly the versions in package-lock.json (BUD-160).
+          npm ci --no-audit --no-fund
           npx playwright install chromium
           # The system packages come from Ubuntu's mirrors, which are sometimes unreachable from GitHub's runners, and
           # apt can spend many minutes failing. Try twice, a few minutes each; if they still can't be fetched, carry on:
@@ -150,11 +151,6 @@ jobs:
             sleep 15
           done
           echo "::warning::Couldn't install Playwright's system packages; using what the runner already has"
-
-      # TEMPORARY (BUD-160): prints the lockfile npm just wrote, so it can be committed. Removed in the same PR.
-      - name: Print the e2e lockfile
-        working-directory: tests/e2e
-        run: echo "LOCKFILE-BASE64:$(gzip -9c package-lock.json | base64 -w0)"
 
       - name: Run end-to-end tests
         working-directory: tests/e2e
