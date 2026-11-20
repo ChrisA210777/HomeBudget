@@ -1,10 +1,11 @@
 using 'main.bicep'
 
-// The Dev environment: free tiers only (ADR-010). Values that differ per person come from the
+// The Dev environment (ADR-010), now on B1: its App Service plan is shared with Poker Manager (PMP-86, 20 Nov 2026),
+// which needs Always On. The database stays on the free offer. Values that differ per person come from the
 // deploy workflow's environment (GitHub repository variables). The sign-in secrets are in Key Vault (BUD-147).
 
 param environmentName = 'dev'
-param appServiceSku = 'F1'
+param appServiceSku = 'B1'
 param budgetAmount = 1
 param budgetStartDate = '2026-11-01'
 param budgetContactEmails = [readEnvironmentVariable('BUDGET_EMAIL', 'nobody@example.com')]
