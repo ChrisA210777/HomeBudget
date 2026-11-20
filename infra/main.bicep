@@ -1,5 +1,6 @@
 // Home Budget: one environment (BUD-9). Deployed by .github/workflows/deploy.yml.
-// See ADR-010: Dev runs entirely on free tiers (App Service F1, Azure SQL free offer).
+// See ADR-010: Dev started on free tiers (App Service F1, Azure SQL free offer). It's now on B1, shared with Poker
+// Manager (PMP-86), with a Basic database (BUD-170).
 
 targetScope = 'resourceGroup'
 
@@ -16,6 +17,13 @@ param location string = resourceGroup().location
 ])
 param appServiceSku string = 'F1'
 
+@description('Database tier. Free is the Azure SQL free offer: serverless, it pauses after an hour idle and takes about a minute to wake. Basic is 5 DTUs and 2 GB, never pauses, and costs about £4.50 a month (BUD-170).')
+@allowed([
+  'Free'
+  'Basic'
+])
+param databaseTier string = 'Free'
+
 @description('Object id of the identity that deploys (the GitHub Actions service principal). It becomes the database server\'s Entra admin, so the pipeline can run migrations.')
 param sqlAdminObjectId string
 
@@ -28,7 +36,7 @@ param microsoftClientId string = ''
 @description('Google OAuth client ID for "Sign in with Google" (ADR-015). Empty turns Google sign-in off. Its secret is in Key Vault (BUD-147).')
 param googleClientId string = ''
 
-@description('Monthly budget for this resource group, in the billing currency. Alerts go out as soon as anything is spent.')
+@description('Monthly budget for this resource group, in the billing currency. Alerts go out when spending goes over it or is forecast to.')
 param budgetAmount int = 1
 
 @description('First day of the month the budget starts (yyyy-MM-01). Fixed, because a budget\'s start date can\'t change.')
@@ -109,12 +117,11 @@ resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-prev
   }
 }
 
-// The Azure SQL free offer: 100,000 vCore-seconds and 32 GB a month at no cost. When the month's
-// allowance is used up the database pauses until the 1st rather than charging.
-resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
-  parent: sqlServer
-  name: databaseName
-  location: location
+// The Azure SQL free offer: 100,000 vCore-seconds and 32 GB a month at no cost. When the month's allowance is used up,
+// the database pauses until the 1st rather than charging. It also pauses after an hour idle, and the next visit waits
+// about a minute for it to wake, so Dev moved to Basic (BUD-170). Leaving the free offer needs useFreeLimit set to
+// false, and Basic's largest size is 2 GB.
+var freeDatabase = {
   sku: {
     name: 'GP_S_Gen5_2'
     tier: 'GeneralPurpose'
@@ -128,6 +135,27 @@ resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
     maxSizeBytes: 34359738368
     requestedBackupStorageRedundancy: 'Local'
   }
+}
+var basicDatabase = {
+  sku: {
+    name: 'Basic'
+    tier: 'Basic'
+    capacity: 5
+  }
+  properties: {
+    useFreeLimit: false
+    maxSizeBytes: 2147483648
+    requestedBackupStorageRedundancy: 'Local'
+  }
+}
+var databaseSettings = databaseTier == 'Basic' ? basicDatabase : freeDatabase
+
+resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+  parent: sqlServer
+  name: databaseName
+  location: location
+  sku: databaseSettings.sku
+  properties: databaseSettings.properties
 }
 
 // ---- Database auditing (BUD-165, ADR-017) ------------------------------------------
@@ -426,10 +454,10 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
       startDate: budgetStartDate
     }
     notifications: {
-      anySpend: {
+      overBudget: {
         enabled: true
         operator: 'GreaterThan'
-        threshold: 1
+        threshold: 100
         thresholdType: 'Actual'
         contactEmails: budgetContactEmails
       }

@@ -1,15 +1,15 @@
 # Azure hosting (BUD-9, BUD-11)
 
-`main.bicep` defines one environment. `dev.bicepparam` is the Dev environment, which runs entirely on free tiers (ADR-010):
+`main.bicep` defines one environment. `dev.bicepparam` is the Dev environment. It started on free tiers (ADR-010); since 20 Nov 2026 its plan is B1, shared with Poker Manager, and its database is Basic (BUD-170), so neither sleeps:
 
 | Resource | Tier | Cost |
 |---|---|---|
 | App Service plan + Linux web app | B1, Always On. The plan is shared with Poker Manager (PMP-86), whose web app runs on it too | about £10 a month for both apps |
-| Azure SQL database | Free offer (serverless), pauses for the rest of the month if the free allowance runs out | £0 |
+| Azure SQL database | Basic: 5 DTUs, 2 GB, never pauses, 7 days of point-in-time restore (BUD-170) | about £4.50 a month |
 | Log Analytics + Application Insights | Pay as you go, capped at 0.1 GB a day | £0 (within the free allowance) |
 | User-assigned managed identity | | £0 |
 | Key Vault (BUD-147) | Standard: no monthly fee, $0.03 per 10,000 operations; the app reads three secrets about once a day. Purge protection on (BUD-166) | £0 (well under 1p a month) |
-| Budget | £1 a month, emails on any spend | £0 |
+| Budget | £15 a month, emails when spending goes over it or is forecast to | £0 |
 | SQL auditing (BUD-165) | Server audit to the Log Analytics workspace above; the app's own queries are left out | £0 (a few MB a month, within the cap and free allowance) |
 | Action group + activity log alert (BUD-165) | Emails the budget contacts when the database's admin changes | £0 (activity log alerts and the first 1,000 emails a month are free) |
 
@@ -89,9 +89,8 @@ If Dev was set up before Key Vault:
 ## Things to know
 
 - **The plan is shared with Poker Manager** (decided 20 Nov 2026). Poker Manager's web app runs on `asp-homebudget-dev`, and its deploy identity may read and join this plan only. Don't set `appServiceSku` back to `F1` while it's there: Poker Manager runs with Always On, and its deploys refuse to run on a free plan. Changing the size changes it for both apps.
-- **The first visit after a quiet spell can be slow** (up to about a minute): the web app no longer sleeps (B1, Always On), but the free database still pauses when idle.
-- **The database's free allowance** is 100,000 vCore-seconds a month. If it runs out, the database pauses until the 1st (by design, so it can't cost anything); the app shows an error until then. Usage is under the database's **Free amount remaining** metric in the portal.
-- **Upgrading** is a parameter change: set `appServiceSku` to `B1` (Always On, no sleeping) or `S1` (deployment slots).
+- **The database is Basic** (BUD-170, about £4.50 a month), so the first visit after a quiet spell is quick. On the free offer (`databaseTier = 'Free'`) it paused after an hour idle and the next visit waited about a minute for it to wake; a longer pause delay wouldn't help, because the free allowance (100,000 vCore-seconds a month, about 55 hours awake) runs out and the database then pauses until the 1st. Basic's largest size is 2 GB; if the data grows towards that, move to S0.
+- **Upgrading** is a parameter change: set `appServiceSku` to `B1` (Always On, no sleeping) or `S1` (deployment slots), and `databaseTier` to `Basic`. The database changes tier online; connections drop for a moment at the end.
 - **Key Vault references** are read when the app starts and about once a day after. After changing a secret, restart the app. If a reference can't be read, the app gets the reference text instead of the secret and signing in fails: check the app's **Environment variables** page, where each Key Vault reference shows whether it resolved.
 - **Deleted secrets** are kept for 7 days (soft delete) and can be recovered in that time. Purge protection (BUD-166) means
   they can't be destroyed sooner, and can't be turned off.
